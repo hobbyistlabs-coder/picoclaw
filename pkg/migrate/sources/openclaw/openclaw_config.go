@@ -123,7 +123,6 @@ type OpenClawChannels struct {
 	Teams       *OpenClawTeamsConfig       `json:"msteams"`
 	IRC         *OpenClawIrcConfig         `json:"irc"`
 	Mattermost  *OpenClawMattermostConfig  `json:"mattermost"`
-	Feishu      *OpenClawFeishuConfig      `json:"feishu"`
 	IMessage    *OpenClawIMessageConfig    `json:"imessage"`
 	BlueBubbles *OpenClawBlueBubblesConfig `json:"bluebubbles"`
 	QQ          *OpenClawQQConfig          `json:"qq"`
@@ -221,17 +220,6 @@ type OpenClawMattermostConfig struct {
 	DmPolicy  *string  `json:"dmPolicy"`
 	AllowFrom []string `json:"allowFrom"`
 	Enabled   *bool    `json:"enabled"`
-}
-
-type OpenClawFeishuConfig struct {
-	AppID             *string  `json:"appId"`
-	AppSecret         *string  `json:"appSecret"`
-	Domain            *string  `json:"domain"`
-	DmPolicy          *string  `json:"dmPolicy"`
-	Enabled           *bool    `json:"enabled"`
-	VerificationToken *string  `json:"verificationToken"`
-	EncryptKey        *string  `json:"encryptKey"`
-	AllowFrom         []string `json:"allowFrom"`
 }
 
 type OpenClawIMessageConfig struct {
@@ -375,8 +363,6 @@ func (c *OpenClawConfig) IsChannelEnabled(name string) bool {
 		return c.Channels.Matrix == nil || c.Channels.Matrix.Enabled == nil || *c.Channels.Matrix.Enabled
 	case "whatsapp":
 		return c.Channels.WhatsApp == nil || c.Channels.WhatsApp.Enabled == nil || *c.Channels.WhatsApp.Enabled
-	case "feishu":
-		return c.Channels.Feishu == nil || c.Channels.Feishu.Enabled == nil || *c.Channels.Feishu.Enabled
 	default:
 		return false
 	}
@@ -405,11 +391,6 @@ func GetChannelAllowFrom(ch any) []string {
 		}
 		return c.AllowFrom
 	case *OpenClawWhatsAppConfig:
-		if c == nil {
-			return nil
-		}
-		return c.AllowFrom
-	case *OpenClawFeishuConfig:
 		if c == nil {
 			return nil
 		}
@@ -628,7 +609,6 @@ type PeerMatch struct {
 type ChannelsConfig struct {
 	WhatsApp WhatsAppConfig `json:"whatsapp"`
 	Telegram TelegramConfig `json:"telegram"`
-	Feishu   FeishuConfig   `json:"feishu"`
 	Discord  DiscordConfig  `json:"discord"`
 	MaixCam  MaixCamConfig  `json:"maixcam"`
 	QQ       QQConfig       `json:"qq"`
@@ -649,15 +629,6 @@ type TelegramConfig struct {
 	Token     string   `json:"token"`
 	Proxy     string   `json:"proxy"`
 	AllowFrom []string `json:"allow_from"`
-}
-
-type FeishuConfig struct {
-	Enabled           bool     `json:"enabled"`
-	AppID             string   `json:"app_id"`
-	AppSecret         string   `json:"app_secret"`
-	EncryptKey        string   `json:"encrypt_key"`
-	VerificationToken string   `json:"verification_token"`
-	AllowFrom         []string `json:"allow_from"`
 }
 
 type DiscordConfig struct {
@@ -819,26 +790,6 @@ func (c *OpenClawConfig) convertChannels(warnings *[]string) ChannelsConfig {
 		}
 		if c.Channels.WhatsApp.BridgeURL != nil {
 			channels.WhatsApp.BridgeURL = *c.Channels.WhatsApp.BridgeURL
-		}
-	}
-
-	if c.Channels.Feishu != nil {
-		enabled := c.Channels.Feishu.Enabled == nil || *c.Channels.Feishu.Enabled
-		channels.Feishu = FeishuConfig{
-			Enabled:   enabled,
-			AllowFrom: c.Channels.Feishu.AllowFrom,
-		}
-		if c.Channels.Feishu.AppID != nil {
-			channels.Feishu.AppID = *c.Channels.Feishu.AppID
-		}
-		if c.Channels.Feishu.AppSecret != nil {
-			channels.Feishu.AppSecret = *c.Channels.Feishu.AppSecret
-		}
-		if c.Channels.Feishu.EncryptKey != nil {
-			channels.Feishu.EncryptKey = *c.Channels.Feishu.EncryptKey
-		}
-		if c.Channels.Feishu.VerificationToken != nil {
-			channels.Feishu.VerificationToken = *c.Channels.Feishu.VerificationToken
 		}
 	}
 
@@ -1020,13 +971,6 @@ func (c ChannelsConfig) ToStandardChannels() config.ChannelsConfig {
 			Enabled: c.Telegram.Enabled,
 			Token:   c.Telegram.Token,
 			Proxy:   c.Telegram.Proxy,
-		},
-		Feishu: config.FeishuConfig{
-			Enabled:           c.Feishu.Enabled,
-			AppID:             c.Feishu.AppID,
-			AppSecret:         c.Feishu.AppSecret,
-			EncryptKey:        c.Feishu.EncryptKey,
-			VerificationToken: c.Feishu.VerificationToken,
 		},
 		Discord: config.DiscordConfig{
 			Enabled:     c.Discord.Enabled,

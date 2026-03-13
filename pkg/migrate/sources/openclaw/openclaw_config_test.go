@@ -198,12 +198,6 @@ func TestConvertToPicoClaw(t *testing.T) {
 				"enabled": true,
 				"bridgeUrl": "http://localhost:3000"
 			},
-			"feishu": {
-				"enabled": true,
-				"appId": "app-id",
-				"appSecret": "app-secret",
-				"allowFrom": ["user3"]
-			},
 			"signal": {
 				"enabled": true
 			}
@@ -268,10 +262,6 @@ func TestConvertToPicoClaw(t *testing.T) {
 
 	if picoCfg.Channels.WhatsApp.BridgeURL != "http://localhost:3000" {
 		t.Errorf("expected whatsapp bridge URL 'http://localhost:3000', got '%s'", picoCfg.Channels.WhatsApp.BridgeURL)
-	}
-
-	if picoCfg.Channels.Feishu.AppID != "app-id" {
-		t.Errorf("expected feishu app ID 'app-id', got '%s'", picoCfg.Channels.Feishu.AppID)
 	}
 
 	if len(picoCfg.ModelList) != 1 {

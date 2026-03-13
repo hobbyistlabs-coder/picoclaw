@@ -36,6 +36,13 @@ func DefaultConfig() *Config {
 				SummarizeMessageThreshold: 20,
 				SummarizeTokenPercent:     75,
 			},
+			List: []AgentConfig{
+				{
+					ID:        "the-clinician",
+					Name:      "Medical Persona",
+					Workspace: filepath.Join(homePath, "Obsidian_Vault", "Patients"),
+				},
+			},
 		},
 		Bindings: []AgentBinding{},
 		Session: SessionConfig{
@@ -58,14 +65,6 @@ func DefaultConfig() *Config {
 					Enabled: true,
 					Text:    "Thinking... 💭",
 				},
-			},
-			Feishu: FeishuConfig{
-				Enabled:           false,
-				AppID:             "",
-				AppSecret:         "",
-				EncryptKey:        "",
-				VerificationToken: "",
-				AllowFrom:         FlexibleStringSlice{},
 			},
 			Discord: DiscordConfig{
 				Enabled:     false,

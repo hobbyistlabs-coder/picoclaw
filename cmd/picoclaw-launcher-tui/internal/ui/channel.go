@@ -43,12 +43,6 @@ func (s *appState) buildChannelMenuItems() []MenuItem {
 			func() { s.push("channel-whatsapp", s.whatsappForm()) },
 		),
 		channelItem(
-			"Feishu",
-			"Feishu bot settings",
-			s.config.Channels.Feishu.Enabled,
-			func() { s.push("channel-feishu", s.feishuForm()) },
-		),
-		channelItem(
 			"DingTalk",
 			"DingTalk bot settings",
 			s.config.Channels.DingTalk.Enabled,
@@ -152,25 +146,6 @@ func (s *appState) whatsappForm() tview.Primitive {
 	form := baseChannelForm("WhatsApp", cfg.Enabled, s.makeChannelOnEnabled(&cfg.Enabled))
 	form.AddInputField("Bridge URL", cfg.BridgeURL, 128, nil, func(text string) {
 		cfg.BridgeURL = strings.TrimSpace(text)
-	})
-	addAllowFromField(form, &cfg.AllowFrom)
-	return wrapWithBack(form, s)
-}
-
-func (s *appState) feishuForm() tview.Primitive {
-	cfg := &s.config.Channels.Feishu
-	form := baseChannelForm("Feishu", cfg.Enabled, s.makeChannelOnEnabled(&cfg.Enabled))
-	form.AddInputField("App ID", cfg.AppID, 64, nil, func(text string) {
-		cfg.AppID = strings.TrimSpace(text)
-	})
-	form.AddInputField("App Secret", cfg.AppSecret, 128, nil, func(text string) {
-		cfg.AppSecret = strings.TrimSpace(text)
-	})
-	form.AddInputField("Encrypt Key", cfg.EncryptKey, 128, nil, func(text string) {
-		cfg.EncryptKey = strings.TrimSpace(text)
-	})
-	form.AddInputField("Verification Token", cfg.VerificationToken, 128, nil, func(text string) {
-		cfg.VerificationToken = strings.TrimSpace(text)
 	})
 	addAllowFromField(form, &cfg.AllowFrom)
 	return wrapWithBack(form, s)

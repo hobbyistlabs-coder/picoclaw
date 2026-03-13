@@ -30,7 +30,6 @@ import { gatewayAtom } from "@/store/gateway"
 const DEFAULT_VISIBLE_CHANNELS = 4
 const CHANNEL_IMPORTANCE_ORDER = [
   "discord",
-  "feishu",
   "telegram",
   "slack",
   "line",
@@ -48,19 +47,6 @@ const CHANNEL_IMPORTANCE_INDEX = new Map(
   CHANNEL_IMPORTANCE_ORDER.map((name, index) => [name, index]),
 )
 
-function IconLark({ className }: { className?: string }) {
-  return React.createElement("span", {
-    className,
-    "aria-hidden": "true",
-    style: {
-      display: "inline-block",
-      backgroundColor: "currentColor",
-      mask: "url(/lark.svg) center / contain no-repeat",
-      WebkitMask: "url(/lark.svg) center / contain no-repeat",
-    } as React.CSSProperties,
-  })
-}
-
 const CHANNEL_ICON_MAP: Record<
   string,
   React.ComponentType<{ className?: string }>
@@ -68,7 +54,6 @@ const CHANNEL_ICON_MAP: Record<
   telegram: IconBrandTelegram,
   discord: IconBrandDiscord,
   slack: IconBrandSlack,
-  feishu: IconLark,
   dingtalk: IconBrandDingtalk,
   line: IconBrandLine,
   qq: IconBrandQq,

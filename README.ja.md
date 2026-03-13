@@ -753,14 +753,6 @@ HEARTBEAT_OK 応答         ユーザーが直接結果を受け取る
     "whatsapp": {
       "enabled": false
     },
-    "feishu": {
-      "enabled": false,
-      "app_id": "cli_xxx",
-      "app_secret": "xxx",
-      "encrypt_key": "",
-      "verification_token": "",
-      "allow_from": []
-    }
   },
   "tools": {
     "web": {

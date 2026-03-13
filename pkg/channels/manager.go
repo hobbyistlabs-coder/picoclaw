@@ -248,10 +248,6 @@ func (m *Manager) initChannels() error {
 		}
 	}
 
-	if m.config.Channels.Feishu.Enabled {
-		m.initChannel("feishu", "Feishu")
-	}
-
 	if m.config.Channels.Discord.Enabled && m.config.Channels.Discord.Token != "" {
 		m.initChannel("discord", "Discord")
 	}
@@ -332,10 +328,11 @@ func (m *Manager) SetupHTTPServer(addr string, healthServer *health.Server) {
 	}
 
 	m.httpServer = &http.Server{
-		Addr:         addr,
-		Handler:      m.mux,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		Addr:              addr,
+		Handler:           m.mux,
+		ReadTimeout:       30 * time.Second,
+		ReadHeaderTimeout: 10 * time.Second,
+		WriteTimeout:      30 * time.Second,
 	}
 }
 

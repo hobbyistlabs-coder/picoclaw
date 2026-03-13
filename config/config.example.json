@@ -96,16 +96,6 @@
       "allow_from": [],
       "reasoning_channel_id": ""
     },
-    "feishu": {
-      "enabled": false,
-      "app_id": "",
-      "app_secret": "",
-      "encrypt_key": "",
-      "verification_token": "",
-      "allow_from": [],
-      "reasoning_channel_id": "",
-      "random_reaction_emoji": []
-    },
     "dingtalk": {
       "enabled": false,
       "client_id": "YOUR_CLIENT_ID",
