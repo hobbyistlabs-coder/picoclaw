@@ -3,7 +3,6 @@ package alpaca
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/alpacahq/alpaca-trade-api-go/v3/alpaca"
 	"github.com/alpacahq/alpaca-trade-api-go/v3/marketdata"
@@ -60,7 +59,7 @@ func (t *AlpacaTool) Parameters() map[string]any {
 func (t *AlpacaTool) Execute(ctx context.Context, args map[string]any) *tools.ToolResult {
 	action, ok := args["action"].(string)
 	if !ok {
-		return tools.ErrorResult("missing or invalid ction\ parameter")
+		return tools.ErrorResult("missing or invalid 'action' parameter")
 	}
 
 	if !ok {
@@ -92,7 +91,7 @@ func (t *AlpacaTool) getEquity() *tools.ToolResult {
 	if err != nil {
 		return tools.ErrorResult(fmt.Sprintf("failed to get account: %v", err))
 	}
-	return tools.TextResult(fmt.Sprintf("Account Equity: $%s", acct.Equity.String()))
+	return tools.UserResult(fmt.Sprintf("Account Equity: $%s", acct.Equity.String()))
 }
 
 func (t *AlpacaTool) getPrice(symbol string) *tools.ToolResult {
@@ -103,13 +102,13 @@ func (t *AlpacaTool) getPrice(symbol string) *tools.ToolResult {
 	if err != nil {
 		return tools.ErrorResult(fmt.Sprintf("failed to get latest trade for %s: %v", symbol, err))
 	}
-	return tools.TextResult(fmt.Sprintf("Latest price for %s: $%.2f", symbol, trade.Price))
+	return tools.UserResult(fmt.Sprintf("Latest price for %s: $%.2f", symbol, trade.Price))
 }
 
 func (t *AlpacaTool) getSMA(symbol string) *tools.ToolResult {
 	req := marketdata.GetBarsRequest{
 		TimeFrame: marketdata.OneDay,
-		Limit:     10, // 10-day simple moving average
+		TotalLimit:     10, // 10-day simple moving average
 	}
 	bars, err := t.marketData.GetBars(symbol, req)
 	if err != nil {
@@ -123,7 +122,7 @@ func (t *AlpacaTool) getSMA(symbol string) *tools.ToolResult {
 		sum += bar.Close
 	}
 	sma := sum / float64(len(bars))
-	return tools.TextResult(fmt.Sprintf("10-Day SMA for %s: $%.2f", symbol, sma))
+	return tools.UserResult(fmt.Sprintf("10-Day SMA for %s: $%.2f", symbol, sma))
 }
 func init() {
 	// tools.Register(&AlpacaTool{}) // We will register it manually where we have access to config.
