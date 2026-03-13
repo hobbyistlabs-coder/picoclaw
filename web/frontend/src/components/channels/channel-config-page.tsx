@@ -13,7 +13,6 @@ import {
 } from "@/api/channels"
 import { getChannelDisplayName } from "@/components/channels/channel-display-name"
 import { DiscordForm } from "@/components/channels/channel-forms/discord-form"
-import { FeishuForm } from "@/components/channels/channel-forms/feishu-form"
 import { GenericForm } from "@/components/channels/channel-forms/generic-form"
 import { SlackForm } from "@/components/channels/channel-forms/slack-form"
 import { TelegramForm } from "@/components/channels/channel-forms/telegram-form"
@@ -125,10 +124,6 @@ function isConfigured(
       return asString(config.token) !== ""
     case "slack":
       return asString(config.bot_token) !== ""
-    case "feishu":
-      return (
-        asString(config.app_id) !== "" && asString(config.app_secret) !== ""
-      )
     case "dingtalk":
       return (
         asString(config.client_id) !== "" &&
@@ -179,8 +174,6 @@ function getRequiredFieldKeys(channelName: string): string[] {
       return ["token"]
     case "slack":
       return ["bot_token"]
-    case "feishu":
-      return ["app_id", "app_secret"]
     case "dingtalk":
       return ["client_id", "client_secret"]
     case "line":
@@ -431,15 +424,6 @@ export function ChannelConfigPage({ channelName }: ChannelConfigPageProps) {
       case "slack":
         return (
           <SlackForm
-            config={editConfig}
-            onChange={handleChange}
-            isEdit={isEdit}
-            fieldErrors={fieldErrors}
-          />
-        )
-      case "feishu":
-        return (
-          <FeishuForm
             config={editConfig}
             onChange={handleChange}
             isEdit={isEdit}

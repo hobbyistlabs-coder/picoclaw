@@ -909,14 +909,6 @@ picoclaw agent -m "Ola, como vai?"
     "whatsapp": {
       "enabled": false
     },
-    "feishu": {
-      "enabled": false,
-      "app_id": "cli_xxx",
-      "app_secret": "xxx",
-      "encrypt_key": "",
-      "verification_token": "",
-      "allow_from": []
-    },
     "qq": {
       "enabled": false,
       "app_id": "",

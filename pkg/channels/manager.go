@@ -248,10 +248,6 @@ func (m *Manager) initChannels() error {
 		}
 	}
 
-	if m.config.Channels.Feishu.Enabled {
-		m.initChannel("feishu", "Feishu")
-	}
-
 	if m.config.Channels.Discord.Enabled && m.config.Channels.Discord.Token != "" {
 		m.initChannel("discord", "Discord")
 	}
