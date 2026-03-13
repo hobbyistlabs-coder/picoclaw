@@ -15,7 +15,6 @@ import (
 	"jane/pkg/channels"
 	_ "jane/pkg/channels/dingtalk"
 	_ "jane/pkg/channels/discord"
-	_ "jane/pkg/channels/feishu"
 	_ "jane/pkg/channels/irc"
 	_ "jane/pkg/channels/line"
 	_ "jane/pkg/channels/maixcam"

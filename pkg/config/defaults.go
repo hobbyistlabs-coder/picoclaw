@@ -59,14 +59,6 @@ func DefaultConfig() *Config {
 					Text:    "Thinking... 💭",
 				},
 			},
-			Feishu: FeishuConfig{
-				Enabled:           false,
-				AppID:             "",
-				AppSecret:         "",
-				EncryptKey:        "",
-				VerificationToken: "",
-				AllowFrom:         FlexibleStringSlice{},
-			},
 			Discord: DiscordConfig{
 				Enabled:     false,
 				Token:       "",

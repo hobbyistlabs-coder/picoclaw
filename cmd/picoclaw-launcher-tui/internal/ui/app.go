@@ -138,7 +138,6 @@ func (s *appState) countChannels() (enabled int, total int) {
 		c.QQ.Enabled,
 		c.MaixCam.Enabled,
 		c.WhatsApp.Enabled,
-		c.Feishu.Enabled,
 		c.DingTalk.Enabled,
 		c.Slack.Enabled,
 		c.Matrix.Enabled,
@@ -438,7 +437,7 @@ func (s *appState) isActiveModelValid() bool {
 func (s *appState) hasEnabledChannel() bool {
 	c := s.config.Channels
 	return c.Telegram.Enabled || c.Discord.Enabled || c.QQ.Enabled || c.MaixCam.Enabled ||
-		c.WhatsApp.Enabled || c.Feishu.Enabled || c.DingTalk.Enabled || c.Slack.Enabled ||
+		c.WhatsApp.Enabled || c.DingTalk.Enabled || c.Slack.Enabled ||
 		c.Matrix.Enabled || c.LINE.Enabled || c.OneBot.Enabled || c.WeCom.Enabled || c.WeComApp.Enabled
 }
 

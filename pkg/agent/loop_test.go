@@ -846,7 +846,6 @@ func TestTargetReasoningChannelID_AllChannels(t *testing.T) {
 	for name, id := range map[string]string{
 		"whatsapp":  "rid-whatsapp",
 		"telegram":  "rid-telegram",
-		"feishu":    "rid-feishu",
 		"discord":   "rid-discord",
 		"maixcam":   "rid-maixcam",
 		"qq":        "rid-qq",
@@ -866,7 +865,6 @@ func TestTargetReasoningChannelID_AllChannels(t *testing.T) {
 	}{
 		{channel: "whatsapp", wantID: "rid-whatsapp"},
 		{channel: "telegram", wantID: "rid-telegram"},
-		{channel: "feishu", wantID: "rid-feishu"},
 		{channel: "discord", wantID: "rid-discord"},
 		{channel: "maixcam", wantID: "rid-maixcam"},
 		{channel: "qq", wantID: "rid-qq"},

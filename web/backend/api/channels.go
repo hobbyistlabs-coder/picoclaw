@@ -15,7 +15,6 @@ var channelCatalog = []channelCatalogItem{
 	{Name: "telegram", ConfigKey: "telegram"},
 	{Name: "discord", ConfigKey: "discord"},
 	{Name: "slack", ConfigKey: "slack"},
-	{Name: "feishu", ConfigKey: "feishu"},
 	{Name: "dingtalk", ConfigKey: "dingtalk"},
 	{Name: "line", ConfigKey: "line"},
 	{Name: "qq", ConfigKey: "qq"},
