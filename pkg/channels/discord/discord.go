@@ -406,6 +406,8 @@ func (c *DiscordChannel) handleMessage(s *discordgo.Session, m *discordgo.Messag
 		return localPath // fallback
 	}
 
+	var contentBuilder strings.Builder
+	contentBuilder.WriteString(content)
 	for _, attachment := range m.Attachments {
 		isAudio := utils.IsAudioFile(attachment.Filename, attachment.ContentType)
 
@@ -413,21 +415,36 @@ func (c *DiscordChannel) handleMessage(s *discordgo.Session, m *discordgo.Messag
 			localPath := c.downloadAttachment(attachment.URL, attachment.Filename)
 			if localPath != "" {
 				mediaPaths = append(mediaPaths, storeMedia(localPath, attachment.Filename))
-				content = appendContent(content, fmt.Sprintf("[audio: %s]", attachment.Filename))
+				if contentBuilder.Len() > 0 {
+					contentBuilder.WriteByte('\n')
+				}
+				contentBuilder.WriteString("[audio: ")
+				contentBuilder.WriteString(attachment.Filename)
+				contentBuilder.WriteByte(']')
 			} else {
 				logger.WarnCF("discord", "Failed to download audio attachment", map[string]any{
 					"url":      attachment.URL,
 					"filename": attachment.Filename,
 				})
 				mediaPaths = append(mediaPaths, attachment.URL)
-				content = appendContent(content, fmt.Sprintf("[attachment: %s]", attachment.URL))
+				if contentBuilder.Len() > 0 {
+					contentBuilder.WriteByte('\n')
+				}
+				contentBuilder.WriteString("[attachment: ")
+				contentBuilder.WriteString(attachment.URL)
+				contentBuilder.WriteByte(']')
 			}
 		} else {
 			mediaPaths = append(mediaPaths, attachment.URL)
-			content = appendContent(content, fmt.Sprintf("[attachment: %s]", attachment.URL))
+			if contentBuilder.Len() > 0 {
+				contentBuilder.WriteByte('\n')
+			}
+			contentBuilder.WriteString("[attachment: ")
+			contentBuilder.WriteString(attachment.URL)
+			contentBuilder.WriteByte(']')
 		}
 	}
-
+	content = contentBuilder.String()
 	if content == "" && len(mediaPaths) == 0 {
 		return
 	}
@@ -600,7 +617,10 @@ func (c *DiscordChannel) resolveDiscordRefs(s *discordgo.Session, text string, g
 		if msg.Author != nil {
 			author = msg.Author.Username
 		}
-		fmt.Fprintf(&sb, "\n[linked message from %s]: %s", author, msg.Content)
+		sb.WriteString("\n[linked message from ")
+		sb.WriteString(author)
+		sb.WriteString("]: ")
+		sb.WriteString(msg.Content)
 	}
 
 	return sb.String()
