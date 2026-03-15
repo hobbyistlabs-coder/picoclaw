@@ -208,7 +208,8 @@ func RequestDeviceCode(cfg OAuthProviderConfig) (*DeviceCodeInfo, error) {
 		"client_id": cfg.ClientID,
 	})
 
-	resp, err := http.Post(
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Post(
 		cfg.Issuer+"/api/accounts/deviceauth/usercode",
 		"application/json",
 		strings.NewReader(string(reqBody)),
@@ -299,7 +300,8 @@ func LoginDeviceCode(cfg OAuthProviderConfig) (*AuthCredential, error) {
 		"client_id": cfg.ClientID,
 	})
 
-	resp, err := http.Post(
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Post(
 		cfg.Issuer+"/api/accounts/deviceauth/usercode",
 		"application/json",
 		strings.NewReader(string(reqBody)),
@@ -358,7 +360,8 @@ func pollDeviceCode(cfg OAuthProviderConfig, deviceAuthID, userCode string) (*Au
 		"user_code":      userCode,
 	})
 
-	resp, err := http.Post(
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Post(
 		cfg.Issuer+"/api/accounts/deviceauth/token",
 		"application/json",
 		strings.NewReader(string(reqBody)),
@@ -410,7 +413,8 @@ func RefreshAccessToken(cred *AuthCredential, cfg OAuthProviderConfig) (*AuthCre
 		tokenURL = cfg.TokenURL
 	}
 
-	resp, err := http.PostForm(tokenURL, data)
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.PostForm(tokenURL, data)
 	if err != nil {
 		return nil, fmt.Errorf("refreshing token: %w", err)
 	}
@@ -506,7 +510,8 @@ func ExchangeCodeForTokens(cfg OAuthProviderConfig, code, codeVerifier, redirect
 		provider = "google-antigravity"
 	}
 
-	resp, err := http.PostForm(tokenURL, data)
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.PostForm(tokenURL, data)
 	if err != nil {
 		return nil, fmt.Errorf("exchanging code for tokens: %w", err)
 	}
