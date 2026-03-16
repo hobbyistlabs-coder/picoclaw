@@ -58,7 +58,10 @@ func (al *AgentLoop) processMedicalRequest(
 	clonedAgent.Workspace = patientWorkspace
 
 	var finalResponse strings.Builder
-	finalResponse.WriteString(fmt.Sprintf("Clinician Agent initialized for patient: %s\n\n", targetPatient))
+	// Bolt: Using multiple direct WriteString calls instead of fmt.Sprintf to avoid formatting overhead
+	finalResponse.WriteString("Clinician Agent initialized for patient: ")
+	finalResponse.WriteString(targetPatient)
+	finalResponse.WriteString("\n\n")
 
 	// CoT State Machine variables
 	var currentContext string = opts.UserMessage
@@ -94,10 +97,16 @@ func (al *AgentLoop) processMedicalRequest(
 		}
 
 		// Accumulate result
-		finalResponse.WriteString(fmt.Sprintf("### [%s]\n%s\n\n", phase, phaseResult))
+		// Bolt: Using multiple direct WriteString calls instead of fmt.Sprintf to avoid formatting overhead
+		finalResponse.WriteString("### [")
+		finalResponse.WriteString(phase)
+		finalResponse.WriteString("]\n")
+		finalResponse.WriteString(phaseResult)
+		finalResponse.WriteString("\n\n")
 
 		// Pass result as context to next phase
-		currentContext = currentContext + "\n\n" + fmt.Sprintf("Result of %s:\n%s", phase, phaseResult)
+		// Bolt: Using string concatenation instead of fmt.Sprintf to avoid formatting overhead
+		currentContext = currentContext + "\n\nResult of " + phase + ":\n" + phaseResult
 
 		// Mandatory safety check abort
 		if phase == PhaseSafetyDisclaimers {
