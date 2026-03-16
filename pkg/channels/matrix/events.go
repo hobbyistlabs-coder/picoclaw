@@ -136,6 +136,13 @@ func (c *MatrixChannel) handleMessageEvent(ctx context.Context, evt *event.Event
 		"is_group":   fmt.Sprintf("%t", isGroup),
 		"sender_raw": senderID,
 	}
+
+	logger.DebugCF("matrix", "Received message", map[string]any{
+		"sender_id": senderID,
+		"room_id":   roomID,
+		"is_group":  isGroup,
+	})
+
 	if replyTo := msgEvt.GetRelatesTo().GetReplyTo(); replyTo != "" {
 		metadata["reply_to_msg_id"] = replyTo.String()
 	}

@@ -13,6 +13,7 @@ import (
 
 	"jane/pkg/bus"
 	"jane/pkg/channels"
+	"jane/pkg/logger"
 )
 
 func markdownToHTML(md string) string {
@@ -38,8 +39,16 @@ func (c *MatrixChannel) Send(ctx context.Context, msg bus.OutboundMessage) error
 
 	_, err := c.client.SendMessageEvent(ctx, roomID, event.EventMessage, c.messageContent(content))
 	if err != nil {
+		logger.ErrorCF("matrix", "Failed to send message", map[string]any{
+			"room_id": roomID.String(),
+			"error":   err.Error(),
+		})
 		return fmt.Errorf("matrix send: %w", channels.ErrTemporary)
 	}
+
+	logger.DebugCF("matrix", "Sent message", map[string]any{
+		"room_id": roomID.String(),
+	})
 	return nil
 }
 
@@ -93,5 +102,17 @@ func (c *MatrixChannel) EditMessage(ctx context.Context, chatID string, messageI
 	editContent.SetEdit(id.EventID(messageID))
 
 	_, err := c.client.SendMessageEvent(ctx, roomID, event.EventMessage, editContent)
+	if err != nil {
+		logger.ErrorCF("matrix", "Failed to edit message", map[string]any{
+			"room_id":    roomID.String(),
+			"message_id": messageID,
+			"error":      err.Error(),
+		})
+	} else {
+		logger.DebugCF("matrix", "Edited message", map[string]any{
+			"room_id":    roomID.String(),
+			"message_id": messageID,
+		})
+	}
 	return err
 }
