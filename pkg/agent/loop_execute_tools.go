@@ -37,6 +37,7 @@ func (al *AgentLoop) executeToolBatch(
 		wg.Add(1)
 		go func(idx int, tc providers.ToolCall) {
 			defer wg.Done()
+			toolStartTime := time.Now()
 
 			// Panic recovery for robust tool execution
 			defer func() {
@@ -114,6 +115,10 @@ func (al *AgentLoop) executeToolBatch(
 				opts.ChatID,
 				asyncCallback,
 			)
+
+			toolDuration := time.Since(toolStartTime)
+			metricAgentLoopToolExecutionDuration.Add(toolDuration.Milliseconds())
+
 			agentResults[idx].result = toolResult
 		}(i, tc)
 	}

@@ -7,6 +7,7 @@
 package agent
 
 import (
+	"expvar"
 	"sync"
 	"sync/atomic"
 
@@ -63,4 +64,11 @@ const (
 	metadataKeyTeamID         = "team_id"
 	metadataKeyParentPeerKind = "parent_peer_kind"
 	metadataKeyParentPeerID   = "parent_peer_id"
+)
+
+var (
+	metricAgentLoopIterations           = expvar.NewInt("agent_loop_iterations")
+	metricAgentLoopIterationDurationMs  = expvar.NewInt("agent_loop_iteration_duration_ms")
+	metricAgentLoopToolExecutionDuration= expvar.NewInt("agent_loop_tool_execution_duration_ms")
+	metricAgentLoopFailures             = expvar.NewInt("agent_loop_failures")
 )

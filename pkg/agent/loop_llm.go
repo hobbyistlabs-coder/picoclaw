@@ -214,13 +214,21 @@ func (al *AgentLoop) runLLMIteration(
 				"tools_json":    formatToolsForLog(providerToolDefs),
 			})
 
+		metricAgentLoopIterations.Add(1)
+		iterationStartTime := time.Now()
+
 		// Call LLM with fallback chain and retry logic
 		response, err := al.executeLLMWithRetry(
 			ctx, agent, opts, &messages,
 			providerToolDefs, activeCandidates,
 			activeModel, iteration,
 		)
+
+		iterationDuration := time.Since(iterationStartTime)
+		metricAgentLoopIterationDurationMs.Add(iterationDuration.Milliseconds())
+
 		if err != nil {
+			metricAgentLoopFailures.Add(1)
 			return "", iteration, err
 		}
 		go al.handleReasoning(
