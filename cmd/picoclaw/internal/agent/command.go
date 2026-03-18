@@ -26,5 +26,9 @@ func NewAgentCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&sessionKey, "session", "s", "cli:default", "Session key")
 	cmd.Flags().StringVarP(&model, "model", "", "", "Model to use")
 
+	cmd.AddCommand(NewCreateCommand())
+	cmd.AddCommand(NewAssignMCPCommand())
+	cmd.AddCommand(NewRemoveMCPCommand())
+
 	return cmd
 }
