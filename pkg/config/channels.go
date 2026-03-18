@@ -10,9 +10,10 @@ type ChannelsConfig struct {
 	Slack    SlackConfig    `json:"slack"`
 	Matrix   MatrixConfig   `json:"matrix"`
 	LINE     LINEConfig     `json:"line"`
-	OneBot   OneBotConfig   `json:"onebot"`
-	Pico     PicoConfig     `json:"pico"`
-	IRC      IRCConfig      `json:"irc"`
+	OneBot    OneBotConfig    `json:"onebot"`
+	Pico      PicoConfig      `json:"pico"`
+	IRC       IRCConfig       `json:"irc"`
+	GMessages GMessagesConfig `json:"gmessages"`
 }
 
 // GroupTriggerConfig controls when the bot responds in group chats.
@@ -175,4 +176,14 @@ type IRCConfig struct {
 	GroupTrigger       GroupTriggerConfig  `json:"group_trigger,omitempty"`
 	Typing             TypingConfig        `json:"typing,omitempty"`
 	ReasoningChannelID string              `json:"reasoning_channel_id"    env:"PICOCLAW_CHANNELS_IRC_REASONING_CHANNEL_ID"`
+}
+
+type GMessagesConfig struct {
+	Enabled            bool                `json:"enabled"                 env:"PICOCLAW_CHANNELS_GMESSAGES_ENABLED"`
+	DataDir            string              `json:"data_dir"                env:"PICOCLAW_CHANNELS_GMESSAGES_DATA_DIR"`
+	AllowFrom          FlexibleStringSlice `json:"allow_from"              env:"PICOCLAW_CHANNELS_GMESSAGES_ALLOW_FROM"`
+	GroupTrigger       GroupTriggerConfig  `json:"group_trigger,omitempty"`
+	Typing             TypingConfig        `json:"typing,omitempty"`
+	Placeholder        PlaceholderConfig   `json:"placeholder,omitempty"`
+	ReasoningChannelID string              `json:"reasoning_channel_id"    env:"PICOCLAW_CHANNELS_GMESSAGES_REASONING_CHANNEL_ID"`
 }
