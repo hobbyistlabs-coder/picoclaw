@@ -39,6 +39,7 @@ type AgentInstance struct {
 	Tools                     *tools.ToolRegistry
 	Subagents                 *config.SubagentsConfig
 	SkillsFilter              []string
+	MCPServers                []string
 	Candidates                []providers.FallbackCandidate
 
 	// Router is non-nil when model routing is configured and the light model
@@ -122,12 +123,14 @@ func NewAgentInstance(
 	agentName := ""
 	var subagents *config.SubagentsConfig
 	var skillsFilter []string
+	var mcpServers []string
 
 	if agentCfg != nil {
 		agentID = routing.NormalizeAgentID(agentCfg.ID)
 		agentName = agentCfg.Name
 		subagents = agentCfg.Subagents
 		skillsFilter = agentCfg.Skills
+		mcpServers = agentCfg.MCPServers
 	}
 
 	maxIter := defaults.MaxToolIterations
@@ -246,6 +249,7 @@ func NewAgentInstance(
 		Tools:                     toolsRegistry,
 		Subagents:                 subagents,
 		SkillsFilter:              skillsFilter,
+		MCPServers:                mcpServers,
 		Candidates:                candidates,
 		Router:                    router,
 		LightCandidates:           lightCandidates,

@@ -102,6 +102,20 @@ func (al *AgentLoop) ensureMCPInitialized(ctx context.Context) error {
 						continue
 					}
 
+					// Check if this agent explicitly restricts MCP servers
+					if agent != nil {
+						allowed := false
+						for _, allowedServer := range agent.MCPServers {
+							if allowedServer == serverName {
+								allowed = true
+								break
+							}
+						}
+						if !allowed {
+							continue // Skip registering this tool for this agent
+						}
+					}
+
 					mcpTool := tools.NewMCPTool(mcpManager, serverName, tool)
 
 					if al.cfg.Tools.MCP.Discovery.Enabled {
