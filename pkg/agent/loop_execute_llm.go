@@ -31,6 +31,29 @@ func (al *AgentLoop) executeLLMWithRetry(
 		"prompt_cache_key": agent.ID,
 	}
 
+	if opts.Stream {
+		llmOpts["stream_callback"] = func(ctx context.Context, chunk string, isReasoning bool) {
+			pubCtx, pubCancel := context.WithTimeout(ctx, 2*time.Second)
+			defer pubCancel()
+
+			if err := al.bus.PublishOutboundStream(pubCtx, bus.OutboundStreamMessage{
+				Channel:     opts.Channel,
+				ChatID:      opts.ChatID,
+				Content:     chunk,
+				IsReasoning: isReasoning,
+			}); err != nil {
+				// Don't log full timeout errors for every dropped streaming chunk to avoid log spam,
+				// just drop the chunk.
+				if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, bus.ErrBusClosed) {
+					logger.DebugCF("agent", "Failed to publish stream chunk", map[string]any{
+						"channel": opts.Channel,
+						"error":   err.Error(),
+					})
+				}
+			}
+		}
+	}
+
 	if agent.ThinkingLevel != ThinkingOff {
 		if tc, ok := agent.Provider.(providers.ThinkingCapable); ok && tc.SupportsThinking() {
 			llmOpts["thinking_level"] = string(agent.ThinkingLevel)

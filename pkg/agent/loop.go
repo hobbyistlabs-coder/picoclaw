@@ -53,6 +53,7 @@ type processOptions struct {
 	EnableSummary   bool     // Whether to trigger summarization
 	SendResponse    bool     // Whether to send response via bus
 	NoHistory       bool     // If true, don't load session history (for heartbeat)
+	Stream          bool     // Whether to stream LLM generation
 }
 
 const (

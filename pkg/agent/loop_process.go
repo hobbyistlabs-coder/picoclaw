@@ -134,6 +134,7 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 		DefaultResponse: defaultResponse,
 		EnableSummary:   true,
 		SendResponse:    false,
+		Stream:          true, // Hardcoded for Phase 1 streaming implementation
 	}
 
 	// Medical Persona specific routing interception

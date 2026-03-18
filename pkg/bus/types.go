@@ -36,6 +36,13 @@ type OutboundMessage struct {
 	ReplyToMessageID string `json:"reply_to_message_id,omitempty"`
 }
 
+type OutboundStreamMessage struct {
+	Channel     string `json:"channel"`
+	ChatID      string `json:"chat_id"`
+	Content     string `json:"content"`
+	IsReasoning bool   `json:"is_reasoning"`
+}
+
 // MediaPart describes a single media attachment to send.
 type MediaPart struct {
 	Type        string `json:"type"`                   // "image" | "audio" | "video" | "file"
