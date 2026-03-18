@@ -86,6 +86,11 @@ func (al *AgentLoop) runAgentLoop(
 		finalContent = opts.DefaultResponse
 	}
 
+	if finalContent == "__PENDING_APPROVAL__" {
+		// Stop processing, approval requested from the user.
+		return "", nil
+	}
+
 	// 5. Save final assistant message to session
 	agent.Sessions.AddMessage(opts.SessionKey, "assistant", finalContent)
 	agent.Sessions.Save(opts.SessionKey)
@@ -314,6 +319,48 @@ func (al *AgentLoop) runLLMIteration(
 
 		// Save assistant message with tool calls to session
 		agent.Sessions.AddFullMessage(opts.SessionKey, assistantMsg)
+
+		// Check if any tool requires human-in-the-loop approval
+		needsApproval := false
+		var approvalToolName string
+		for _, tc := range normalizedToolCalls {
+			if tool, ok := agent.Tools.Get(tc.Name); ok {
+				if tool.RequiresApproval() {
+					needsApproval = true
+					approvalToolName = tc.Name
+					break
+				}
+			}
+		}
+
+		if needsApproval {
+			logger.InfoCF("agent", "Tool execution requires approval, pausing loop",
+				map[string]any{
+					"agent_id": agent.ID,
+					"tool":     approvalToolName,
+				})
+
+			// Store pending state
+			al.pendingApprovals.Store(opts.SessionKey, pendingApprovalState{
+				SessionKey:          opts.SessionKey,
+				Agent:               agent,
+				Opts:                opts,
+				NormalizedToolCalls: normalizedToolCalls,
+				Messages:            &messages,
+				Iteration:           iteration,
+			})
+
+			// Send approval request to user
+			promptMsg := fmt.Sprintf("⚠️ Tool `%s` requires your approval to execute. Proceed? (Yes/No)", approvalToolName)
+			al.bus.PublishOutbound(ctx, bus.OutboundMessage{
+				Channel: opts.Channel,
+				ChatID:  opts.ChatID,
+				Content: promptMsg,
+			})
+
+			// Return special marker to pause iteration
+			return "__PENDING_APPROVAL__", iteration, nil
+		}
 
 		// Execute tool calls in parallel
 		agentResults := al.executeToolBatch(ctx, agent, opts, normalizedToolCalls, iteration)

@@ -364,6 +364,10 @@ func (m *mockCustomTool) Execute(ctx context.Context, args map[string]any) *tool
 	return tools.SilentResult("Custom tool executed")
 }
 
+func (m *mockCustomTool) RequiresApproval() bool {
+	return false
+}
+
 // testHelper executes a message and returns the response
 type testHelper struct {
 	al *AgentLoop

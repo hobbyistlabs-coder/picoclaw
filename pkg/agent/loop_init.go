@@ -48,14 +48,15 @@ func NewAgentLoop(
 	}
 
 	al := &AgentLoop{
-		bus:         msgBus,
-		cfg:         cfg,
-		registry:    registry,
-		state:       stateManager,
-		summarizing: sync.Map{},
-		summaryJobs: make(chan summaryJob, 100),
-		fallback:    fallbackChain,
-		cmdRegistry: commands.NewRegistry(commands.BuiltinDefinitions()),
+		bus:              msgBus,
+		cfg:              cfg,
+		registry:         registry,
+		state:            stateManager,
+		summarizing:      sync.Map{},
+		summaryJobs:      make(chan summaryJob, 100),
+		pendingApprovals: sync.Map{},
+		fallback:         fallbackChain,
+		cmdRegistry:      commands.NewRegistry(commands.BuiltinDefinitions()),
 	}
 
 	return al

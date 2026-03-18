@@ -168,3 +168,7 @@ func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) *tools
 		ForUser: result,
 	}
 }
+
+func (t *WebSearchTool) RequiresApproval() bool {
+	return false
+}

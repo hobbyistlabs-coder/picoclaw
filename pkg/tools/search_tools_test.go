@@ -337,3 +337,7 @@ func TestPromoteTools_ConcurrentWithTickTTL(t *testing.T) {
 	}
 	<-done
 }
+
+func (t *mockSearchableTool) RequiresApproval() bool {
+	return false
+}

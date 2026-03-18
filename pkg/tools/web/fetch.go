@@ -216,3 +216,7 @@ func (t *WebFetchTool) extractText(htmlContent string) string {
 
 	return strings.Join(cleanLines, "\n")
 }
+
+func (t *WebFetchTool) RequiresApproval() bool {
+	return false
+}

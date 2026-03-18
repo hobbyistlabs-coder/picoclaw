@@ -14,6 +14,7 @@ import (
 	"jane/pkg/bus"
 	"jane/pkg/constants"
 	"jane/pkg/logger"
+	"jane/pkg/providers"
 	"jane/pkg/routing"
 	"jane/pkg/utils"
 )
@@ -114,6 +115,122 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 	// Resolve session key from route, while preserving explicit agent-scoped keys.
 	scopeKey := resolveScopeKey(route, msg.SessionKey)
 	sessionKey := scopeKey
+
+	// Check if this session has a pending human-in-the-loop approval
+	if stateRaw, ok := al.pendingApprovals.Load(sessionKey); ok {
+		state := stateRaw.(pendingApprovalState)
+		content := strings.TrimSpace(strings.ToLower(msg.Content))
+
+		isYes := content == "yes" || content == "y" || content == "approve"
+		isNo := content == "no" || content == "n" || content == "deny"
+
+		if isYes || isNo {
+			// Valid response, consume the state
+			al.pendingApprovals.Delete(sessionKey)
+
+			// DO NOT add the user's message ("yes"/"no") to the session history.
+			// LLM APIs strictly enforce that an `assistant` message with tool calls must be
+			// immediately followed by `tool` role messages. Interleaving a `user` message
+			// will cause a 400 Bad Request error.
+
+			if isYes {
+				logger.InfoCF("agent", "User approved tool execution", map[string]any{"session_key": sessionKey})
+
+				// Execute the pending tools
+				agentResults := al.executeToolBatch(ctx, state.Agent, state.Opts, state.NormalizedToolCalls, state.Iteration)
+
+				// Process tool results similarly to runLLMIteration
+				for _, r := range agentResults {
+					if !r.result.Silent && r.result.ForUser != "" && state.Opts.SendResponse {
+						al.bus.PublishOutbound(ctx, bus.OutboundMessage{
+							Channel: state.Opts.Channel,
+							ChatID:  state.Opts.ChatID,
+							Content: r.result.ForUser,
+						})
+					}
+
+					if len(r.result.Media) > 0 {
+						parts := make([]bus.MediaPart, 0, len(r.result.Media))
+						for _, ref := range r.result.Media {
+							part := bus.MediaPart{Ref: ref}
+							if al.mediaStore != nil {
+								if _, meta, err := al.mediaStore.ResolveWithMeta(ref); err == nil {
+									part.Filename = meta.Filename
+									part.ContentType = meta.ContentType
+									part.Type = inferMediaType(meta.Filename, meta.ContentType)
+								}
+							}
+							parts = append(parts, part)
+						}
+						al.bus.PublishOutboundMedia(ctx, bus.OutboundMediaMessage{
+							Channel: state.Opts.Channel,
+							ChatID:  state.Opts.ChatID,
+							Parts:   parts,
+						})
+					}
+
+					contentForLLM := r.result.ForLLM
+					if contentForLLM == "" && r.result.Err != nil {
+						contentForLLM = r.result.Err.Error()
+					}
+
+					if r.result.IsError {
+						logger.ErrorCF("agent", "Tool execution failed", map[string]any{
+							"tool":           r.tc.Name,
+							"error":          contentForLLM,
+							"error_category": "logic_failure",
+						})
+					}
+
+					toolResultMsg := providers.Message{
+						Role:       "tool",
+						Content:    contentForLLM,
+						ToolCallID: r.tc.ID,
+					}
+
+					*state.Messages = append(*state.Messages, toolResultMsg)
+					state.Agent.Sessions.AddFullMessage(state.SessionKey, toolResultMsg)
+				}
+
+				state.Agent.Tools.TickTTL()
+			} else {
+				logger.InfoCF("agent", "User denied tool execution", map[string]any{"session_key": sessionKey})
+
+				for _, tc := range state.NormalizedToolCalls {
+					toolResultMsg := providers.Message{
+						Role:       "tool",
+						Content:    "User denied permission to execute this tool.",
+						ToolCallID: tc.ID,
+					}
+					*state.Messages = append(*state.Messages, toolResultMsg)
+					state.Agent.Sessions.AddFullMessage(state.SessionKey, toolResultMsg)
+				}
+			}
+
+			// Resume loop using runAgentLoop which continues until max iterations are reached
+
+			// Replace the state's opts.UserMessage with empty string because the user's approval message
+			// was just a confirmation of the tool, not a new query we want the LLM to process directly
+			// as a user turn before evaluating the tool result. The user message is already saved in history.
+			opts := state.Opts
+			opts.UserMessage = ""
+
+			// runAgentLoop expects to build context messages itself, but since we already appended
+			// the tool results, we need a way to pass them. Actually, runAgentLoop rebuilds messages from
+			// history. Since we called AddFullMessage on the session, runAgentLoop will naturally
+			// load the pending tool results we just injected into the session history.
+			return al.runAgentLoop(ctx, state.Agent, opts)
+		} else {
+			// Invalid response, remind user
+			remindMsg := "⚠️ Awaiting approval. Please reply 'Yes' to execute or 'No' to cancel."
+			al.bus.PublishOutbound(ctx, bus.OutboundMessage{
+				Channel: msg.Channel,
+				ChatID:  msg.ChatID,
+				Content: remindMsg,
+			})
+			return "", nil
+		}
+	}
 
 	logger.InfoCF("agent", "Routed message",
 		map[string]any{
