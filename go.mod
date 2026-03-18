@@ -29,6 +29,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/tencent-connect/botgo v0.2.1
 	github.com/traefik/yaegi v0.16.1
+	go.mau.fi/mautrix-gmessages v0.0.0-00010101000000-000000000000
 	go.mau.fi/whatsmeow v0.0.0-20260219150138-7ae702b1eed4
 	golang.org/x/oauth2 v0.35.0
 	golang.org/x/time v0.14.0
@@ -104,3 +105,5 @@ require (
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 )
+
+replace go.mau.fi/mautrix-gmessages => github.com/MaxGhenis/gmessages v0.2602.1-0.20260302032635-a6d7f9898a99
