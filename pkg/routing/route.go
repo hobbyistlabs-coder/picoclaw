@@ -121,8 +121,8 @@ func (r *RouteResolver) ResolveRoute(input RouteInput) ResolvedRoute {
 func (r *RouteResolver) filterBindings(channel, accountID string) []config.AgentBinding {
 	var filtered []config.AgentBinding
 	for _, b := range r.cfg.Bindings {
-		matchChannel := strings.ToLower(strings.TrimSpace(b.Match.Channel))
-		if matchChannel == "" || matchChannel != channel {
+		matchChannel := strings.TrimSpace(b.Match.Channel)
+		if matchChannel == "" || !strings.EqualFold(matchChannel, channel) {
 			continue
 		}
 		if !matchesAccountID(b.Match.AccountID, accountID) {
@@ -141,7 +141,7 @@ func matchesAccountID(matchAccountID, actual string) bool {
 	if trimmed == "*" {
 		return true
 	}
-	return strings.ToLower(trimmed) == strings.ToLower(actual)
+	return strings.EqualFold(trimmed, actual)
 }
 
 func (r *RouteResolver) findPeerMatch(bindings []config.AgentBinding, peer *RoutePeer) *config.AgentBinding {
@@ -150,12 +150,12 @@ func (r *RouteResolver) findPeerMatch(bindings []config.AgentBinding, peer *Rout
 		if b.Match.Peer == nil {
 			continue
 		}
-		peerKind := strings.ToLower(strings.TrimSpace(b.Match.Peer.Kind))
+		peerKind := strings.TrimSpace(b.Match.Peer.Kind)
 		peerID := strings.TrimSpace(b.Match.Peer.ID)
 		if peerKind == "" || peerID == "" {
 			continue
 		}
-		if peerKind == strings.ToLower(peer.Kind) && peerID == peer.ID {
+		if strings.EqualFold(peerKind, peer.Kind) && peerID == peer.ID {
 			return b
 		}
 	}
