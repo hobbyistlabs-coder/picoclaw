@@ -69,12 +69,18 @@ func (al *AgentLoop) runAgentLoop(
 	// 2. Save user message to session
 	agent.Sessions.AddMessage(opts.SessionKey, "user", opts.UserMessage)
 
+	logger.LogSessionEvent(al.cfg.WorkspacePath(), opts.SessionKey, "state_transition", logger.ErrorCategoryNone, map[string]any{
+		"from_state": "start",
+		"to_state":   "running_llm",
+	}, "")
+
 	// 3. Run LLM iteration loop
 	startTime := time.Now()
 	finalContent, iteration, err := al.runLLMIteration(ctx, agent, messages, opts)
 	metricsIterationDuration.Add(time.Since(startTime).Seconds())
 	if err != nil {
 		metricsFailureCounts.Add(1)
+		logger.LogSessionEvent(al.cfg.WorkspacePath(), opts.SessionKey, "error", logger.ErrorCategoryLogicFailure, nil, err.Error())
 		return "", err
 	}
 
@@ -90,10 +96,20 @@ func (al *AgentLoop) runAgentLoop(
 	agent.Sessions.AddMessage(opts.SessionKey, "assistant", finalContent)
 	agent.Sessions.Save(opts.SessionKey)
 
+	logger.LogSessionEvent(al.cfg.WorkspacePath(), opts.SessionKey, "state_transition", logger.ErrorCategoryNone, map[string]any{
+		"from_state": "running_llm",
+		"to_state":   "summarizing",
+	}, "")
+
 	// 6. Optional: summarization
 	if opts.EnableSummary {
 		al.maybeSummarize(agent, opts.SessionKey, opts.Channel, opts.ChatID)
 	}
+
+	logger.LogSessionEvent(al.cfg.WorkspacePath(), opts.SessionKey, "state_transition", logger.ErrorCategoryNone, map[string]any{
+		"from_state": "summarizing",
+		"to_state":   "completed",
+	}, "")
 
 	// 7. Optional: send response via bus
 	if opts.SendResponse {
@@ -230,7 +246,15 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			logger.LogSessionEvent(al.cfg.WorkspacePath(), opts.SessionKey, "error", logger.ErrorCategoryModelFailure, nil, err.Error())
 			return "", iteration, err
+		}
+
+		if response.Content != "" || response.ReasoningContent != "" {
+			logger.LogSessionEvent(al.cfg.WorkspacePath(), opts.SessionKey, "cot", logger.ErrorCategoryNone, map[string]any{
+				"cot_text": response.ReasoningContent,
+				"content":  response.Content,
+			}, "")
 		}
 		go al.handleReasoning(
 			ctx,
@@ -273,6 +297,10 @@ func (al *AgentLoop) runLLMIteration(
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
+			logger.LogSessionEvent(al.cfg.WorkspacePath(), opts.SessionKey, "tool_call", logger.ErrorCategoryNone, map[string]any{
+				"tool_name": tc.Name,
+				"inputs":    tc.Arguments,
+			}, "")
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
