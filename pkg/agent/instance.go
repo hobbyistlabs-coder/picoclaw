@@ -110,6 +110,10 @@ func NewAgentInstance(
 		toolsRegistry.Register(tools.NewCalculatorTool())
 	}
 
+	if cfg.Tools.IsToolEnabled("timer") {
+		toolsRegistry.Register(tools.NewTimerTool())
+	}
+
 	sessionsDir := filepath.Join(workspace, "sessions")
 	sessions := initSessionStore(sessionsDir)
 

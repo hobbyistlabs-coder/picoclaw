@@ -520,6 +520,9 @@ func DefaultConfig() *Config {
 			GoEval: ToolConfig{
 				Enabled: true,
 			},
+			Timer: ToolConfig{
+				Enabled: true,
+			},
 		},
 		Heartbeat: HeartbeatConfig{
 			Enabled:  true,

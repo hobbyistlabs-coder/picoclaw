@@ -135,6 +135,7 @@ type ToolsConfig struct {
 	BrowserAction   ToolConfig         `json:"browser_action"                                           envPrefix:"PICOCLAW_TOOLS_BROWSER_ACTION_"`
 	GoEval          ToolConfig         `json:"go_eval"                                                  envPrefix:"PICOCLAW_TOOLS_GO_EVAL_"`
 	Calculator      ToolConfig         `json:"calculator"                                               envPrefix:"PICOCLAW_TOOLS_CALCULATOR_"`
+	Timer           ToolConfig         `json:"timer"                                                    envPrefix:"PICOCLAW_TOOLS_TIMER_"`
 }
 
 type SearchCacheConfig struct {
@@ -238,6 +239,8 @@ func (t *ToolsConfig) IsToolEnabled(name string) bool {
 		return t.MCP2Cli.Enabled
 	case "calculator":
 		return t.Calculator.Enabled
+	case "timer":
+		return t.Timer.Enabled
 	default:
 		return true
 	}
