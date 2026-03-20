@@ -30,6 +30,7 @@ import (
 	"jane/pkg/config"
 	"jane/pkg/cron"
 	"jane/pkg/devices"
+	"jane/pkg/etl"
 	"jane/pkg/health"
 	"jane/pkg/heartbeat"
 	"jane/pkg/logger"
@@ -191,6 +192,15 @@ func gatewayCmd(debug bool) error {
 	resourceTracker.Start(ctx)
 	fmt.Println("✓ Resource tracker started")
 
+	// Start ETL pipeline
+	etlLogPath := filepath.Join(cfg.WorkspacePath(), "logs", "etl", "system_metrics.jsonl")
+	etlPipeline := etl.NewPipeline(1*time.Minute, etlLogPath)
+	if err := etlPipeline.Start(ctx); err != nil {
+		fmt.Printf("Error starting ETL pipeline: %v\n", err)
+	} else {
+		fmt.Println("✓ ETL pipeline started")
+	}
+
 	if err := channelManager.StartAll(ctx); err != nil {
 		fmt.Printf("Error starting channels: %v\n", err)
 		return err
@@ -221,6 +231,7 @@ func gatewayCmd(debug bool) error {
 	heartbeatService.Stop()
 	cronService.Stop()
 	resourceTracker.Stop()
+	etlPipeline.Stop()
 	mediaStore.Stop()
 	agentLoop.Stop()
 	agentLoop.Close()
