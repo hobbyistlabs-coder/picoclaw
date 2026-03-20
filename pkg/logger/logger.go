@@ -26,6 +26,7 @@ const (
 	ErrorCategoryModelFailure          ErrorCategory = "Model Failure"
 	ErrorCategoryInfrastructureFailure ErrorCategory = "Infrastructure Failure"
 	ErrorCategoryLogicFailure          ErrorCategory = "Logic Failure"
+	ErrorCategoryNone                  ErrorCategory = "None"
 )
 
 type LogLevel = zerolog.Level

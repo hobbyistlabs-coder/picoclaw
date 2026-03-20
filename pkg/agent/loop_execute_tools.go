@@ -56,6 +56,10 @@ func (al *AgentLoop) executeToolBatch(
 						ForLLM: errStr,
 						Err:    fmt.Errorf("%s", errStr),
 					}
+					logger.LogSessionEvent(al.cfg.WorkspacePath(), opts.SessionKey, "tool_result", logger.ErrorCategoryLogicFailure, map[string]any{
+						"tool_name": tc.Name,
+						"outputs":   errStr,
+					}, "")
 				}
 			}()
 
@@ -121,6 +125,11 @@ func (al *AgentLoop) executeToolBatch(
 				asyncCallback,
 			)
 			metricsToolExecutionDuration.Add(time.Since(startToolTime).Seconds())
+
+			logger.LogSessionEvent(al.cfg.WorkspacePath(), opts.SessionKey, "tool_result", logger.ErrorCategoryNone, map[string]any{
+				"tool_name": tc.Name,
+				"outputs":   toolResult.ForLLM,
+			}, "")
 			agentResults[idx].result = toolResult
 		}(i, tc)
 	}
