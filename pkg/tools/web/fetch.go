@@ -158,13 +158,22 @@ func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) *tools.
 			text = string(body)
 			extractor = "raw"
 		}
-	} else if strings.Contains(contentType, "text/html") || len(body) > 0 &&
-		(strings.HasPrefix(string(body), "<!DOCTYPE") || strings.HasPrefix(strings.ToLower(string(body)), "<html")) {
-		text = t.extractText(string(body))
-		extractor = "text"
 	} else {
-		text = string(body)
-		extractor = "raw"
+		// Bolt: Avoid full-body string casting and strings.ToLower allocations.
+		// Since we only need to check the prefix, we can safely check the first few bytes.
+		isHTML := strings.Contains(contentType, "text/html")
+		if !isHTML {
+			isHTML = (len(body) >= 9 && strings.EqualFold(string(body[:9]), "<!doctype")) ||
+				(len(body) >= 5 && strings.EqualFold(string(body[:5]), "<html"))
+		}
+
+		if isHTML {
+			text = t.extractText(string(body))
+			extractor = "text"
+		} else {
+			text = string(body)
+			extractor = "raw"
+		}
 	}
 
 	truncated := len(text) > maxChars
