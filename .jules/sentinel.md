@@ -12,3 +12,8 @@
 **Vulnerability:** The Pico WebSocket authentication handler was using standard string equality (`==`) to compare the provided bearer token against the configured secret token.
 **Learning:** String equality operators in Go return early as soon as a character mismatch is found. This allows an attacker to measure the time it takes for the server to reject the connection and iteratively guess the token character by character (a timing attack).
 **Prevention:** Always use `subtle.ConstantTimeCompare` from the `crypto/subtle` package when comparing secrets, tokens, passwords, or cryptographic signatures to ensure the comparison time depends only on the length of the secret, not the contents.
+
+## 2025-03-24 - [CRITICAL] Fix Timing Leak Vulnerability in Pico WebSocket Auth Length Check
+**Vulnerability:** Even when using `subtle.ConstantTimeCompare`, the Pico WebSocket authentication handler was leaking token lengths because `subtle.ConstantTimeCompare` in Go returns early when comparing slices of unequal length.
+**Learning:** Checking the length of an untrusted token and returning early before calling `subtle.ConstantTimeCompare` re-introduces a timing attack where an attacker can brute force the expected token's length.
+**Prevention:** When comparing tokens with `subtle.ConstantTimeCompare`, always check lengths first. If the lengths differ, execute a dummy comparison (e.g., comparing the expected token against itself) before returning false to ensure the response time remains constant regardless of the provided token's length.
