@@ -19,14 +19,17 @@ func IsAudioFile(filename, contentType string) bool {
 	audioExtensions := []string{".mp3", ".wav", ".ogg", ".m4a", ".flac", ".aac", ".wma"}
 	audioTypes := []string{"audio/", "application/ogg", "application/x-ogg"}
 
+	// Fast path optimization: lower-case once
+	lowerFilename := strings.ToLower(filename)
 	for _, ext := range audioExtensions {
-		if strings.HasSuffix(strings.ToLower(filename), ext) {
+		if strings.HasSuffix(lowerFilename, ext) {
 			return true
 		}
 	}
 
+	lowerContentType := strings.ToLower(contentType)
 	for _, audioType := range audioTypes {
-		if strings.HasPrefix(strings.ToLower(contentType), audioType) {
+		if strings.HasPrefix(lowerContentType, audioType) {
 			return true
 		}
 	}
