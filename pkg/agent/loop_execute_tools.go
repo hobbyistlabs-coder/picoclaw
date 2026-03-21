@@ -56,6 +56,16 @@ func (al *AgentLoop) executeToolBatch(
 						ForLLM: errStr,
 						Err:    fmt.Errorf("%s", errStr),
 					}
+					logger.LogSessionEvent(
+						agent.Workspace,
+						opts.SessionKey,
+						logger.EventTypeError,
+						logger.EventDetails{
+							ToolName: tc.Name,
+						},
+						logger.ErrorCategoryLogicFailure,
+						errStr,
+					)
 				}
 			}()
 
@@ -67,6 +77,25 @@ func (al *AgentLoop) executeToolBatch(
 					"tool":      tc.Name,
 					"iteration": iteration,
 				})
+
+			var inputsMap map[string]any
+			if tc.Arguments != nil {
+				inputsMap = tc.Arguments
+			} else {
+				inputsMap = make(map[string]any)
+			}
+
+			logger.LogSessionEvent(
+				agent.Workspace,
+				opts.SessionKey,
+				logger.EventTypeToolCall,
+				logger.EventDetails{
+					ToolName: tc.Name,
+					Inputs:   inputsMap,
+				},
+				"none",
+				"",
+			)
 
 			// Create async callback for tools that implement AsyncExecutor.
 			// When the background work completes, this publishes the result
@@ -122,6 +151,36 @@ func (al *AgentLoop) executeToolBatch(
 			)
 			metricsToolExecutionDuration.Add(time.Since(startToolTime).Seconds())
 			agentResults[idx].result = toolResult
+
+			// Log tool execution result
+			if toolResult.Err != nil {
+				logger.LogSessionEvent(
+					agent.Workspace,
+					opts.SessionKey,
+					logger.EventTypeError,
+					logger.EventDetails{
+						ToolName: tc.Name,
+					},
+					logger.ErrorCategoryLogicFailure,
+					toolResult.Err.Error(),
+				)
+			} else {
+				logger.LogSessionEvent(
+					agent.Workspace,
+					opts.SessionKey,
+					logger.EventTypeToolResult,
+					logger.EventDetails{
+						ToolName: tc.Name,
+						Outputs: map[string]any{
+							"for_llm":  toolResult.ForLLM,
+							"for_user": toolResult.ForUser,
+							"silent":   toolResult.Silent,
+						},
+					},
+					"none",
+					"",
+				)
+			}
 		}(i, tc)
 	}
 	wg.Wait()

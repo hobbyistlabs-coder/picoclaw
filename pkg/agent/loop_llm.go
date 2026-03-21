@@ -230,6 +230,15 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			// Categorize error as infrastructure failure since it failed the retry chain
+			logger.LogSessionEvent(
+				agent.Workspace,
+				opts.SessionKey,
+				logger.EventTypeError,
+				logger.EventDetails{},
+				logger.ErrorCategoryInfrastructureFailure,
+				err.Error(),
+			)
 			return "", iteration, err
 		}
 		go al.handleReasoning(
@@ -261,6 +270,17 @@ func (al *AgentLoop) runLLMIteration(
 					"iteration":     iteration,
 					"content_chars": len(finalContent),
 				})
+
+			logger.LogSessionEvent(
+				agent.Workspace,
+				opts.SessionKey,
+				logger.EventTypeCoT,
+				logger.EventDetails{
+					CoTText: finalContent,
+				},
+				"none",
+				"",
+			)
 			break
 		}
 
@@ -281,6 +301,17 @@ func (al *AgentLoop) runLLMIteration(
 				"count":     len(normalizedToolCalls),
 				"iteration": iteration,
 			})
+
+		logger.LogSessionEvent(
+			agent.Workspace,
+			opts.SessionKey,
+			logger.EventTypeCoT,
+			logger.EventDetails{
+				CoTText: response.ReasoningContent,
+			},
+			"none",
+			"",
+		)
 
 		// Build assistant message with tool calls
 		assistantMsg := providers.Message{
@@ -325,6 +356,18 @@ func (al *AgentLoop) runLLMIteration(
 		}
 
 		if requiresApproval {
+			logger.LogSessionEvent(
+				agent.Workspace,
+				opts.SessionKey,
+				logger.EventTypeStateTransition,
+				logger.EventDetails{
+					FromState: "generating",
+					ToState:   "pending_approval",
+				},
+				"none",
+				"",
+			)
+
 			logger.InfoCF("agent", "Tool execution paused for user approval", map[string]any{
 				"agent_id":    agent.ID,
 				"session_key": opts.SessionKey,
