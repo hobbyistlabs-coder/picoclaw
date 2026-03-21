@@ -282,6 +282,18 @@ func (al *AgentLoop) runLLMIteration(
 				"iteration": iteration,
 			})
 
+		// Log CoT event for Session Replay
+		if response.Content != "" || response.ReasoningContent != "" {
+			_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeCoT,
+				Details: &logger.EventDetails{
+					CoTText: response.ReasoningContent,
+					Outputs: response.Content,
+				},
+			})
+		}
+
 		// Build assistant message with tool calls
 		assistantMsg := providers.Message{
 			Role:             "assistant",
@@ -289,6 +301,16 @@ func (al *AgentLoop) runLLMIteration(
 			ReasoningContent: response.ReasoningContent,
 		}
 		for _, tc := range normalizedToolCalls {
+			// Log ToolCall event for Session Replay
+			_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeToolCall,
+				Details: &logger.EventDetails{
+					ToolName: tc.Name,
+					Inputs:   tc.Arguments,
+				},
+			})
+
 			argumentsJSON, _ := json.Marshal(tc.Arguments)
 			// Copy ExtraContent to ensure thought_signature is persisted for Gemini 3
 			extraContent := tc.ExtraContent
@@ -404,7 +426,11 @@ func (al *AgentLoop) runLLMIteration(
 				contentForLLM = r.result.Err.Error()
 			}
 
+			var errCategory logger.ReplayErrorCategory = logger.ReplayErrorNone
+			var errMsg string
 			if r.result.IsError {
+				errCategory = logger.ReplayErrorLogicFailure
+				errMsg = contentForLLM
 				logger.ErrorCF("agent", "Tool execution failed",
 					map[string]any{
 						"tool":           r.tc.Name,
@@ -412,6 +438,18 @@ func (al *AgentLoop) runLLMIteration(
 						"error_category": "logic_failure",
 					})
 			}
+
+			// Log ToolResult event for Session Replay
+			_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID:     opts.SessionKey,
+				EventType:     logger.EventTypeToolResult,
+				ErrorCategory: errCategory,
+				ErrorMessage:  errMsg,
+				Details: &logger.EventDetails{
+					ToolName: r.tc.Name,
+					Outputs:  contentForLLM,
+				},
+			})
 
 			toolResultMsg := providers.Message{
 				Role:       "tool",

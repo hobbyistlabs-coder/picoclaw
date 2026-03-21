@@ -172,6 +172,19 @@ func (al *AgentLoop) executeLLMWithRetry(
 			}
 		}
 
+		// Log Error event for Session Replay
+		var replayCategory logger.ReplayErrorCategory = logger.ReplayErrorInfrastructureFailure
+		if errorCategory == "model_failure" {
+			replayCategory = logger.ReplayErrorModelFailure
+		}
+
+		_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+			SessionID:     opts.SessionKey,
+			EventType:     logger.EventTypeError,
+			ErrorCategory: replayCategory,
+			ErrorMessage:  err.Error(),
+		})
+
 		logger.ErrorCF("agent", "LLM call failed",
 			map[string]any{
 				"agent_id":       agent.ID,
