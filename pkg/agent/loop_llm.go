@@ -239,6 +239,20 @@ func (al *AgentLoop) runLLMIteration(
 			al.targetReasoningChannelID(opts.Channel),
 		)
 
+		// Log CoT event if reasoning is present
+		if response.ReasoningContent != "" || response.Reasoning != "" {
+			reasoningStr := response.ReasoningContent
+			if reasoningStr == "" {
+				reasoningStr = response.Reasoning
+			}
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
+				EventType: "cot",
+				Details: logger.SessionEventDetails{
+					CoTText: reasoningStr,
+				},
+			})
+		}
+
 		logger.DebugCF("agent", "LLM response",
 			map[string]any{
 				"agent_id":       agent.ID,
@@ -309,6 +323,15 @@ func (al *AgentLoop) runLLMIteration(
 				ExtraContent:     extraContent,
 				ThoughtSignature: thoughtSignature,
 			})
+
+			// Log tool call event
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
+				EventType: "tool_call",
+				Details: logger.SessionEventDetails{
+					ToolName: tc.Name,
+					Inputs:   tc.Arguments,
+				},
+			})
 		}
 		messages = append(messages, assistantMsg)
 
@@ -328,6 +351,15 @@ func (al *AgentLoop) runLLMIteration(
 			logger.InfoCF("agent", "Tool execution paused for user approval", map[string]any{
 				"agent_id":    agent.ID,
 				"session_key": opts.SessionKey,
+			})
+
+			// Log state transition to pending_approval
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
+				EventType: "state_transition",
+				Details: logger.SessionEventDetails{
+					FromState: "generating",
+					ToState:   "pending_approval",
+				},
 			})
 
 			// Format approval message
