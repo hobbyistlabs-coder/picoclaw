@@ -4,7 +4,7 @@ This document tracks the tasks required to implement the "Ultimate Visibility" E
 
 ## 1. Extract (Ingestion & Telemetry Collection)
 
-- [ ] **Structured Logging:** Ensure `zerolog` is used consistently across the codebase for structured JSON logging. Add context to logs where missing (session IDs, tool inputs/outputs).
+- [x] **Structured Logging:** Ensure `zerolog` is used consistently across the codebase for structured JSON logging. Add context to logs where missing (session IDs, tool inputs/outputs).
 - [x] **Basic Metrics Implementation:** Introduce a metrics package (e.g., using `expvar` or a Prometheus client) to expose basic application metrics.
 - [x] **Goroutine Tracking:** Implement a metric to track the number of active Goroutines.
 - [x] **Memory Tracking:** Implement a metric to track heap allocation and GC pauses.
