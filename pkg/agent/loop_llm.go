@@ -69,17 +69,41 @@ func (al *AgentLoop) runAgentLoop(
 	// 2. Save user message to session
 	agent.Sessions.AddMessage(opts.SessionKey, "user", opts.UserMessage)
 
+	_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+		SessionID: opts.SessionKey,
+		EventType: logger.EventTypeStateTransition,
+		Details: logger.EventDetails{
+			FromState: "idle",
+			ToState:   "generating",
+		},
+	})
+
 	// 3. Run LLM iteration loop
 	startTime := time.Now()
 	finalContent, iteration, err := al.runLLMIteration(ctx, agent, messages, opts)
 	metricsIterationDuration.Add(time.Since(startTime).Seconds())
 	if err != nil {
 		metricsFailureCounts.Add(1)
+		_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+			SessionID:     opts.SessionKey,
+			EventType:     logger.EventTypeError,
+			ErrorCategory: logger.ReplayErrorCategoryInfrastructureFailure,
+			ErrorMessage:  err.Error(),
+		})
 		return "", err
 	}
 
 	// If last tool had ForUser content and we already sent it, we might not need to send final response
 	// This is controlled by the tool's Silent flag and ForUser content
+
+	_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+		SessionID: opts.SessionKey,
+		EventType: logger.EventTypeStateTransition,
+		Details: logger.EventDetails{
+			FromState: "generating",
+			ToState:   "idle",
+		},
+	})
 
 	// 4. Handle empty response
 	if finalContent == "" {
@@ -230,6 +254,12 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID:     opts.SessionKey,
+				EventType:     logger.EventTypeError,
+				ErrorCategory: logger.ReplayErrorCategoryInfrastructureFailure,
+				ErrorMessage:  err.Error(),
+			})
 			return "", iteration, err
 		}
 		go al.handleReasoning(
@@ -255,6 +285,17 @@ func (al *AgentLoop) runLLMIteration(
 			if finalContent == "" && response.ReasoningContent != "" {
 				finalContent = response.ReasoningContent
 			}
+
+			if finalContent != "" {
+				_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+					SessionID: opts.SessionKey,
+					EventType: logger.EventTypeCOT,
+					Details: logger.EventDetails{
+						CotText: finalContent,
+					},
+				})
+			}
+
 			logger.InfoCF("agent", "LLM response without tool calls (direct answer)",
 				map[string]any{
 					"agent_id":      agent.ID,
@@ -315,6 +356,27 @@ func (al *AgentLoop) runLLMIteration(
 		// Save assistant message with tool calls to session
 		agent.Sessions.AddFullMessage(opts.SessionKey, assistantMsg)
 
+		if assistantMsg.Content != "" || assistantMsg.ReasoningContent != "" {
+			_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeCOT,
+				Details: logger.EventDetails{
+					CotText: fmt.Sprintf("%s\n%s", assistantMsg.ReasoningContent, assistantMsg.Content),
+				},
+			})
+		}
+
+		for _, tc := range normalizedToolCalls {
+			_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeToolCall,
+				Details: logger.EventDetails{
+					ToolName: tc.Name,
+					Inputs:   tc.Arguments,
+				},
+			})
+		}
+
 		// --- HITL: Check if any tool requires human approval ---
 		requiresApproval := false
 		for _, tc := range normalizedToolCalls {
@@ -328,6 +390,15 @@ func (al *AgentLoop) runLLMIteration(
 			logger.InfoCF("agent", "Tool execution paused for user approval", map[string]any{
 				"agent_id":    agent.ID,
 				"session_key": opts.SessionKey,
+			})
+
+			_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeStateTransition,
+				Details: logger.EventDetails{
+					FromState: "executing_tools",
+					ToState:   "pending_approval",
+				},
 			})
 
 			// Format approval message
@@ -411,6 +482,15 @@ func (al *AgentLoop) runLLMIteration(
 						"error":          contentForLLM,
 						"error_category": "logic_failure",
 					})
+				_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+					SessionID:     opts.SessionKey,
+					EventType:     logger.EventTypeError,
+					ErrorCategory: logger.ReplayErrorCategoryLogicFailure,
+					ErrorMessage:  contentForLLM,
+					Details: logger.EventDetails{
+						ToolName: r.tc.Name,
+					},
+				})
 			}
 
 			toolResultMsg := providers.Message{
@@ -422,6 +502,18 @@ func (al *AgentLoop) runLLMIteration(
 
 			// Save tool result message to session
 			agent.Sessions.AddFullMessage(opts.SessionKey, toolResultMsg)
+
+			_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeToolResult,
+				Details: logger.EventDetails{
+					ToolName: r.tc.Name,
+					Outputs: map[string]any{
+						"for_llm":  contentForLLM,
+						"for_user": r.result.ForUser,
+					},
+				},
+			})
 		}
 
 		// Tick down TTL of discovered tools after processing tool results.

@@ -143,6 +143,15 @@ func (al *AgentLoop) executeLLMWithRetry(
 				},
 			)
 
+			_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeStateTransition,
+				Details: logger.EventDetails{
+					FromState: "generating",
+					ToState:   "compressing_context",
+				},
+			})
+
 			if retry == 0 && !constants.IsInternalChannel(opts.Channel) {
 				al.bus.PublishOutbound(ctx, bus.OutboundMessage{
 					Channel: opts.Channel,
@@ -159,6 +168,14 @@ func (al *AgentLoop) executeLLMWithRetry(
 				newHistory, newSummary, "",
 				nil, opts.Channel, opts.ChatID,
 			)
+			_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeStateTransition,
+				Details: logger.EventDetails{
+					FromState: "compressing_context",
+					ToState:   "generating",
+				},
+			})
 			continue
 		}
 		break
@@ -179,6 +196,19 @@ func (al *AgentLoop) executeLLMWithRetry(
 				"error":          err.Error(),
 				"error_category": errorCategory,
 			})
+		var cat logger.ReplayErrorCategory
+		switch errorCategory {
+		case "model_failure":
+			cat = logger.ReplayErrorCategoryModelFailure
+		default:
+			cat = logger.ReplayErrorCategoryInfrastructureFailure
+		}
+		_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+			SessionID:     opts.SessionKey,
+			EventType:     logger.EventTypeError,
+			ErrorCategory: cat,
+			ErrorMessage:  err.Error(),
+		})
 		return nil, fmt.Errorf("LLM call failed after retries: %w", err)
 	}
 

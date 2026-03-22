@@ -36,6 +36,15 @@ func (al *AgentLoop) executeToolBatch(
 	agentResults := make([]indexedAgentResult, len(normalizedToolCalls))
 	var wg sync.WaitGroup
 
+	_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+		SessionID: opts.SessionKey,
+		EventType: logger.EventTypeStateTransition,
+		Details: logger.EventDetails{
+			FromState: "generating",
+			ToState:   "executing_tools",
+		},
+	})
+
 	for i, tc := range normalizedToolCalls {
 		agentResults[i].tc = tc
 
@@ -56,6 +65,15 @@ func (al *AgentLoop) executeToolBatch(
 						ForLLM: errStr,
 						Err:    fmt.Errorf("%s", errStr),
 					}
+					_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+						SessionID:     opts.SessionKey,
+						EventType:     logger.EventTypeError,
+						ErrorCategory: logger.ReplayErrorCategoryLogicFailure,
+						ErrorMessage:  errStr,
+						Details: logger.EventDetails{
+							ToolName: tc.Name,
+						},
+					})
 				}
 			}()
 
@@ -125,6 +143,15 @@ func (al *AgentLoop) executeToolBatch(
 		}(i, tc)
 	}
 	wg.Wait()
+
+	_ = logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+		SessionID: opts.SessionKey,
+		EventType: logger.EventTypeStateTransition,
+		Details: logger.EventDetails{
+			FromState: "executing_tools",
+			ToState:   "generating",
+		},
+	})
 
 	return agentResults
 }
