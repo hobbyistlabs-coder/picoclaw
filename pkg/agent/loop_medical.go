@@ -101,8 +101,10 @@ func (al *AgentLoop) processMedicalRequest(
 
 		// Mandatory safety check abort
 		if phase == PhaseSafetyDisclaimers {
-			if strings.Contains(strings.ToLower(phaseResult), "life-threatening") ||
-				strings.Contains(strings.ToLower(phaseResult), "red flag") {
+			// ⚡ Bolt: Cache strings.ToLower(phaseResult) to avoid allocating a large string and passing over it twice.
+			lowerPhaseResult := strings.ToLower(phaseResult)
+			if strings.Contains(lowerPhaseResult, "life-threatening") ||
+				strings.Contains(lowerPhaseResult, "red flag") {
 				finalResponse.WriteString("\n⚠️ **RED FLAG DETECTED: This requires immediate emergency medical attention.**\n")
 			}
 		}
