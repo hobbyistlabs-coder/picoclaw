@@ -7,12 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"jane/pkg/logger"
 	"jane/pkg/providers/protocoltypes"
 )
 
@@ -66,7 +66,10 @@ func NewProvider(apiKey, apiBase, proxy string, opts ...Option) *Provider {
 				Proxy: http.ProxyURL(parsed),
 			}
 		} else {
-			log.Printf("openai_compat: invalid proxy URL %q: %v", proxy, err)
+			logger.WarnCF("openai_compat", "invalid proxy URL", map[string]any{
+				"proxy": proxy,
+				"error": err.Error(),
+			})
 		}
 	}
 
@@ -366,7 +369,10 @@ func decodeToolCallArguments(raw json.RawMessage, name string) map[string]any {
 
 	var decoded any
 	if err := json.Unmarshal(raw, &decoded); err != nil {
-		log.Printf("openai_compat: failed to decode tool call arguments payload for %q: %v", name, err)
+		logger.ErrorCF("openai_compat", "failed to decode tool call arguments payload", map[string]any{
+			"tool":  name,
+			"error": err.Error(),
+		})
 		arguments["raw"] = string(raw)
 		return arguments
 	}
@@ -377,14 +383,20 @@ func decodeToolCallArguments(raw json.RawMessage, name string) map[string]any {
 			return arguments
 		}
 		if err := json.Unmarshal([]byte(v), &arguments); err != nil {
-			log.Printf("openai_compat: failed to decode tool call arguments for %q: %v", name, err)
+			logger.ErrorCF("openai_compat", "failed to decode tool call arguments", map[string]any{
+				"tool":  name,
+				"error": err.Error(),
+			})
 			arguments["raw"] = v
 		}
 		return arguments
 	case map[string]any:
 		return v
 	default:
-		log.Printf("openai_compat: unsupported tool call arguments type for %q: %T", name, decoded)
+		logger.WarnCF("openai_compat", "unsupported tool call arguments type", map[string]any{
+			"tool": name,
+			"type": fmt.Sprintf("%T", decoded),
+		})
 		arguments["raw"] = string(raw)
 		return arguments
 	}

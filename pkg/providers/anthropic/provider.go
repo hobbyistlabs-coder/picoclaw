@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
+
+	"jane/pkg/logger"
 
 	"jane/pkg/providers/protocoltypes"
 )
@@ -252,7 +253,7 @@ func applyThinkingConfig(params *anthropic.MessageNewParams, level string) {
 	// Anthropic API rejects requests with temperature set alongside thinking.
 	// Reset to zero value (omitted from JSON serialization).
 	if params.Temperature.Valid() {
-		log.Printf("anthropic: temperature cleared because thinking is enabled (level=%s)", level)
+		logger.InfoCF("anthropic", "temperature cleared because thinking is enabled", map[string]any{"level": level})
 	}
 	params.Temperature = anthropic.MessageNewParams{}.Temperature
 
@@ -272,11 +273,16 @@ func applyThinkingConfig(params *anthropic.MessageNewParams, level string) {
 
 	// budget_tokens must be < max_tokens; clamp to respect user's max_tokens setting.
 	if budget >= params.MaxTokens {
-		log.Printf("anthropic: budget_tokens (%d) clamped to %d (max_tokens-1)", budget, params.MaxTokens-1)
+		logger.WarnCF("anthropic", "budget_tokens clamped to max_tokens-1", map[string]any{
+			"budget":     budget,
+			"max_tokens": params.MaxTokens,
+		})
 		budget = params.MaxTokens - 1
 	} else if budget > params.MaxTokens*80/100 {
-		log.Printf("anthropic: thinking budget (%d) exceeds 80%% of max_tokens (%d), output may be truncated",
-			budget, params.MaxTokens)
+		logger.WarnCF("anthropic", "thinking budget exceeds 80% of max_tokens, output may be truncated", map[string]any{
+			"budget":     budget,
+			"max_tokens": params.MaxTokens,
+		})
 	}
 	params.Thinking = anthropic.ThinkingConfigParamOfEnabled(budget)
 }
@@ -348,7 +354,10 @@ func parseResponse(resp *anthropic.Message) *LLMResponse {
 			tu := block.AsToolUse()
 			var args map[string]any
 			if err := json.Unmarshal(tu.Input, &args); err != nil {
-				log.Printf("anthropic: failed to decode tool call input for %q: %v", tu.Name, err)
+				logger.ErrorCF("anthropic", "failed to decode tool call input", map[string]any{
+					"tool":  tu.Name,
+					"error": err.Error(),
+				})
 				args = map[string]any{"raw": string(tu.Input)}
 			}
 			toolCalls = append(toolCalls, ToolCall{

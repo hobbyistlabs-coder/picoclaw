@@ -3,7 +3,6 @@ package gateway
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -248,7 +247,7 @@ func setupCronTool(
 		var err error
 		cronTool, err = tools.NewCronTool(cronService, agentLoop, msgBus, workspace, restrict, execTimeout, cfg)
 		if err != nil {
-			log.Fatalf("Critical error during CronTool initialization: %v", err)
+			logger.FatalCF("gateway", "Critical error during CronTool initialization", map[string]any{"error": err.Error()})
 		}
 
 		agentLoop.RegisterTool(cronTool)

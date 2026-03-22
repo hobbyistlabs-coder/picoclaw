@@ -15,7 +15,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -23,6 +22,7 @@ import (
 	"time"
 
 	"jane/web/backend/api"
+	"jane/pkg/logger"
 	"jane/web/backend/launcherconfig"
 	"jane/web/backend/middleware"
 	"jane/web/backend/utils"
@@ -59,11 +59,11 @@ func main() {
 
 	absPath, err := filepath.Abs(configPath)
 	if err != nil {
-		log.Fatalf("Failed to resolve config path: %v", err)
+		logger.FatalCF("main", "Failed to resolve config path", map[string]any{"error": err.Error()})
 	}
 	err = utils.EnsureOnboarded(absPath)
 	if err != nil {
-		log.Printf("Warning: Failed to initialize PicoClaw config automatically: %v", err)
+		logger.WarnCF("main", "Failed to initialize PicoClaw config automatically", map[string]any{"error": err.Error()})
 	}
 
 	var explicitPort bool
@@ -80,7 +80,7 @@ func main() {
 	launcherPath := launcherconfig.PathForAppConfig(absPath)
 	launcherCfg, err := launcherconfig.Load(launcherPath, launcherconfig.Default())
 	if err != nil {
-		log.Printf("Warning: Failed to load %s: %v", launcherPath, err)
+		logger.WarnCF("main", "Failed to load launcher config", map[string]any{"path": launcherPath, "error": err.Error()})
 		launcherCfg = launcherconfig.Default()
 	}
 
@@ -98,7 +98,7 @@ func main() {
 		if err == nil {
 			err = errors.New("must be in range 1-65535")
 		}
-		log.Fatalf("Invalid port %q: %v", effectivePort, err)
+		logger.FatalCF("main", "Invalid port", map[string]any{"port": effectivePort, "error": err.Error()})
 	}
 
 	// Determine listen address
@@ -122,7 +122,7 @@ func main() {
 
 	accessControlledMux, err := middleware.IPAllowlist(launcherCfg.AllowedCIDRs, mux)
 	if err != nil {
-		log.Fatalf("Invalid allowed CIDR configuration: %v", err)
+		logger.FatalCF("main", "Invalid allowed CIDR configuration", map[string]any{"error": err.Error()})
 	}
 
 	// Apply middleware stack
@@ -151,7 +151,7 @@ func main() {
 			time.Sleep(500 * time.Millisecond)
 			url := "http://localhost:" + effectivePort
 			if err := utils.OpenBrowser(url); err != nil {
-				log.Printf("Warning: Failed to auto-open browser: %v", err)
+				logger.WarnCF("main", "Failed to auto-open browser", map[string]any{"error": err.Error()})
 			}
 		}()
 	}
@@ -173,6 +173,6 @@ func main() {
 	}
 
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("Server failed to start: %v", err)
+		logger.FatalCF("main", "Server failed to start", map[string]any{"error": err.Error()})
 	}
 }

@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"jane/pkg/logger"
 	"jane/pkg/providers"
 )
 
@@ -63,13 +63,13 @@ func MigrateFromJSON(
 
 		data, readErr := os.ReadFile(srcPath)
 		if readErr != nil {
-			log.Printf("memory: migrate: skip %s: %v", name, readErr)
+			logger.WarnCF("memory", "migrate: skip", map[string]any{"file": name, "error": readErr.Error()})
 			continue
 		}
 
 		var sess jsonSession
 		if parseErr := json.Unmarshal(data, &sess); parseErr != nil {
-			log.Printf("memory: migrate: skip %s: %v", name, parseErr)
+			logger.WarnCF("memory", "migrate: skip", map[string]any{"file": name, "error": parseErr.Error()})
 			continue
 		}
 
@@ -104,7 +104,7 @@ func MigrateFromJSON(
 		// Rename to .migrated as backup (not delete).
 		renameErr := os.Rename(srcPath, srcPath+".migrated")
 		if renameErr != nil {
-			log.Printf("memory: migrate: rename %s: %v", name, renameErr)
+			logger.WarnCF("memory", "migrate: rename", map[string]any{"file": name, "error": renameErr.Error()})
 		}
 
 		migrated++

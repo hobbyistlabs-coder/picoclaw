@@ -2,8 +2,8 @@ package session
 
 import (
 	"context"
-	"log"
 
+	"jane/pkg/logger"
 	"jane/pkg/memory"
 	"jane/pkg/providers"
 )
@@ -22,20 +22,20 @@ func NewJSONLBackend(store memory.Store) *JSONLBackend {
 
 func (b *JSONLBackend) AddMessage(sessionKey, role, content string) {
 	if err := b.store.AddMessage(context.Background(), sessionKey, role, content); err != nil {
-		log.Printf("session: add message: %v", err)
+		logger.ErrorCF("session", "add message", map[string]any{"session": sessionKey, "role": role, "error": err.Error()})
 	}
 }
 
 func (b *JSONLBackend) AddFullMessage(sessionKey string, msg providers.Message) {
 	if err := b.store.AddFullMessage(context.Background(), sessionKey, msg); err != nil {
-		log.Printf("session: add full message: %v", err)
+		logger.ErrorCF("session", "add full message", map[string]any{"session": sessionKey, "error": err.Error()})
 	}
 }
 
 func (b *JSONLBackend) GetHistory(key string) []providers.Message {
 	msgs, err := b.store.GetHistory(context.Background(), key)
 	if err != nil {
-		log.Printf("session: get history: %v", err)
+		logger.ErrorCF("session", "get history", map[string]any{"session": key, "error": err.Error()})
 		return []providers.Message{}
 	}
 	return msgs
@@ -44,7 +44,7 @@ func (b *JSONLBackend) GetHistory(key string) []providers.Message {
 func (b *JSONLBackend) GetSummary(key string) string {
 	summary, err := b.store.GetSummary(context.Background(), key)
 	if err != nil {
-		log.Printf("session: get summary: %v", err)
+		logger.ErrorCF("session", "get summary", map[string]any{"session": key, "error": err.Error()})
 		return ""
 	}
 	return summary
@@ -52,19 +52,19 @@ func (b *JSONLBackend) GetSummary(key string) string {
 
 func (b *JSONLBackend) SetSummary(key, summary string) {
 	if err := b.store.SetSummary(context.Background(), key, summary); err != nil {
-		log.Printf("session: set summary: %v", err)
+		logger.ErrorCF("session", "set summary", map[string]any{"session": key, "error": err.Error()})
 	}
 }
 
 func (b *JSONLBackend) SetHistory(key string, history []providers.Message) {
 	if err := b.store.SetHistory(context.Background(), key, history); err != nil {
-		log.Printf("session: set history: %v", err)
+		logger.ErrorCF("session", "set history", map[string]any{"session": key, "error": err.Error()})
 	}
 }
 
 func (b *JSONLBackend) TruncateHistory(key string, keepLast int) {
 	if err := b.store.TruncateHistory(context.Background(), key, keepLast); err != nil {
-		log.Printf("session: truncate history: %v", err)
+		logger.ErrorCF("session", "truncate history", map[string]any{"session": key, "error": err.Error()})
 	}
 }
 

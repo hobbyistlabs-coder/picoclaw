@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -19,6 +18,7 @@ import (
 
 	"jane/pkg/config"
 	"jane/web/backend/utils"
+	"jane/pkg/logger"
 )
 
 // gateway holds the state for the managed gateway process.
@@ -57,20 +57,20 @@ func (h *Handler) TryAutoStartGateway() {
 
 	ready, reason, err := h.gatewayStartReady()
 	if err != nil {
-		log.Printf("Skip auto-starting gateway: %v", err)
+		logger.InfoCF("gateway", "Skip auto-starting gateway", map[string]any{"error": err.Error()})
 		return
 	}
 	if !ready {
-		log.Printf("Skip auto-starting gateway: %s", reason)
+		logger.InfoCF("gateway", "Skip auto-starting gateway", map[string]any{"reason": reason})
 		return
 	}
 
 	pid, err := h.startGatewayLocked()
 	if err != nil {
-		log.Printf("Failed to auto-start gateway: %v", err)
+		logger.ErrorCF("gateway", "Failed to auto-start gateway", map[string]any{"error": err.Error()})
 		return
 	}
-	log.Printf("Gateway auto-started (PID: %d)", pid)
+	logger.InfoCF("gateway", "Gateway auto-started", map[string]any{"pid": pid})
 }
 
 // gatewayStartReady validates whether current config can start the gateway.
@@ -162,7 +162,7 @@ func (h *Handler) startGatewayLocked() (int, error) {
 
 	// Ensure Pico Channel is configured before starting gateway
 	if _, err := h.ensurePicoChannel(); err != nil {
-		log.Printf("Warning: failed to ensure pico channel: %v", err)
+		logger.WarnCF("gateway", "failed to ensure pico channel", map[string]any{"error": err.Error()})
 		// Non-fatal: gateway can still start without pico channel
 	}
 
@@ -172,7 +172,7 @@ func (h *Handler) startGatewayLocked() (int, error) {
 
 	gateway.cmd = cmd
 	pid := cmd.Process.Pid
-	log.Printf("Started picoclaw gateway (PID: %d) from %s", pid, execPath)
+	logger.InfoCF("gateway", "Started picoclaw gateway", map[string]any{"pid": pid, "execPath": execPath})
 
 	// Broadcast starting event
 	gateway.events.Broadcast(GatewayEvent{Status: "starting", PID: pid})
@@ -184,9 +184,9 @@ func (h *Handler) startGatewayLocked() (int, error) {
 	// Wait for exit in background and clean up
 	go func() {
 		if err := cmd.Wait(); err != nil {
-			log.Printf("Gateway process exited: %v", err)
+			logger.WarnCF("gateway", "Gateway process exited", map[string]any{"error": err.Error()})
 		} else {
-			log.Printf("Gateway process exited normally")
+			logger.InfoC("gateway", "Gateway process exited normally")
 		}
 
 		gateway.mu.Lock()
@@ -317,7 +317,7 @@ func (h *Handler) handleGatewayStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Sent stop signal to gateway (PID: %d)", pid)
+	logger.InfoCF("gateway", "Sent stop signal to gateway", map[string]any{"pid": pid})
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
