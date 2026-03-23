@@ -75,6 +75,15 @@ func (al *AgentLoop) runAgentLoop(
 	metricsIterationDuration.Add(time.Since(startTime).Seconds())
 	if err != nil {
 		metricsFailureCounts.Add(1)
+
+		// Log error event
+		_ = logger.LogSessionEvent(agent.Workspace, logger.ReplayEvent{
+			SessionID:     opts.SessionKey,
+			EventType:     logger.EventCategoryError,
+			ErrorMessage:  err.Error(),
+			ErrorCategory: logger.ReplayErrorLogicFailure, // General loop failure
+		})
+
 		return "", err
 	}
 
@@ -230,8 +239,23 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			_ = logger.LogSessionEvent(agent.Workspace, logger.ReplayEvent{
+				SessionID:     opts.SessionKey,
+				EventType:     logger.EventCategoryError,
+				ErrorMessage:  err.Error(),
+			})
 			return "", iteration, err
 		}
+
+		// Log CoT event
+		_ = logger.LogSessionEvent(agent.Workspace, logger.ReplayEvent{
+			SessionID: opts.SessionKey,
+			EventType: logger.EventCategoryCoT,
+			Details: logger.ReplayEventDetails{
+				CoTText: response.ReasoningContent,
+			},
+		})
+
 		go al.handleReasoning(
 			ctx,
 			response.Reasoning,
@@ -273,6 +297,16 @@ func (al *AgentLoop) runLLMIteration(
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
+
+			// Log individual tool call event
+			_ = logger.LogSessionEvent(agent.Workspace, logger.ReplayEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventCategoryToolCall,
+				Details: logger.ReplayEventDetails{
+					ToolName: tc.Name,
+					Inputs:   tc.Arguments,
+				},
+			})
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
@@ -348,6 +382,16 @@ func (al *AgentLoop) runLLMIteration(
 				activeModel:         activeModel,
 			})
 
+			// Log state transition
+			_ = logger.LogSessionEvent(agent.Workspace, logger.ReplayEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventCategoryStateTransition,
+				Details: logger.ReplayEventDetails{
+					FromState: "generating",
+					ToState:   "awaiting_approval",
+				},
+			})
+
 			al.bus.PublishOutbound(ctx, bus.OutboundMessage{
 				Channel: opts.Channel,
 				ChatID:  opts.ChatID,
@@ -411,7 +455,29 @@ func (al *AgentLoop) runLLMIteration(
 						"error":          contentForLLM,
 						"error_category": "logic_failure",
 					})
+
+				// Log error event
+				_ = logger.LogSessionEvent(agent.Workspace, logger.ReplayEvent{
+					SessionID: opts.SessionKey,
+					EventType: logger.EventCategoryError,
+					ErrorCategory: logger.ReplayErrorLogicFailure,
+					ErrorMessage: contentForLLM,
+				})
 			}
+
+			// Log tool result event
+			_ = logger.LogSessionEvent(agent.Workspace, logger.ReplayEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventCategoryToolResult,
+				Details: logger.ReplayEventDetails{
+					ToolName: r.tc.Name,
+					Outputs: map[string]any{
+						"for_llm": contentForLLM,
+						"for_user": r.result.ForUser,
+						"is_error": r.result.IsError,
+					},
+				},
+			})
 
 			toolResultMsg := providers.Message{
 				Role:       "tool",

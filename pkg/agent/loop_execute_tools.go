@@ -56,6 +56,14 @@ func (al *AgentLoop) executeToolBatch(
 						ForLLM: errStr,
 						Err:    fmt.Errorf("%s", errStr),
 					}
+
+					// Log error event
+					_ = logger.LogSessionEvent(agent.Workspace, logger.ReplayEvent{
+						SessionID: opts.SessionKey,
+						EventType: logger.EventCategoryError,
+						ErrorCategory: logger.ReplayErrorLogicFailure,
+						ErrorMessage: errStr,
+					})
 				}
 			}()
 
