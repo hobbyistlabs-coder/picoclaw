@@ -9,6 +9,8 @@ package agent
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"reflect"
 	"sync"
 	"time"
 
@@ -116,13 +118,24 @@ func registerSharedTools(
 			}
 		}
 
+		var browserActionTool *tools.BrowserActionTool
 		if cfg.Tools.IsToolEnabled("browser_action") {
-			browserActionTool := tools.NewBrowserActionTool()
+			browserActionTool = tools.NewBrowserActionTool()
 			agent.Tools.Register(browserActionTool)
 		}
 
 		if cfg.Tools.IsToolEnabled("go_eval") {
 			goEvalTool := tools.NewGoEvalTool(agent.Workspace)
+
+			// Setup jane/env bindings for GoEvalTool
+			bindings := make(map[string]reflect.Value)
+			bindings["Workspace"] = reflect.ValueOf(agent.Workspace)
+			bindings["HTTPClient"] = reflect.ValueOf(&http.Client{Timeout: 15 * time.Second})
+			if browserActionTool != nil {
+				bindings["Browser"] = reflect.ValueOf(browserActionTool)
+			}
+			goEvalTool.SetBindings(bindings)
+
 			agent.Tools.Register(goEvalTool)
 		}
 

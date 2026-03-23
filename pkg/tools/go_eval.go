@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -37,6 +38,7 @@ func (b *threadSafeBuffer) Len() int {
 type GoEvalTool struct {
 	workspace string
 	timeout   time.Duration
+	bindings  map[string]reflect.Value
 }
 
 func NewGoEvalTool(workspace string) *GoEvalTool {
@@ -46,12 +48,16 @@ func NewGoEvalTool(workspace string) *GoEvalTool {
 	}
 }
 
+func (t *GoEvalTool) SetBindings(bindings map[string]reflect.Value) {
+	t.bindings = bindings
+}
+
 func (t *GoEvalTool) Name() string {
 	return "go_eval"
 }
 
 func (t *GoEvalTool) Description() string {
-	return "Executes Go code dynamically using Yaegi interpreter. Provide valid Go source code. The code will be interpreted and executed safely without requiring the Go toolchain. Useful for complex logic or tasks that require writing a Go script."
+	return "Executes Go code dynamically using Yaegi interpreter. Provide valid Go source code. The code will be interpreted and executed safely without requiring the Go toolchain. Useful for complex logic or tasks that require writing a Go script. An internal package 'jane/env' is available which provides access to contextual bindings: Workspace (string), HTTPClient (*http.Client), and Browser (*tools.BrowserActionTool). Example usage: import \"jane/env\"; env.Browser.Execute(ctx, map[string]any{\"action\":\"navigate\",\"url\":\"https://example.com\"})"
 }
 
 func (t *GoEvalTool) Parameters() map[string]any {
@@ -90,6 +96,14 @@ func (t *GoEvalTool) Execute(ctx context.Context, args map[string]any) *ToolResu
 			ForUser: "Execution environment setup failed.",
 			IsError: true,
 		}
+	}
+
+	// Inject contextual bindings if available
+	if t.bindings != nil && len(t.bindings) > 0 {
+		exports := interp.Exports{
+			"jane/env/env": t.bindings,
+		}
+		i.Use(exports)
 	}
 
 	// Channel to capture execution result
