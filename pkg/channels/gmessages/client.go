@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"jane/pkg/logger"
 	"github.com/mdp/qrterminal/v3"
 	"github.com/rs/zerolog"
+	"jane/pkg/logger"
 
 	"go.mau.fi/mautrix-gmessages/pkg/libgm"
 	"go.mau.fi/mautrix-gmessages/pkg/libgm/events"
@@ -220,7 +220,6 @@ func (c *GMessagesChannel) handlePairing(ctx context.Context, client *GMClient) 
 	fmt.Println("\n=== Scan this QR code in Google Messages (Device Pairing) ===")
 	qrterminal.GenerateHalfBlock(qrURL, qrterminal.L, os.Stdout)
 	fmt.Println("Waiting for pairing...")
-
 
 	select {
 	case <-pairingCh:

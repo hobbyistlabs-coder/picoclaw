@@ -359,6 +359,6 @@ func TestToolRegistry_ConcurrentAccess(t *testing.T) {
 	}
 }
 
-func (t *mockRegistryTool) RequiresApproval() bool { return false }
-func (t *mockContextAwareTool) RequiresApproval() bool { return false }
+func (t *mockRegistryTool) RequiresApproval() bool      { return false }
+func (t *mockContextAwareTool) RequiresApproval() bool  { return false }
 func (t *mockAsyncRegistryTool) RequiresApproval() bool { return false }

@@ -11,3 +11,7 @@
 ## 2025-03-20 - String Operations Fast Paths and Avoiding Double Searches
 **Learning:** When trying to optimize `strings.ToLower`, ensure you don't introduce regressions with byte-to-rune casting on UTF-8 strings. Also, `strings.Contains(s, sub)` literally calls `strings.Index(s, sub)` under the hood. Using `strings.Contains` followed immediately by `strings.Index` to extract the position is an anti-pattern that searches the string twice, undermining the intended performance optimization.
 **Action:** Always prefer a single `strings.Index` call over `Contains`+`Index`. Stick to one single optimization per PR to reduce risk and review burden.
+
+## 2025-03-23 - Huge memory cost for parsing large payloads via strings.ToLower
+**Learning:** In Go, calling `strings.ToLower(string(byteSlice))` on multi-megabyte payloads (e.g., HTTP bodies) creates huge, blocking memory allocations $O(N)$ merely to check a short prefix.
+**Action:** When inspecting byte slices, avoid entire string conversions and case-transformations. Use `bytes.HasPrefix` or slice extraction (`bytes.EqualFold(byteSlice[:5], []byte("<html"))`) to keep checks $O(1)$.
