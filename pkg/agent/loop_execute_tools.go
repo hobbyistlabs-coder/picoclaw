@@ -121,6 +121,26 @@ func (al *AgentLoop) executeToolBatch(
 				asyncCallback,
 			)
 			metricsToolExecutionDuration.Add(time.Since(startToolTime).Seconds())
+
+			// Log session event for the tool result
+			errorCategory := logger.ReplayErrorCategoryNone
+			errorMessage := ""
+			if toolResult.IsError || toolResult.Err != nil {
+				errorCategory = logger.ReplayErrorCategoryLogicFailure
+				if toolResult.Err != nil {
+					errorMessage = toolResult.Err.Error()
+				} else {
+					errorMessage = toolResult.ForLLM
+				}
+				logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "error", nil, errorCategory, errorMessage)
+			}
+
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "tool_result", &logger.EventDetails{
+				ToolName: tc.Name,
+				Inputs:   tc.Arguments,
+				Outputs:  map[string]any{"result": toolResult.ForLLM},
+			}, errorCategory, errorMessage)
+
 			agentResults[idx].result = toolResult
 		}(i, tc)
 	}

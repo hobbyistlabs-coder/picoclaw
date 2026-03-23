@@ -230,8 +230,20 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			errCat := logger.ReplayErrorCategoryInfrastructureFailure
+			if failErr := providers.ClassifyError(err, agent.ID, activeModel); failErr != nil {
+				if failErr.Reason == providers.FailoverFormat || failErr.Reason == providers.FailoverContextLength {
+					errCat = logger.ReplayErrorCategoryModelFailure
+				}
+			}
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "error", nil, errCat, err.Error())
 			return "", iteration, err
 		}
+
+		logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "cot", &logger.EventDetails{
+			COTText: fmt.Sprintf("Reasoning: %s\n\nContent: %s", response.Reasoning, response.Content),
+		}, logger.ReplayErrorCategoryNone, "")
+
 		go al.handleReasoning(
 			ctx,
 			response.Reasoning,
@@ -273,6 +285,11 @@ func (al *AgentLoop) runLLMIteration(
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
+
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "tool_call", &logger.EventDetails{
+				ToolName: tc.Name,
+				Inputs:   tc.Arguments,
+			}, logger.ReplayErrorCategoryNone, "")
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
@@ -325,6 +342,11 @@ func (al *AgentLoop) runLLMIteration(
 		}
 
 		if requiresApproval {
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "state_transition", &logger.EventDetails{
+				FromState: "generating",
+				ToState:   "waiting_for_approval",
+			}, logger.ReplayErrorCategoryNone, "")
+
 			logger.InfoCF("agent", "Tool execution paused for user approval", map[string]any{
 				"agent_id":    agent.ID,
 				"session_key": opts.SessionKey,
