@@ -63,6 +63,30 @@ func TestSpawnTool_Execute_ValidTask(t *testing.T) {
 	}
 }
 
+func TestSpawnTool_Execute_Timeout(t *testing.T) {
+	provider := &MockLLMProvider{}
+	manager := NewSubagentManager(provider, "test-model", "/tmp/test")
+	tool := NewSpawnTool(manager)
+
+	ctx := context.Background()
+	args := map[string]any{
+		"task":    "Write a haiku about coding",
+		"label":   "haiku-task",
+		"timeout": 1, // 1 second timeout
+	}
+
+	result := tool.Execute(ctx, args)
+	if result == nil {
+		t.Fatal("Result should not be nil")
+	}
+	if result.IsError {
+		t.Errorf("Expected success for valid task with timeout, got error: %s", result.ForLLM)
+	}
+	if !result.Async {
+		t.Error("SpawnTool should return async result")
+	}
+}
+
 func TestSpawnTool_Execute_NilManager(t *testing.T) {
 	tool := NewSpawnTool(nil)
 

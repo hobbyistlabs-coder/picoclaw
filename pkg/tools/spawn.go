@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 )
 
 type SpawnTool struct {
@@ -43,6 +44,10 @@ func (t *SpawnTool) Parameters() map[string]any {
 			"agent_id": map[string]any{
 				"type":        "string",
 				"description": "Optional target agent ID to delegate the task to",
+			},
+			"timeout": map[string]any{
+				"type":        "integer",
+				"description": "Optional timeout for the subagent task in seconds",
 			},
 		},
 		"required": []string{"task"},
@@ -95,9 +100,34 @@ func (t *SpawnTool) execute(ctx context.Context, args map[string]any, cb AsyncCa
 		chatID = "direct"
 	}
 
+	// Handle optional timeout
+	var timeoutCtx context.Context
+	var cancel context.CancelFunc
+
+	if timeoutSeconds, ok := args["timeout"].(float64); ok && timeoutSeconds > 0 {
+		timeoutCtx, cancel = context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
+	} else if timeoutSeconds, ok := args["timeout"].(int); ok && timeoutSeconds > 0 {
+		timeoutCtx, cancel = context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
+	} else {
+		timeoutCtx = ctx
+	}
+
+	// Wrap the callback to ensure context cancellation happens after execution
+	wrappedCb := func(ctx context.Context, res *ToolResult) {
+		if cancel != nil {
+			defer cancel()
+		}
+		if cb != nil {
+			cb(ctx, res)
+		}
+	}
+
 	// Pass callback to manager for async completion notification
-	result, err := t.manager.Spawn(ctx, task, label, agentID, channel, chatID, cb)
+	result, err := t.manager.Spawn(timeoutCtx, task, label, agentID, channel, chatID, wrappedCb)
 	if err != nil {
+		if cancel != nil {
+			cancel()
+		}
 		return ErrorResult(fmt.Sprintf("failed to spawn subagent: %v", err))
 	}
 
