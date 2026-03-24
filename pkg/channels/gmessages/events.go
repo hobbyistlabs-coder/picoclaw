@@ -53,7 +53,7 @@ func (h *EventHandler) Handle(rawEvt any) {
 
 func (h *EventHandler) handleClientReady(evt *events.ClientReady) {
 	logger.InfoCF("channels.gmessages", "Client ready", map[string]any{
-		"session_id": evt.SessionID,
+		"session_id":    evt.SessionID,
 		"conversations": len(evt.Conversations),
 	})
 
@@ -190,7 +190,7 @@ func (h *EventHandler) handleMessage(evt *libgm.WrappedMessage) {
 		// determine if it's a group from DB (we do it in the next steps)
 
 		peer := bus.Peer{
-			ID:   chatID,
+			ID: chatID,
 		}
 
 		senderInfo := bus.SenderInfo{
@@ -218,7 +218,7 @@ func (h *EventHandler) handleMessage(evt *libgm.WrappedMessage) {
 
 	logger.DebugCF("channels.gmessages", "Stored message", map[string]any{
 		"msg_id": dbMsg.MessageID,
-		"from": senderName,
+		"from":   senderName,
 		"is_old": evt.IsOld,
 	})
 }
@@ -298,14 +298,14 @@ func ExtractMessageBody(msg *gmproto.Message) string {
 }
 
 type MediaInfo struct {
-	MediaID                 string
-	MimeType                string
-	MediaName               string
-	DecryptionKey           []byte
-	Size                    int64
-	ThumbnailMediaID        string
-	ThumbnailDecryptionKey  []byte
-	InlineData              []byte
+	MediaID                string
+	MimeType               string
+	MediaName              string
+	DecryptionKey          []byte
+	Size                   int64
+	ThumbnailMediaID       string
+	ThumbnailDecryptionKey []byte
+	InlineData             []byte
 }
 
 func ExtractMediaInfo(msg *gmproto.Message) *MediaInfo {
@@ -323,13 +323,13 @@ func ExtractMediaInfo(msg *gmproto.Message) *MediaInfo {
 
 			mi := &MediaInfo{
 				MediaID:                mc.GetMediaID(),
-				MimeType:              mime,
-				MediaName:             mc.GetMediaName(),
-				DecryptionKey:         mc.GetDecryptionKey(),
-				Size:                  mc.GetSize(),
-				ThumbnailMediaID:      mc.GetThumbnailMediaID(),
+				MimeType:               mime,
+				MediaName:              mc.GetMediaName(),
+				DecryptionKey:          mc.GetDecryptionKey(),
+				Size:                   mc.GetSize(),
+				ThumbnailMediaID:       mc.GetThumbnailMediaID(),
 				ThumbnailDecryptionKey: mc.GetThumbnailDecryptionKey(),
-				InlineData:            mc.GetMediaData(),
+				InlineData:             mc.GetMediaData(),
 			}
 
 			if mi.MediaID == "" && mi.ThumbnailMediaID != "" {
