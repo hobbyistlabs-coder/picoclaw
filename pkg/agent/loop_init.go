@@ -9,6 +9,8 @@ package agent
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"reflect"
 	"sync"
 	"time"
 
@@ -116,13 +118,24 @@ func registerSharedTools(
 			}
 		}
 
+		var browserActionTool *tools.BrowserActionTool
 		if cfg.Tools.IsToolEnabled("browser_action") {
-			browserActionTool := tools.NewBrowserActionTool()
+			browserActionTool = tools.NewBrowserActionTool()
 			agent.Tools.Register(browserActionTool)
 		}
 
 		if cfg.Tools.IsToolEnabled("go_eval") {
 			goEvalTool := tools.NewGoEvalTool(agent.Workspace)
+
+			bindings := map[string]reflect.Value{
+				"Workspace":  reflect.ValueOf(agent.Workspace),
+				"HTTPClient": reflect.ValueOf(&http.Client{Timeout: 60 * time.Second}),
+			}
+			if browserActionTool != nil {
+				bindings["BrowserActionTool"] = reflect.ValueOf(browserActionTool)
+			}
+			goEvalTool.SetBindings(bindings)
+
 			agent.Tools.Register(goEvalTool)
 		}
 

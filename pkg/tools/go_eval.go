@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -37,6 +38,7 @@ func (b *threadSafeBuffer) Len() int {
 type GoEvalTool struct {
 	workspace string
 	timeout   time.Duration
+	bindings  map[string]reflect.Value
 }
 
 func NewGoEvalTool(workspace string) *GoEvalTool {
@@ -44,6 +46,11 @@ func NewGoEvalTool(workspace string) *GoEvalTool {
 		workspace: workspace,
 		timeout:   60 * time.Second, // Default timeout
 	}
+}
+
+// SetBindings sets the bindings to expose to the Yaegi interpreter via the synthetic "jane/env" package.
+func (t *GoEvalTool) SetBindings(bindings map[string]reflect.Value) {
+	t.bindings = bindings
 }
 
 func (t *GoEvalTool) Name() string {
@@ -89,6 +96,20 @@ func (t *GoEvalTool) Execute(ctx context.Context, args map[string]any) *ToolResu
 			ForLLM:  fmt.Sprintf("Failed to initialize standard library symbols: %v", err),
 			ForUser: "Execution environment setup failed.",
 			IsError: true,
+		}
+	}
+
+	if t.bindings != nil && len(t.bindings) > 0 {
+		exports := map[string]map[string]reflect.Value{
+			"jane/env": t.bindings,
+			"jane/env/env": t.bindings, // fallback for package resolution
+		}
+		if err := i.Use(exports); err != nil {
+			return &ToolResult{
+				ForLLM:  fmt.Sprintf("Failed to inject agent bindings: %v", err),
+				ForUser: "Execution environment setup failed.",
+				IsError: true,
+			}
 		}
 	}
 
