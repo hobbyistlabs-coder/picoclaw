@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -37,12 +38,23 @@ func (b *threadSafeBuffer) Len() int {
 type GoEvalTool struct {
 	workspace string
 	timeout   time.Duration
+	bindings  map[string]reflect.Value
+	mu        sync.RWMutex
 }
 
 func NewGoEvalTool(workspace string) *GoEvalTool {
 	return &GoEvalTool{
 		workspace: workspace,
 		timeout:   60 * time.Second, // Default timeout
+		bindings:  make(map[string]reflect.Value),
+	}
+}
+
+func (t *GoEvalTool) SetBindings(bindings map[string]reflect.Value) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for k, v := range bindings {
+		t.bindings[k] = v
 	}
 }
 
@@ -87,6 +99,21 @@ func (t *GoEvalTool) Execute(ctx context.Context, args map[string]any) *ToolResu
 	if err := i.Use(stdlib.Symbols); err != nil {
 		return &ToolResult{
 			ForLLM:  fmt.Sprintf("Failed to initialize standard library symbols: %v", err),
+			ForUser: "Execution environment setup failed.",
+			IsError: true,
+		}
+	}
+
+	t.mu.RLock()
+	exports := map[string]map[string]reflect.Value{
+		"jane/env":     t.bindings,
+		"jane/env/env": t.bindings,
+	}
+	t.mu.RUnlock()
+
+	if err := i.Use(exports); err != nil {
+		return &ToolResult{
+			ForLLM:  fmt.Sprintf("Failed to load environment bindings: %v", err),
 			ForUser: "Execution environment setup failed.",
 			IsError: true,
 		}
