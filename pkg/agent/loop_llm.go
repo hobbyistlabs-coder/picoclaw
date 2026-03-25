@@ -230,8 +230,21 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "error", nil, "infrastructure_failure", err.Error())
 			return "", iteration, err
 		}
+
+		// Log CoT event for session replay
+		cotText := response.Reasoning
+		if cotText == "" {
+			cotText = response.Content
+		}
+		if cotText != "" {
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "cot", map[string]any{
+				"cot_text": cotText,
+			}, "none", "")
+		}
+
 		go al.handleReasoning(
 			ctx,
 			response.Reasoning,
@@ -273,6 +286,10 @@ func (al *AgentLoop) runLLMIteration(
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "tool_call", map[string]any{
+				"tool_name": tc.Name,
+				"inputs":    tc.Arguments,
+			}, "none", "")
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
@@ -337,6 +354,11 @@ func (al *AgentLoop) runLLMIteration(
 				approvalMsg += fmt.Sprintf("\n- `%s`:\n```json\n%s\n```\n", tc.Name, string(argsJSON))
 			}
 			approvalMsg += "\nDo you approve? (Yes/No)"
+
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "state_transition", map[string]any{
+				"from_state": "executing",
+				"to_state":   "pending_approval",
+			}, "none", "")
 
 			al.pendingApprovals.Store(opts.SessionKey, pendingApprovalState{
 				agent:               agent,
@@ -411,6 +433,19 @@ func (al *AgentLoop) runLLMIteration(
 						"error":          contentForLLM,
 						"error_category": "logic_failure",
 					})
+				logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "error", map[string]any{
+					"tool_name": r.tc.Name,
+				}, "logic_failure", contentForLLM)
+			} else {
+				// Parse output if it's JSON to match schema structure expectation, otherwise store as string
+				var outputObj any
+				if err := json.Unmarshal([]byte(contentForLLM), &outputObj); err != nil {
+					outputObj = contentForLLM
+				}
+				logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "tool_result", map[string]any{
+					"tool_name": r.tc.Name,
+					"outputs":   outputObj,
+				}, "none", "")
 			}
 
 			toolResultMsg := providers.Message{
