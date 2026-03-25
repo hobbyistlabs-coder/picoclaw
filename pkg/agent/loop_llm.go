@@ -230,6 +230,7 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			logger.LogSessionEvent(al.cfg.WorkspacePath(), opts.SessionKey, logger.ReplayEventError, logger.ReplayEventDetails{}, logger.ReplayErrorModelFailure, err.Error())
 			return "", iteration, err
 		}
 		go al.handleReasoning(
@@ -238,6 +239,14 @@ func (al *AgentLoop) runLLMIteration(
 			opts.Channel,
 			al.targetReasoningChannelID(opts.Channel),
 		)
+
+		if response.Reasoning != "" || response.ReasoningContent != "" {
+			reasoningText := response.Reasoning
+			if reasoningText == "" {
+				reasoningText = response.ReasoningContent
+			}
+			logger.LogSessionEvent(al.cfg.WorkspacePath(), opts.SessionKey, logger.ReplayEventCoT, logger.ReplayEventDetails{CoTText: reasoningText}, logger.ReplayErrorNone, "")
+		}
 
 		logger.DebugCF("agent", "LLM response",
 			map[string]any{
@@ -273,6 +282,7 @@ func (al *AgentLoop) runLLMIteration(
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
+			logger.LogSessionEvent(al.cfg.WorkspacePath(), opts.SessionKey, logger.ReplayEventToolCall, logger.ReplayEventDetails{ToolName: tc.Name, Inputs: tc.Arguments}, logger.ReplayErrorNone, "")
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
@@ -329,6 +339,7 @@ func (al *AgentLoop) runLLMIteration(
 				"agent_id":    agent.ID,
 				"session_key": opts.SessionKey,
 			})
+			logger.LogSessionEvent(al.cfg.WorkspacePath(), opts.SessionKey, logger.ReplayEventStateTransition, logger.ReplayEventDetails{FromState: "generating", ToState: "pending_approval"}, logger.ReplayErrorNone, "")
 
 			// Format approval message
 			approvalMsg := "The following tool execution requires your approval:\n"

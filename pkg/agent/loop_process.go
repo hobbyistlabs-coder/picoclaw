@@ -165,6 +165,8 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 					"agent_id":    agent.ID,
 					"session_key": sessionKey,
 				})
+				logger.LogSessionEvent(al.cfg.WorkspacePath(), sessionKey, logger.ReplayEventStateTransition, logger.ReplayEventDetails{FromState: "pending_approval", ToState: "rejected"}, logger.ReplayErrorNone, "")
+
 				for _, tc := range pending.normalizedToolCalls {
 					rejectMsg := providers.Message{
 						Role:       "tool",
@@ -198,6 +200,7 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 					"agent_id":    agent.ID,
 					"session_key": sessionKey,
 				})
+				logger.LogSessionEvent(al.cfg.WorkspacePath(), sessionKey, logger.ReplayEventStateTransition, logger.ReplayEventDetails{FromState: "pending_approval", ToState: "approved"}, logger.ReplayErrorNone, "")
 
 				// Execute the approved tools
 				agentResults := al.executeToolBatch(ctx, pending.agent, pending.opts, pending.normalizedToolCalls, pending.iteration)

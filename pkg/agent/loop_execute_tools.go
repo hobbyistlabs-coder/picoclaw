@@ -56,6 +56,7 @@ func (al *AgentLoop) executeToolBatch(
 						ForLLM: errStr,
 						Err:    fmt.Errorf("%s", errStr),
 					}
+					logger.LogSessionEvent(al.cfg.WorkspacePath(), opts.SessionKey, logger.ReplayEventError, logger.ReplayEventDetails{ToolName: tc.Name}, logger.ReplayErrorLogicFailure, errStr)
 				}
 			}()
 
@@ -122,6 +123,28 @@ func (al *AgentLoop) executeToolBatch(
 			)
 			metricsToolExecutionDuration.Add(time.Since(startToolTime).Seconds())
 			agentResults[idx].result = toolResult
+
+			errorCat := logger.ReplayErrorNone
+			errMsg := ""
+			if toolResult != nil && toolResult.IsError {
+				errorCat = logger.ReplayErrorLogicFailure
+				if toolResult.Err != nil {
+					errMsg = toolResult.Err.Error()
+				} else {
+					errMsg = toolResult.ForLLM
+				}
+			}
+
+			var outputs any
+			if toolResult != nil {
+				if toolResult.ForLLM != "" {
+					outputs = toolResult.ForLLM
+				} else if toolResult.Err != nil {
+					outputs = toolResult.Err.Error()
+				}
+			}
+
+			logger.LogSessionEvent(al.cfg.WorkspacePath(), opts.SessionKey, logger.ReplayEventToolResult, logger.ReplayEventDetails{ToolName: tc.Name, Outputs: outputs}, errorCat, errMsg)
 		}(i, tc)
 	}
 	wg.Wait()
