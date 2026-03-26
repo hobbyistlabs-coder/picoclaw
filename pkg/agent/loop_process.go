@@ -160,6 +160,15 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 		if isYes || isNo {
 			al.pendingApprovals.Delete(sessionKey)
 
+			// Session Replay: Log State Transition
+			_ = logger.LogSessionEvent(agent.Workspace, sessionKey, logger.SessionEvent{
+				EventType: logger.ReplayEventTypeStateTransition,
+				Details: logger.SessionEventDetails{
+					FromState: "pending_approval",
+					ToState:   "generating",
+				},
+			})
+
 			if isNo {
 				logger.InfoCF("agent", "User rejected tool execution", map[string]any{
 					"agent_id":    agent.ID,

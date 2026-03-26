@@ -230,6 +230,12 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			// Session Replay: Log Error
+			_ = logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
+				EventType:     logger.ReplayEventTypeError,
+				ErrorCategory: logger.ReplayErrorCategoryInfrastructureFailure,
+				ErrorMessage:  err.Error(),
+			})
 			return "", iteration, err
 		}
 		go al.handleReasoning(
@@ -238,6 +244,14 @@ func (al *AgentLoop) runLLMIteration(
 			opts.Channel,
 			al.targetReasoningChannelID(opts.Channel),
 		)
+
+		// Session Replay: Log Chain of Thought
+		_ = logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
+			EventType: logger.ReplayEventTypeCoT,
+			Details: logger.SessionEventDetails{
+				CoTText: response.ReasoningContent,
+			},
+		})
 
 		logger.DebugCF("agent", "LLM response",
 			map[string]any{
@@ -273,6 +287,15 @@ func (al *AgentLoop) runLLMIteration(
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
+
+			// Session Replay: Log Tool Call
+			_ = logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
+				EventType: logger.ReplayEventTypeToolCall,
+				Details: logger.SessionEventDetails{
+					ToolName: tc.Name,
+					Inputs:   tc.Arguments,
+				},
+			})
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
@@ -325,6 +348,15 @@ func (al *AgentLoop) runLLMIteration(
 		}
 
 		if requiresApproval {
+			// Session Replay: Log State Transition
+			_ = logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
+				EventType: logger.ReplayEventTypeStateTransition,
+				Details: logger.SessionEventDetails{
+					FromState: "generating",
+					ToState:   "pending_approval",
+				},
+			})
+
 			logger.InfoCF("agent", "Tool execution paused for user approval", map[string]any{
 				"agent_id":    agent.ID,
 				"session_key": opts.SessionKey,
@@ -404,6 +436,15 @@ func (al *AgentLoop) runLLMIteration(
 				contentForLLM = r.result.Err.Error()
 			}
 
+			// Session Replay: Log Tool Result
+			_ = logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
+				EventType: logger.ReplayEventTypeToolResult,
+				Details: logger.SessionEventDetails{
+					ToolName: r.tc.Name,
+					Outputs:  map[string]any{"content": contentForLLM},
+				},
+			})
+
 			if r.result.IsError {
 				logger.ErrorCF("agent", "Tool execution failed",
 					map[string]any{
@@ -411,6 +452,16 @@ func (al *AgentLoop) runLLMIteration(
 						"error":          contentForLLM,
 						"error_category": "logic_failure",
 					})
+
+				// Session Replay: Log Tool Error
+				_ = logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
+					EventType:     logger.ReplayEventTypeError,
+					ErrorCategory: logger.ReplayErrorCategoryLogicFailure,
+					ErrorMessage:  contentForLLM,
+					Details: logger.SessionEventDetails{
+						ToolName: r.tc.Name,
+					},
+				})
 			}
 
 			toolResultMsg := providers.Message{
