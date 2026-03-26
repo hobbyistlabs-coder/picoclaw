@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -37,12 +38,23 @@ func (b *threadSafeBuffer) Len() int {
 type GoEvalTool struct {
 	workspace string
 	timeout   time.Duration
+	bindings  map[string]reflect.Value
 }
 
 func NewGoEvalTool(workspace string) *GoEvalTool {
 	return &GoEvalTool{
 		workspace: workspace,
 		timeout:   60 * time.Second, // Default timeout
+		bindings:  make(map[string]reflect.Value),
+	}
+}
+
+func (t *GoEvalTool) SetBindings(bindings map[string]any) {
+	if t.bindings == nil {
+		t.bindings = make(map[string]reflect.Value)
+	}
+	for k, v := range bindings {
+		t.bindings[k] = reflect.ValueOf(v)
 	}
 }
 
@@ -89,6 +101,20 @@ func (t *GoEvalTool) Execute(ctx context.Context, args map[string]any) *ToolResu
 			ForLLM:  fmt.Sprintf("Failed to initialize standard library symbols: %v", err),
 			ForUser: "Execution environment setup failed.",
 			IsError: true,
+		}
+	}
+
+	if len(t.bindings) > 0 {
+		exports := map[string]map[string]reflect.Value{
+			"jane/env":     t.bindings,
+			"jane/env/env": t.bindings, // Fallback path for package resolution
+		}
+		if err := i.Use(exports); err != nil {
+			return &ToolResult{
+				ForLLM:  fmt.Sprintf("Failed to initialize custom environment bindings: %v", err),
+				ForUser: "Execution environment bindings setup failed.",
+				IsError: true,
+			}
 		}
 	}
 

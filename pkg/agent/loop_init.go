@@ -123,6 +123,13 @@ func registerSharedTools(
 
 		if cfg.Tools.IsToolEnabled("go_eval") {
 			goEvalTool := tools.NewGoEvalTool(agent.Workspace)
+			bindings := map[string]any{
+				"Workspace": agent.Workspace,
+			}
+			if browserTool, ok := agent.Tools.Get("browser_action"); ok {
+				bindings["BrowserActionTool"] = browserTool
+			}
+			goEvalTool.SetBindings(bindings)
 			agent.Tools.Register(goEvalTool)
 		}
 
