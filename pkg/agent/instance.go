@@ -3,13 +3,13 @@ package agent
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"jane/pkg/config"
+	"jane/pkg/logger"
 	"jane/pkg/memory"
 	"jane/pkg/providers"
 	"jane/pkg/routing"
@@ -86,7 +86,7 @@ func NewAgentInstance(
 	if cfg.Tools.IsToolEnabled("exec") {
 		execTool, err := tools.NewExecToolWithConfig(workspace, restrict, cfg)
 		if err != nil {
-			log.Fatalf("Critical error: unable to initialize exec tool: %v", err)
+			logger.FatalCF("agent", "Critical error: unable to initialize exec tool", map[string]any{"error": err.Error()})
 		}
 		toolsRegistry.Register(execTool)
 	}
@@ -225,8 +225,7 @@ func NewAgentInstance(
 			})
 			lightCandidates = resolved
 		} else {
-			log.Printf("routing: light_model %q not found in model_list — routing disabled for agent %q",
-				rc.LightModel, agentID)
+			logger.WarnCF("agent", "routing: light_model not found in model_list — routing disabled for agent", map[string]any{"lightModel": rc.LightModel, "agentID": agentID})
 		}
 	}
 
@@ -314,7 +313,7 @@ func (a *AgentInstance) Close() error {
 func initSessionStore(dir string) session.SessionStore {
 	store, err := memory.NewJSONLStore(dir)
 	if err != nil {
-		log.Printf("memory: init store: %v; using json sessions", err)
+		logger.WarnCF("agent", "memory: init store failed; using json sessions", map[string]any{"error": err.Error()})
 		return session.NewSessionManager(dir)
 	}
 
@@ -322,11 +321,11 @@ func initSessionStore(dir string) session.SessionStore {
 		// Migration failure means the store could not write data.
 		// Fall back to SessionManager to avoid a split state where
 		// some sessions are in JSONL and others remain in JSON.
-		log.Printf("memory: migration failed: %v; falling back to json sessions", merr)
+		logger.WarnCF("agent", "memory: migration failed; falling back to json sessions", map[string]any{"error": merr.Error()})
 		store.Close()
 		return session.NewSessionManager(dir)
 	} else if n > 0 {
-		log.Printf("memory: migrated %d session(s) to jsonl", n)
+		logger.InfoCF("agent", "memory: migrated session(s) to jsonl", map[string]any{"count": n})
 	}
 
 	return session.NewJSONLBackend(store)
