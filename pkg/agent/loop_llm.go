@@ -232,6 +232,17 @@ func (al *AgentLoop) runLLMIteration(
 		if err != nil {
 			return "", iteration, err
 		}
+
+		if response.ReasoningContent != "" {
+			_ = logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "cot", logger.SessionEventDetails{
+				CotText: response.ReasoningContent,
+			}, logger.ReplayErrorNone, "")
+		} else if response.Reasoning != "" {
+			_ = logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "cot", logger.SessionEventDetails{
+				CotText: response.Reasoning,
+			}, logger.ReplayErrorNone, "")
+		}
+
 		go al.handleReasoning(
 			ctx,
 			response.Reasoning,
@@ -267,6 +278,12 @@ func (al *AgentLoop) runLLMIteration(
 		normalizedToolCalls := make([]providers.ToolCall, 0, len(response.ToolCalls))
 		for _, tc := range response.ToolCalls {
 			normalizedToolCalls = append(normalizedToolCalls, providers.NormalizeToolCall(tc))
+
+			// Session Replay tool call logging
+			_ = logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "tool_call", logger.SessionEventDetails{
+				ToolName: tc.Name,
+				Inputs:   tc.Arguments,
+			}, logger.ReplayErrorNone, "")
 		}
 
 		// Log tool calls
@@ -329,6 +346,10 @@ func (al *AgentLoop) runLLMIteration(
 				"agent_id":    agent.ID,
 				"session_key": opts.SessionKey,
 			})
+			_ = logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "state_transition", logger.SessionEventDetails{
+				FromState: "generating",
+				ToState:   "awaiting_approval",
+			}, logger.ReplayErrorNone, "")
 
 			// Format approval message
 			approvalMsg := "The following tool execution requires your approval:\n"

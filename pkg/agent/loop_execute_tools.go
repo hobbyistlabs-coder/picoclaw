@@ -122,6 +122,39 @@ func (al *AgentLoop) executeToolBatch(
 			)
 			metricsToolExecutionDuration.Add(time.Since(startToolTime).Seconds())
 			agentResults[idx].result = toolResult
+
+			// Session Replay tool result logging
+			outputs := make(map[string]any)
+			if toolResult != nil {
+				if toolResult.ForLLM != "" {
+					outputs["for_llm"] = toolResult.ForLLM
+				}
+				if toolResult.ForUser != "" {
+					outputs["for_user"] = toolResult.ForUser
+				}
+				if toolResult.Err != nil {
+					outputs["error"] = toolResult.Err.Error()
+				}
+				if len(toolResult.Media) > 0 {
+					outputs["media"] = toolResult.Media
+				}
+
+				errCat := logger.ReplayErrorNone
+				errMsg := ""
+				if toolResult.IsError || toolResult.Err != nil {
+					errCat = logger.ReplayErrorLogicFailure
+					if toolResult.Err != nil {
+						errMsg = toolResult.Err.Error()
+					} else {
+						errMsg = "Unknown tool error"
+					}
+				}
+
+				_ = logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "tool_result", logger.SessionEventDetails{
+					ToolName: tc.Name,
+					Outputs:  outputs,
+				}, errCat, errMsg)
+			}
 		}(i, tc)
 	}
 	wg.Wait()

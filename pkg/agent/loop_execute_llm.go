@@ -179,6 +179,7 @@ func (al *AgentLoop) executeLLMWithRetry(
 				"error":          err.Error(),
 				"error_category": errorCategory,
 			})
+		_ = logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "error", logger.SessionEventDetails{}, logger.ReplayErrorCategory(errorCategory), err.Error())
 		return nil, fmt.Errorf("LLM call failed after retries: %w", err)
 	}
 
