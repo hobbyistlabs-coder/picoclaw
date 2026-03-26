@@ -11,3 +11,6 @@
 ## 2025-03-20 - String Operations Fast Paths and Avoiding Double Searches
 **Learning:** When trying to optimize `strings.ToLower`, ensure you don't introduce regressions with byte-to-rune casting on UTF-8 strings. Also, `strings.Contains(s, sub)` literally calls `strings.Index(s, sub)` under the hood. Using `strings.Contains` followed immediately by `strings.Index` to extract the position is an anti-pattern that searches the string twice, undermining the intended performance optimization.
 **Action:** Always prefer a single `strings.Index` call over `Contains`+`Index`. Stick to one single optimization per PR to reduce risk and review burden.
+## 2025-03-21 - Avoid String Conversion and ToLower on Large Byte Slices
+**Learning:** `strings.ToLower(string(body))` is extremely expensive on large byte payloads because it allocates a full string copy of the whole body and then iterates over all runes to lower it, just to check a short prefix.
+**Action:** Instead of converting large byte slices to strings for case-insensitive checks, always use bounded byte comparisons like `bytes.HasPrefix` and `bytes.EqualFold(body[:n], []byte("..."))` to check prefixes without allocating strings.

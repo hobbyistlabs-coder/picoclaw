@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -159,7 +160,10 @@ func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) *tools.
 			extractor = "raw"
 		}
 	} else if strings.Contains(contentType, "text/html") || len(body) > 0 &&
-		(strings.HasPrefix(string(body), "<!DOCTYPE") || strings.HasPrefix(strings.ToLower(string(body)), "<html")) {
+		// ⚡ Bolt: Use bounded byte comparisons (bytes.HasPrefix, bytes.EqualFold)
+		// instead of strings.ToLower(string(body)) to avoid O(N) allocation and full iteration
+		// on large HTML payloads just to check a 5-byte prefix.
+		(bytes.HasPrefix(body, []byte("<!DOCTYPE")) || (len(body) >= 5 && bytes.EqualFold(body[:5], []byte("<html")))) {
 		text = t.extractText(string(body))
 		extractor = "text"
 	} else {
