@@ -3,7 +3,6 @@ package gateway
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -15,6 +14,7 @@ import (
 	"jane/pkg/channels"
 	_ "jane/pkg/channels/dingtalk"
 	_ "jane/pkg/channels/discord"
+	_ "jane/pkg/channels/gmessages"
 	_ "jane/pkg/channels/irc"
 	_ "jane/pkg/channels/line"
 	_ "jane/pkg/channels/maixcam"
@@ -23,7 +23,6 @@ import (
 	_ "jane/pkg/channels/pico"
 	_ "jane/pkg/channels/qq"
 	_ "jane/pkg/channels/slack"
-	_ "jane/pkg/channels/gmessages"
 	_ "jane/pkg/channels/telegram"
 	_ "jane/pkg/channels/whatsapp"
 	_ "jane/pkg/channels/whatsapp_native"
@@ -248,7 +247,7 @@ func setupCronTool(
 		var err error
 		cronTool, err = tools.NewCronTool(cronService, agentLoop, msgBus, workspace, restrict, execTimeout, cfg)
 		if err != nil {
-			log.Fatalf("Critical error during CronTool initialization: %v", err)
+			logger.FatalCF("gateway", "Critical error during CronTool initialization", map[string]any{"error": err.Error()})
 		}
 
 		agentLoop.RegisterTool(cronTool)
