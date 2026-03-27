@@ -290,19 +290,32 @@ func (c *PicoChannel) authenticate(r *http.Request) bool {
 	if token == "" {
 		return false
 	}
+	tokenBytes := []byte(token)
 
 	// Check Authorization header
 	auth := r.Header.Get("Authorization")
 	if after, ok := strings.CutPrefix(auth, "Bearer "); ok {
-		if subtle.ConstantTimeCompare([]byte(after), []byte(token)) == 1 {
-			return true
+		afterBytes := []byte(after)
+		if len(afterBytes) == len(tokenBytes) {
+			if subtle.ConstantTimeCompare(afterBytes, tokenBytes) == 1 {
+				return true
+			}
+		} else {
+			// Dummy compare to prevent timing leak when lengths differ
+			subtle.ConstantTimeCompare(tokenBytes, tokenBytes)
 		}
 	}
 
 	// Check query parameter only when explicitly allowed
 	if c.config.AllowTokenQuery {
-		if subtle.ConstantTimeCompare([]byte(r.URL.Query().Get("token")), []byte(token)) == 1 {
-			return true
+		queryBytes := []byte(r.URL.Query().Get("token"))
+		if len(queryBytes) == len(tokenBytes) {
+			if subtle.ConstantTimeCompare(queryBytes, tokenBytes) == 1 {
+				return true
+			}
+		} else {
+			// Dummy compare to prevent timing leak when lengths differ
+			subtle.ConstantTimeCompare(tokenBytes, tokenBytes)
 		}
 	}
 
