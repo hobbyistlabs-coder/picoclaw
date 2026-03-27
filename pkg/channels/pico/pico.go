@@ -283,6 +283,20 @@ func (c *PicoChannel) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	go c.readLoop(pc)
 }
 
+// compareTokens securely compares a provided token against an expected token.
+// It executes a dummy ConstantTimeCompare when lengths mismatch to prevent length-based timing attacks.
+func compareTokens(provided, expected string) bool {
+	providedBytes := []byte(provided)
+	expectedBytes := []byte(expected)
+
+	if len(providedBytes) != len(expectedBytes) {
+		// Dummy compare to prevent timing leak of token length
+		subtle.ConstantTimeCompare(expectedBytes, expectedBytes)
+		return false
+	}
+	return subtle.ConstantTimeCompare(providedBytes, expectedBytes) == 1
+}
+
 // authenticate checks the Bearer token from the Authorization header.
 // Query parameter authentication is only allowed when AllowTokenQuery is explicitly enabled.
 func (c *PicoChannel) authenticate(r *http.Request) bool {
@@ -294,14 +308,14 @@ func (c *PicoChannel) authenticate(r *http.Request) bool {
 	// Check Authorization header
 	auth := r.Header.Get("Authorization")
 	if after, ok := strings.CutPrefix(auth, "Bearer "); ok {
-		if subtle.ConstantTimeCompare([]byte(after), []byte(token)) == 1 {
+		if compareTokens(after, token) {
 			return true
 		}
 	}
 
 	// Check query parameter only when explicitly allowed
 	if c.config.AllowTokenQuery {
-		if subtle.ConstantTimeCompare([]byte(r.URL.Query().Get("token")), []byte(token)) == 1 {
+		if compareTokens(r.URL.Query().Get("token"), token) {
 			return true
 		}
 	}
