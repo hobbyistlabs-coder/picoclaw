@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -158,13 +159,26 @@ func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) *tools.
 			text = string(body)
 			extractor = "raw"
 		}
-	} else if strings.Contains(contentType, "text/html") || len(body) > 0 &&
-		(strings.HasPrefix(string(body), "<!DOCTYPE") || strings.HasPrefix(strings.ToLower(string(body)), "<html")) {
-		text = t.extractText(string(body))
-		extractor = "text"
 	} else {
-		text = string(body)
-		extractor = "raw"
+		isHTML := strings.Contains(contentType, "text/html")
+		if !isHTML && len(body) > 0 {
+			// Bolt Optimization: Check prefix directly on bytes rather than allocating memory
+			// via string() casting and strings.ToLower() across the entire HTTP response body payload.
+			trimmed := bytes.TrimSpace(body)
+			if len(trimmed) >= 9 && bytes.EqualFold(trimmed[:9], []byte("<!DOCTYPE")) {
+				isHTML = true
+			} else if len(trimmed) >= 5 && bytes.EqualFold(trimmed[:5], []byte("<html")) {
+				isHTML = true
+			}
+		}
+
+		if isHTML {
+			text = t.extractText(string(body))
+			extractor = "text"
+		} else {
+			text = string(body)
+			extractor = "raw"
+		}
 	}
 
 	truncated := len(text) > maxChars
