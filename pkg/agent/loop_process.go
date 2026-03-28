@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"jane/pkg/bus"
 	"jane/pkg/constants"
@@ -160,6 +161,16 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 		if isYes || isNo {
 			al.pendingApprovals.Delete(sessionKey)
 
+			_ = logger.LogSessionEvent(agent.Workspace, sessionKey, logger.ReplayEvent{
+				Timestamp: time.Now(),
+				SessionID: sessionKey,
+				EventType: "state_transition",
+				Details: logger.ReplayEventDetails{
+					FromState: "pending_approval",
+					ToState:   "generating",
+				},
+			})
+
 			if isNo {
 				logger.InfoCF("agent", "User rejected tool execution", map[string]any{
 					"agent_id":    agent.ID,
@@ -236,6 +247,29 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 					if contentForLLM == "" && r.result.Err != nil {
 						contentForLLM = r.result.Err.Error()
 					}
+
+					if r.result.IsError {
+						_ = logger.LogSessionEvent(agent.Workspace, sessionKey, logger.ReplayEvent{
+							Timestamp:     time.Now(),
+							SessionID:     sessionKey,
+							EventType:     "error",
+							ErrorCategory: logger.ReplayErrorCategoryLogicFailure,
+							ErrorMessage:  contentForLLM,
+							Details: logger.ReplayEventDetails{
+								ToolName: r.tc.Name,
+							},
+						})
+					}
+
+					_ = logger.LogSessionEvent(agent.Workspace, sessionKey, logger.ReplayEvent{
+						Timestamp: time.Now(),
+						SessionID: sessionKey,
+						EventType: "tool_result",
+						Details: logger.ReplayEventDetails{
+							ToolName: r.tc.Name,
+							Outputs:  map[string]any{"result": contentForLLM},
+						},
+					})
 
 					toolResultMsg := providers.Message{
 						Role:       "tool",
