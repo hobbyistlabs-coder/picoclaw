@@ -1,2 +1,3 @@
 2026/03/28 04:49:56 systray error: failed to connect to DBus: exec: "dbus-launch": executable file not found in $PATH
 2026/03/28 04:59:35 systray error: failed to connect to DBus: exec: "dbus-launch": executable file not found in $PATH
+2026/03/28 06:35:33 systray error: failed to connect to DBus: exec: "dbus-launch": executable file not found in $PATH

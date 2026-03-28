@@ -1,6 +1,16 @@
-model_list: {}
+model_list:
+  miniMax:0:
+    api_keys:
+      - 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
 channels:
+  telegram:
+    token: YOUR_TELEGRAM_BOT_TOKEN
+  discord:
+    token: YOUR_DISCORD_BOT_TOKEN
   pico:
     token: fc6e2b74daad27f44e8ddc29fd464cc8
-web: {}
+web:
+  brave:
+    api_keys:
+      - YOUR_BRAVE_API_KEY
 skills: {}
