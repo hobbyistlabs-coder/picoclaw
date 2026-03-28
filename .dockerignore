@@ -1,7 +1,7 @@
 .git
 .gitignore
 build/
-.picoclaw/
+.jane-ai/
 config/
 .env
 .env.example

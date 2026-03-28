@@ -16,7 +16,7 @@ RUN go mod tidy && make build && make build-launcher
 
 FROM alpine:3.23
 RUN apk add --no-cache ca-certificates tzdata
-COPY --from=builder /src/build/picoclaw /usr/local/bin/picoclaw
-COPY --from=builder /src/build/picoclaw-launcher /usr/local/bin/picoclaw-launcher
-ENTRYPOINT ["picoclaw-launcher"]
+COPY --from=builder /src/build/jane-ai /usr/local/bin/jane-ai
+COPY --from=builder /src/build/jane-ai-launcher /usr/local/bin/jane-ai-launcher
+ENTRYPOINT ["jane-ai-launcher"]
 CMD ["-public", "-no-browser"]

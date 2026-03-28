@@ -6,22 +6,23 @@ before:
   hooks:
     - go mod tidy
     - go generate ./...
-    - sh -c 'cd web/frontend && pnpm install && pnpm build:backend'
+    - sh -c 'cd web/frontend && bun install && bun run build:backend'
     - go install github.com/tc-hib/go-winres@latest
     - go-winres make --in web/backend/winres/winres.json --out web/backend/rsrc --product-version={{ .Version }} --file-version={{ .Version }}
 
 builds:
-  - id: picoclaw
+  - id: jane-ai
+    binary: jane-ai
     env:
       - CGO_ENABLED=0
     tags:
       - stdjson
     ldflags:
       - -s -w
-      - -X github.com/sipeed/picoclaw/pkg/config.Version={{ .Version }}
-      - -X github.com/sipeed/picoclaw/pkg/config.GitCommit={{ .ShortCommit }}
-      - -X github.com/sipeed/picoclaw/pkg/config.BuildTime={{ .Date }}
-      - -X github.com/sipeed/picoclaw/pkg/config.GoVersion={{ .Env.GOVERSION }}
+      - -X jane/pkg/config.Version={{ .Version }}
+      - -X jane/pkg/config.GitCommit={{ .ShortCommit }}
+      - -X jane/pkg/config.BuildTime={{ .Date }}
+      - -X jane/pkg/config.GoVersion={{ .Env.GOVERSION }}
     goos:
       - linux
       - windows
@@ -45,8 +46,8 @@ builds:
       - goos: windows
         goarch: arm
 
-  - id: picoclaw-launcher
-    binary: picoclaw-launcher
+  - id: jane-ai-launcher
+    binary: jane-ai-launcher
     env:
       - CGO_ENABLED=0
     tags:
@@ -76,8 +77,8 @@ builds:
       - goos: windows
         goarch: arm
 
-  - id: picoclaw-launcher-tui
-    binary: picoclaw-launcher-tui
+  - id: jane-ai-launcher-tui
+    binary: jane-ai-launcher-tui
     env:
       - CGO_ENABLED=0
     tags:
@@ -108,14 +109,14 @@ builds:
         goarch: arm
 
 dockers_v2:
-  - id: picoclaw
+  - id: jane-ai
     dockerfile: docker/Dockerfile.goreleaser
     extra_files:
       - docker/entrypoint.sh
     ids:
-      - picoclaw
+      - jane-ai
     images:
-      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/picoclaw"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/jane-ai"
       - 'docker.io/{{ .Env.DOCKERHUB_IMAGE_NAME }}'
     tags:
       - '{{ if isEnvSet "NIGHTLY_BUILD" }}nightly{{ else }}{{ .Tag }}{{ end }}'
@@ -125,14 +126,14 @@ dockers_v2:
       - linux/arm64
       - linux/riscv64
 
-  - id: picoclaw-launcher
+  - id: jane-ai-launcher
     dockerfile: docker/Dockerfile.goreleaser.launcher
     ids:
-      - picoclaw
-      - picoclaw-launcher
-      - picoclaw-launcher-tui
+      - jane-ai
+      - jane-ai-launcher
+      - jane-ai-launcher-tui
     images:
-      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/picoclaw"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/jane-ai"
       - 'docker.io/{{ .Env.DOCKERHUB_IMAGE_NAME }}'
     tags:
       - '{{ if isEnvSet "NIGHTLY_BUILD" }}nightly-launcher{{ else }}{{ .Tag }}-launcher{{ end }}'
@@ -146,9 +147,9 @@ notarize:
   macos:
     - enabled: '{{ isEnvSet "MACOS_SIGN_P12" }}'
       ids:
-        - picoclaw
-        - picoclaw-launcher
-        - picoclaw-launcher-tui
+        - jane-ai
+        - jane-ai-launcher
+        - jane-ai-launcher-tui
       sign:
         certificate: "{{.Env.MACOS_SIGN_P12}}"
         password: "{{.Env.MACOS_SIGN_PASSWORD}}"
@@ -175,32 +176,32 @@ archives:
         formats: [zip]
 
 nfpms:
-  - id: picoclaw
+  - id: jane-ai
     ids:
-      - picoclaw
-      - picoclaw-launcher
-      - picoclaw-launcher-tui
-    package_name: picoclaw
+      - jane-ai
+      - jane-ai-launcher
+      - jane-ai-launcher-tui
+    package_name: jane-ai
     file_name_template: >-
       {{ .PackageName }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "arm64" }}aarch64
       {{- else if eq .Arch "arm" }}armv{{ .Arm }}
       {{- else }}{{ .Arch }}{{ end }}
-    vendor: picoclaw
-    homepage: https://github.com/{{ .Env.GITHUB_REPOSITORY_OWNER }}/picoclaw
-    maintainer: picoclaw contributors
-    description: picoclaw - a tool for managing and running tasks
+    vendor: jane-ai
+    homepage: https://github.com/{{ .Env.GITHUB_REPOSITORY_OWNER }}/jane-ai
+    maintainer: jane-ai contributors
+    description: jane-ai - a tool for managing and running tasks
     license: MIT
     formats:
       - rpm
       - deb
     bindir: /usr/bin
     contents:
-      - src: web/picoclaw-launcher.desktop
-        dst: /usr/share/applications/picoclaw-launcher.desktop
-      - src: web/picoclaw-launcher.png
-        dst: /usr/share/icons/hicolor/512x512/apps/picoclaw-launcher.png
+      - src: web/jane-ai-launcher.desktop
+        dst: /usr/share/applications/jane-ai-launcher.desktop
+      - src: web/jane-ai-launcher.png
+        dst: /usr/share/icons/hicolor/512x512/apps/jane-ai-launcher.png
 
 changelog:
   sort: asc

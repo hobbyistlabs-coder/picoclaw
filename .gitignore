@@ -8,14 +8,14 @@ build/
 *.dylib
 *.test
 *.out
-/picoclaw
-/picoclaw-test
+/jane-ai
+/jane-ai-test
 cmd/**/workspace
 
 # Picoclaw specific
 
-# PicoClaw
-.picoclaw/
+# Jane AI
+.jane-ai/
 config.json
 sessions/
 build/

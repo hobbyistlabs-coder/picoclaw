@@ -133,7 +133,7 @@ func isCmdProcessAliveLocked(cmd *exec.Cmd) bool {
 }
 
 func (h *Handler) startGatewayLocked() (int, error) {
-	// Locate the picoclaw executable
+	// Locate the Jane AI executable
 	execPath := utils.FindPicoclawBinary()
 
 	cmd := exec.Command(execPath, "gateway")
@@ -173,7 +173,7 @@ func (h *Handler) startGatewayLocked() (int, error) {
 
 	gateway.cmd = cmd
 	pid := cmd.Process.Pid
-	logger.InfoCF("gateway", "Started picoclaw gateway", map[string]any{"pid": pid, "execPath": execPath})
+	logger.InfoCF("gateway", "Started Jane AI gateway", map[string]any{"pid": pid, "execPath": execPath})
 
 	// Broadcast starting event
 	gateway.events.Broadcast(GatewayEvent{Status: "starting", PID: pid})
@@ -235,7 +235,7 @@ func (h *Handler) startGatewayLocked() (int, error) {
 	return pid, nil
 }
 
-// handleGatewayStart starts the picoclaw gateway subprocess.
+// handleGatewayStart starts the Jane AI gateway subprocess.
 //
 //	POST /api/gateway/start
 func (h *Handler) handleGatewayStart(w http.ResponseWriter, r *http.Request) {

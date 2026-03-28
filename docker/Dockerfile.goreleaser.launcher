@@ -4,9 +4,9 @@ ARG TARGETPLATFORM
 
 RUN apk add --no-cache ca-certificates tzdata
 
-COPY $TARGETPLATFORM/picoclaw /usr/local/bin/picoclaw
-COPY $TARGETPLATFORM/picoclaw-launcher /usr/local/bin/picoclaw-launcher
-COPY $TARGETPLATFORM/picoclaw-launcher-tui /usr/local/bin/picoclaw-launcher-tui
+COPY $TARGETPLATFORM/jane-ai /usr/local/bin/jane-ai
+COPY $TARGETPLATFORM/jane-ai-launcher /usr/local/bin/jane-ai-launcher
+COPY $TARGETPLATFORM/jane-ai-launcher-tui /usr/local/bin/jane-ai-launcher-tui
 
-ENTRYPOINT ["picoclaw-launcher"]
+ENTRYPOINT ["jane-ai-launcher"]
 CMD ["-public", "-no-browser"]
