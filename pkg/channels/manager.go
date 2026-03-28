@@ -8,7 +8,6 @@ package channels
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"sync"
 	"time"
@@ -162,7 +161,7 @@ func (m *Manager) StartAll(ctx context.Context) error {
 
 	if len(m.channels) == 0 {
 		logger.WarnC("channels", "No channels enabled")
-		return errors.New("no channels enabled")
+		return nil
 	}
 
 	logger.InfoC("channels", "Starting all channels")
