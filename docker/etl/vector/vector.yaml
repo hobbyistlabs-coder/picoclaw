@@ -1,0 +1,57 @@
+# Vector configuration for Ultimate Visibility ETL
+sources:
+  system_metrics_file:
+    type: file
+    include:
+      - /workspace/logs/etl/system_metrics.jsonl
+    read_from: end
+
+transforms:
+  parse_system_metrics:
+    type: remap
+    inputs:
+      - system_metrics_file
+    source: |
+      . = parse_json!(.message)
+      .timestamp = to_timestamp!(.timestamp)
+
+  system_metrics_to_prometheus:
+    type: log_to_metric
+    inputs:
+      - parse_system_metrics
+    metrics:
+      - type: gauge
+        field: memory_alloc_mb
+        name: memory_alloc_mb
+      - type: gauge
+        field: memory_total_mb
+        name: memory_total_mb
+      - type: gauge
+        field: memory_sys_mb
+        name: memory_sys_mb
+      - type: gauge
+        field: goroutines
+        name: goroutines
+      - type: gauge
+        field: num_gc
+        name: num_gc
+
+sinks:
+  prometheus_exporter:
+    type: prometheus_exporter
+    inputs:
+      - system_metrics_to_prometheus
+    address: 0.0.0.0:9090
+    default_namespace: "etl"
+    flush_period_secs: 15
+
+  loki_logs:
+    type: loki
+    inputs:
+      - parse_system_metrics
+    endpoint: "http://loki:3100"
+    encoding:
+      codec: json
+    labels:
+      source: "vector"
+      job: "system_metrics"
