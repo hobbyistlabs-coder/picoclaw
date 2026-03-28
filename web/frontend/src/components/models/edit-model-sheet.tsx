@@ -32,6 +32,7 @@ interface EditForm {
   maxTokensField: string
   requestTimeout: string
   thinkingLevel: string
+  pricePerMToken: string
 }
 
 interface EditModelSheetProps {
@@ -59,6 +60,7 @@ export function EditModelSheet({
     maxTokensField: "",
     requestTimeout: "",
     thinkingLevel: "",
+    pricePerMToken: "",
   })
   const [saving, setSaving] = useState(false)
   const [setAsDefault, setSetAsDefault] = useState(false)
@@ -79,6 +81,9 @@ export function EditModelSheet({
           ? String(model.request_timeout)
           : "",
         thinkingLevel: model.thinking_level ?? "",
+        pricePerMToken: model.price_per_m_token
+          ? String(model.price_per_m_token)
+          : "",
       })
       setSetAsDefault(model.is_default)
       setError("")
@@ -109,6 +114,9 @@ export function EditModelSheet({
           ? Number(form.requestTimeout)
           : undefined,
         thinking_level: form.thinkingLevel || undefined,
+        price_per_m_token: form.pricePerMToken
+          ? Number(form.pricePerMToken)
+          : undefined,
       })
       if (setAsDefault) {
         await setDefaultModel(model.model_name)
@@ -182,6 +190,20 @@ export function EditModelSheet({
             />
 
             <AdvancedSection>
+              <Field
+                label={t("models.field.pricePerMToken")}
+                hint={t("models.field.pricePerMTokenHint")}
+              >
+                <Input
+                  value={form.pricePerMToken}
+                  onChange={setField("pricePerMToken")}
+                  placeholder="2.50"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                />
+              </Field>
+
               <Field
                 label={t("models.field.proxy")}
                 hint={t("models.field.proxyHint")}

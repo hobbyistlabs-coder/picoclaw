@@ -238,7 +238,7 @@ func (al *AgentLoop) runLLMIteration(
 		if err != nil {
 			return "", iteration, metrics, err
 		}
-		metrics.addUsage(enrichUsageWithCost(activeModel, response.Usage))
+		metrics.addUsage(enrichUsageWithCost(agent.Config, activeModel, response.Usage))
 		go al.handleReasoning(
 			ctx,
 			response.Reasoning,

@@ -17,6 +17,7 @@ export interface ModelInfo {
   max_tokens_field?: string
   request_timeout?: number
   thinking_level?: string
+  price_per_m_token?: number
   // Meta
   configured: boolean
   is_default: boolean

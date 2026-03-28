@@ -3,30 +3,11 @@ package agent
 import (
 	"strings"
 
+	"jane/pkg/config"
 	"jane/pkg/providers"
 )
 
-type tokenRates struct {
-	inputUSDPerMTok  float64
-	outputUSDPerMTok float64
-}
-
-var tokenRatesByModel = map[string]tokenRates{
-	"gpt-5.4":           {inputUSDPerMTok: 2.5, outputUSDPerMTok: 15},
-	"gpt-5-4":           {inputUSDPerMTok: 2.5, outputUSDPerMTok: 15},
-	"gpt-5.4-mini":      {inputUSDPerMTok: 0.75, outputUSDPerMTok: 4.5},
-	"gpt-5-4-mini":      {inputUSDPerMTok: 0.75, outputUSDPerMTok: 4.5},
-	"gpt-5.4-nano":      {inputUSDPerMTok: 0.2, outputUSDPerMTok: 1.25},
-	"gpt-5-4-nano":      {inputUSDPerMTok: 0.2, outputUSDPerMTok: 1.25},
-	"claude-opus-4.6":   {inputUSDPerMTok: 5, outputUSDPerMTok: 25},
-	"claude-opus-4-6":   {inputUSDPerMTok: 5, outputUSDPerMTok: 25},
-	"claude-sonnet-4.6": {inputUSDPerMTok: 3, outputUSDPerMTok: 15},
-	"claude-sonnet-4-6": {inputUSDPerMTok: 3, outputUSDPerMTok: 15},
-	"claude-haiku-4.5":  {inputUSDPerMTok: 1, outputUSDPerMTok: 5},
-	"claude-haiku-4-5":  {inputUSDPerMTok: 1, outputUSDPerMTok: 5},
-}
-
-func enrichUsageWithCost(model string, usage *providers.UsageInfo) *providers.UsageInfo {
+func enrichUsageWithCost(cfg *config.Config, model string, usage *providers.UsageInfo) *providers.UsageInfo {
 	if usage == nil {
 		return nil
 	}
@@ -35,16 +16,36 @@ func enrichUsageWithCost(model string, usage *providers.UsageInfo) *providers.Us
 		return &enriched
 	}
 
-	rates, ok := tokenRatesByModel[normalizePricedModel(model)]
-	if !ok {
+	rate := lookupTokenPrice(cfg, model)
+	if rate <= 0 {
 		return &enriched
 	}
 
-	enriched.EstimatedCostUSD =
-		(float64(enriched.PromptTokens)*rates.inputUSDPerMTok +
-			float64(enriched.CompletionTokens)*rates.outputUSDPerMTok) / 1_000_000
+	enriched.EstimatedCostUSD = float64(enriched.TotalTokens) * rate / 1_000_000
 	enriched.HasEstimatedCost = true
 	return &enriched
+}
+
+func lookupTokenPrice(cfg *config.Config, model string) float64 {
+	if cfg == nil {
+		return 0
+	}
+
+	normalized := normalizePricedModel(model)
+	for i := range cfg.ModelList {
+		candidate := cfg.ModelList[i]
+		if candidate.PricePerMToken <= 0 {
+			continue
+		}
+		if candidate.ModelName == model || normalizePricedModel(candidate.Model) == normalized {
+			return candidate.PricePerMToken
+		}
+	}
+
+	if mc, err := cfg.GetModelConfig(model); err == nil && mc != nil {
+		return mc.PricePerMToken
+	}
+	return 0
 }
 
 func normalizePricedModel(model string) string {

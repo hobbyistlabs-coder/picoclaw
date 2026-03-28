@@ -31,12 +31,13 @@ type modelResponse struct {
 	Proxy      string `json:"proxy,omitempty"`
 	AuthMethod string `json:"auth_method,omitempty"`
 	// Advanced fields
-	ConnectMode    string `json:"connect_mode,omitempty"`
-	Workspace      string `json:"workspace,omitempty"`
-	RPM            int    `json:"rpm,omitempty"`
-	MaxTokensField string `json:"max_tokens_field,omitempty"`
-	RequestTimeout int    `json:"request_timeout,omitempty"`
-	ThinkingLevel  string `json:"thinking_level,omitempty"`
+	ConnectMode    string  `json:"connect_mode,omitempty"`
+	Workspace      string  `json:"workspace,omitempty"`
+	RPM            int     `json:"rpm,omitempty"`
+	MaxTokensField string  `json:"max_tokens_field,omitempty"`
+	RequestTimeout int     `json:"request_timeout,omitempty"`
+	ThinkingLevel  string  `json:"thinking_level,omitempty"`
+	PricePerMToken float64 `json:"price_per_m_token,omitempty"`
 	// Meta
 	Configured bool `json:"configured"`
 	IsDefault  bool `json:"is_default"`
@@ -81,6 +82,7 @@ func (h *Handler) handleListModels(w http.ResponseWriter, r *http.Request) {
 			MaxTokensField: m.MaxTokensField,
 			RequestTimeout: m.RequestTimeout,
 			ThinkingLevel:  m.ThinkingLevel,
+			PricePerMToken: m.PricePerMToken,
 			Configured:     configured[i],
 			IsDefault:      m.ModelName == defaultModel,
 		})

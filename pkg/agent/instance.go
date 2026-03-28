@@ -26,6 +26,7 @@ type AgentInstance struct {
 	Model                     string
 	Fallbacks                 []string
 	Workspace                 string
+	Config                    *config.Config
 	MaxIterations             int
 	MaxTokens                 int
 	Temperature               float64
@@ -235,6 +236,7 @@ func NewAgentInstance(
 		Model:                     model,
 		Fallbacks:                 fallbacks,
 		Workspace:                 workspace,
+		Config:                    cfg,
 		MaxIterations:             maxIter,
 		MaxTokens:                 maxTokens,
 		Temperature:               temperature,
@@ -311,21 +313,29 @@ func (a *AgentInstance) Close() error {
 // Falls back to SessionManager if the JSONL store cannot be initialized or
 // if migration fails (which indicates the store cannot write reliably).
 func initSessionStore(dir string) session.SessionStore {
-	store, err := memory.NewJSONLStore(dir)
+	store, err := memory.NewSQLiteStore(memory.SQLitePath(dir))
 	if err != nil {
-		logger.WarnCF("agent", "memory: init store failed; using json sessions", map[string]any{"error": err.Error()})
+		logger.WarnCF("agent", "memory: init sqlite store failed; using json sessions", map[string]any{"error": err.Error()})
 		return session.NewSessionManager(dir)
 	}
 
 	if n, merr := memory.MigrateFromJSON(context.Background(), dir, store); merr != nil {
-		// Migration failure means the store could not write data.
-		// Fall back to SessionManager to avoid a split state where
-		// some sessions are in JSONL and others remain in JSON.
-		logger.WarnCF("agent", "memory: migration failed; falling back to json sessions", map[string]any{"error": merr.Error()})
+		logger.WarnCF("agent", "memory: json migration failed; falling back to json sessions", map[string]any{"error": merr.Error()})
 		store.Close()
 		return session.NewSessionManager(dir)
 	} else if n > 0 {
-		logger.InfoCF("agent", "memory: migrated session(s) to jsonl", map[string]any{"count": n})
+		logger.InfoCF("agent", "memory: migrated legacy json session(s) to sqlite", map[string]any{"count": n})
+	}
+
+	if n, merr := memory.MigrateFromJSONL(context.Background(), dir, store); merr != nil {
+		// Migration failure means the store could not write data.
+		// Fall back to SessionManager to avoid a split state where
+		// some sessions are in SQLite and others remain in files.
+		logger.WarnCF("agent", "memory: jsonl migration failed; falling back to json sessions", map[string]any{"error": merr.Error()})
+		store.Close()
+		return session.NewSessionManager(dir)
+	} else if n > 0 {
+		logger.InfoCF("agent", "memory: migrated jsonl session(s) to sqlite", map[string]any{"count": n})
 	}
 
 	return session.NewJSONLBackend(store)

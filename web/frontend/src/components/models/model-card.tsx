@@ -117,6 +117,11 @@ export function ModelCard({
       </p>
 
       <div className="flex items-center gap-2">
+        {model.price_per_m_token ? (
+          <span className="text-muted-foreground bg-muted rounded px-1.5 py-0.5 text-[10px] font-medium">
+            ${model.price_per_m_token}/M
+          </span>
+        ) : null}
         {isOAuth ? (
           <span className="text-muted-foreground bg-muted rounded px-1.5 py-0.5 text-[10px] font-medium">
             OAuth

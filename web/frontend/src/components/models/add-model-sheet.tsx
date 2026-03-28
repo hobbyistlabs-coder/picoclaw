@@ -34,6 +34,7 @@ interface AddForm {
   maxTokensField: string
   requestTimeout: string
   thinkingLevel: string
+  pricePerMToken: string
 }
 
 const EMPTY_ADD_FORM: AddForm = {
@@ -49,6 +50,7 @@ const EMPTY_ADD_FORM: AddForm = {
   maxTokensField: "",
   requestTimeout: "",
   thinkingLevel: "",
+  pricePerMToken: "",
 }
 
 interface AddModelSheetProps {
@@ -129,6 +131,9 @@ export function AddModelSheet({
           ? Number(form.requestTimeout)
           : undefined,
         thinking_level: form.thinkingLevel.trim() || undefined,
+        price_per_m_token: form.pricePerMToken
+          ? Number(form.pricePerMToken)
+          : undefined,
       })
       if (setAsDefault) {
         await setDefaultModel(modelName)
@@ -214,6 +219,20 @@ export function AddModelSheet({
             />
 
             <AdvancedSection>
+              <Field
+                label={t("models.field.pricePerMToken")}
+                hint={t("models.field.pricePerMTokenHint")}
+              >
+                <Input
+                  value={form.pricePerMToken}
+                  onChange={setField("pricePerMToken")}
+                  placeholder="2.50"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                />
+              </Field>
+
               <Field
                 label={t("models.field.proxy")}
                 hint={t("models.field.proxyHint")}

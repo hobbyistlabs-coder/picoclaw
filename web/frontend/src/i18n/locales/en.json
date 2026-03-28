@@ -214,6 +214,8 @@
       "requestTimeoutHint": "Maximum seconds to wait for a response. 0 = use default.",
       "rpm": "Rate Limit (RPM)",
       "rpmHint": "Maximum requests per minute. 0 = no limit.",
+      "pricePerMToken": "Price Per 1M Tokens (USD)",
+      "pricePerMTokenHint": "Used for chat cost estimates. Leave blank or 0 to disable cost estimation for this model.",
       "thinkingLevel": "Thinking Level",
       "thinkingLevelHint": "Extended thinking budget: off, low, medium, high, xhigh, adaptive.",
       "maxTokensField": "Max Tokens Field",

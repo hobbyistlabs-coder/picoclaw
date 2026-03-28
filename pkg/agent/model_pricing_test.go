@@ -3,11 +3,18 @@ package agent
 import (
 	"testing"
 
+	"jane/pkg/config"
 	"jane/pkg/providers"
 )
 
 func TestEnrichUsageWithCost(t *testing.T) {
-	usage := enrichUsageWithCost("gpt-5.4", &providers.UsageInfo{
+	usage := enrichUsageWithCost(&config.Config{
+		ModelList: []config.ModelConfig{{
+			ModelName:      "gpt-5.4",
+			Model:          "openai/gpt-5.4",
+			PricePerMToken: 10,
+		}},
+	}, "gpt-5.4", &providers.UsageInfo{
 		PromptTokens:     1000,
 		CompletionTokens: 500,
 		TotalTokens:      1500,

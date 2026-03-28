@@ -334,9 +334,17 @@ func TestHandleDeleteSession_JSONLStorage(t *testing.T) {
 	}
 
 	base := filepath.Join(dir, sanitizeSessionKey(sessionKey))
+	sqliteStore, err := memory.NewSQLiteStore(memory.SQLitePath(dir))
+	if err != nil {
+		t.Fatalf("NewSQLiteStore() error = %v", err)
+	}
+	defer sqliteStore.Close()
+	if _, getErr := sqliteStore.GetSession(t.Context(), sessionKey); !os.IsNotExist(getErr) {
+		t.Fatalf("expected sqlite session to be removed, got err = %v", getErr)
+	}
 	for _, path := range []string{base + ".jsonl", base + ".meta.json"} {
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
-			t.Fatalf("expected %s to be removed, stat err = %v", path, err)
+		if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
+			t.Fatalf("expected %s to be migrated or removed, stat err = %v", path, statErr)
 		}
 	}
 }
