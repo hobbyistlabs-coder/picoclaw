@@ -240,17 +240,9 @@ func renderOAuthCallbackPage(w http.ResponseWriter, flowID, status, title, errMs
 		Title   string
 		Message string
 	}{
-		Payload: template.JS(payloadJSON),
+		Payload: template.JS(string(payloadJSON)),
 		Title:   title,
 		Message: message,
-	}
-
-	const tpl = `<!doctype html><html><head><meta charset="utf-8"><title>Jane AI OAuth</title></head><body><script>(function(){var payload={{.Payload}};var hasOpener=false;try{if(window.opener&&!window.opener.closed){window.opener.postMessage(payload,window.location.origin);hasOpener=true}}catch(e){}var target='/credentials?oauth_flow_id='+encodeURIComponent(payload.flowId||'')+'&oauth_status='+encodeURIComponent(payload.status||'');setTimeout(function(){if(hasOpener){window.close();return}window.location.replace(target)},800)})();</script><div style="font-family:Inter,system-ui,sans-serif;padding:24px"><h2>{{.Title}}</h2><p>{{.Message}}</p><p>You can close this window.</p></div></body></html>`
-
-	t, err := template.New("callback").Parse(tpl)
-	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -260,5 +252,7 @@ func renderOAuthCallbackPage(w http.ResponseWriter, flowID, status, title, errMs
 		w.WriteHeader(http.StatusBadRequest)
 	}
 
-	_ = t.Execute(w, data)
+	_ = oauthCallbackTemplate.Execute(w, data)
 }
+
+var oauthCallbackTemplate = template.Must(template.New("callback").Parse(`<!doctype html><html><head><meta charset="utf-8"><title>Jane AI OAuth</title></head><body><script>(function(){var payload={{.Payload}};var hasOpener=false;try{if(window.opener&&!window.opener.closed){window.opener.postMessage(payload,window.location.origin);hasOpener=true}}catch(e){}var target='/credentials?oauth_flow_id='+encodeURIComponent(payload.flowId||'')+'&oauth_status='+encodeURIComponent(payload.status||'');setTimeout(function(){if(hasOpener){window.close();return}window.location.replace(target)},800)})();</script><div style="font-family:Inter,system-ui,sans-serif;padding:24px"><h2>{{.Title}}</h2><p>{{.Message}}</p><p>You can close this window.</p></div></body></html>`))
