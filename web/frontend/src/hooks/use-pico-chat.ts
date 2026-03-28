@@ -57,6 +57,11 @@ function writeStoredSessionId(sessionId: string) {
   localStorage.removeItem(LEGACY_SESSION_STORAGE_KEY)
 }
 
+function syncSessionId(sessionId: string, setState: (value: string) => void) {
+  writeStoredSessionId(sessionId)
+  setState(sessionId)
+}
+
 function generateSessionId(): string {
   const webCrypto = globalThis.crypto
   if (webCrypto && typeof webCrypto.randomUUID === "function") {
@@ -238,6 +243,14 @@ export function usePicoChat() {
 
   const handlePicoMessage = useCallback(
     (msg: PicoMessage) => {
+      if (
+        msg.session_id &&
+        msg.session_id.trim() !== "" &&
+        msg.session_id !== activeSessionIdRef.current
+      ) {
+        return
+      }
+
       const payload = msg.payload || {}
 
       switch (msg.type) {
@@ -464,7 +477,8 @@ export function usePicoChat() {
 
         // Only switch the active websocket session after history has loaded successfully.
         disconnect()
-        setActiveSessionId(sessionId)
+        activeSessionIdRef.current = sessionId
+        syncSessionId(sessionId, setActiveSessionId)
         setIsTyping(false)
         setTrackedMessages(historyMessages)
         setHistoryMetrics(metrics)
@@ -492,13 +506,10 @@ export function usePicoChat() {
 
   // Start a new empty chat
   const newChat = useCallback(() => {
-    if (messages.length === 0) {
-      return
-    }
-
     disconnect()
     const newId = generateSessionId()
-    setActiveSessionId(newId)
+    activeSessionIdRef.current = newId
+    syncSessionId(newId, setActiveSessionId)
     setTrackedMessages([])
     setHistoryMetrics(null)
     setIsTyping(false)
@@ -509,7 +520,7 @@ export function usePicoChat() {
         connect()
       }
     }, 100)
-  }, [disconnect, connect, gatewayState, messages.length, setTrackedMessages])
+  }, [disconnect, connect, gatewayState, setTrackedMessages])
 
   const sessionMetrics = addChatMetrics(
     historyMetrics,
