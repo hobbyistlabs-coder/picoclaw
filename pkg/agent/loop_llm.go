@@ -232,6 +232,18 @@ func (al *AgentLoop) runLLMIteration(
 		if err != nil {
 			return "", iteration, err
 		}
+
+		if response != nil && response.Reasoning != "" {
+			_ = logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.ReplayEvent{
+				Timestamp: time.Now(),
+				SessionID: opts.SessionKey,
+				EventType: "cot",
+				Details: logger.ReplayEventDetails{
+					CotText: response.Reasoning,
+				},
+			})
+		}
+
 		go al.handleReasoning(
 			ctx,
 			response.Reasoning,
@@ -266,7 +278,18 @@ func (al *AgentLoop) runLLMIteration(
 
 		normalizedToolCalls := make([]providers.ToolCall, 0, len(response.ToolCalls))
 		for _, tc := range response.ToolCalls {
-			normalizedToolCalls = append(normalizedToolCalls, providers.NormalizeToolCall(tc))
+			ntc := providers.NormalizeToolCall(tc)
+			normalizedToolCalls = append(normalizedToolCalls, ntc)
+
+			_ = logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.ReplayEvent{
+				Timestamp: time.Now(),
+				SessionID: opts.SessionKey,
+				EventType: "tool_call",
+				Details: logger.ReplayEventDetails{
+					ToolName: ntc.Name,
+					Inputs:   ntc.Arguments,
+				},
+			})
 		}
 
 		// Log tool calls
@@ -328,6 +351,16 @@ func (al *AgentLoop) runLLMIteration(
 			logger.InfoCF("agent", "Tool execution paused for user approval", map[string]any{
 				"agent_id":    agent.ID,
 				"session_key": opts.SessionKey,
+			})
+
+			_ = logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.ReplayEvent{
+				Timestamp: time.Now(),
+				SessionID: opts.SessionKey,
+				EventType: "state_transition",
+				Details: logger.ReplayEventDetails{
+					FromState: "generating",
+					ToState:   "pending_approval",
+				},
 			})
 
 			// Format approval message
@@ -411,7 +444,28 @@ func (al *AgentLoop) runLLMIteration(
 						"error":          contentForLLM,
 						"error_category": "logic_failure",
 					})
+
+				_ = logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.ReplayEvent{
+					Timestamp:     time.Now(),
+					SessionID:     opts.SessionKey,
+					EventType:     "error",
+					ErrorCategory: logger.ReplayErrorCategoryLogicFailure,
+					ErrorMessage:  contentForLLM,
+					Details: logger.ReplayEventDetails{
+						ToolName: r.tc.Name,
+					},
+				})
 			}
+
+			_ = logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.ReplayEvent{
+				Timestamp: time.Now(),
+				SessionID: opts.SessionKey,
+				EventType: "tool_result",
+				Details: logger.ReplayEventDetails{
+					ToolName: r.tc.Name,
+					Outputs:  map[string]any{"result": contentForLLM},
+				},
+			})
 
 			toolResultMsg := providers.Message{
 				Role:       "tool",
