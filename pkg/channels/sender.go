@@ -84,6 +84,11 @@ func (m *Manager) preSend(ctx context.Context, name string, msg bus.OutboundMess
 	// 3. Try editing placeholder
 	if v, loaded := m.placeholders.LoadAndDelete(key); loaded {
 		if entry, ok := v.(placeholderEntry); ok && entry.id != "" {
+			if editor, ok := ch.(RichMessageEditor); ok {
+				if err := editor.EditOutboundMessage(ctx, msg, entry.id); err == nil {
+					return true
+				}
+			}
 			if editor, ok := ch.(MessageEditor); ok {
 				if err := editor.EditMessage(ctx, msg.ChatID, entry.id, msg.Content); err == nil {
 					return true // edited successfully, skip Send

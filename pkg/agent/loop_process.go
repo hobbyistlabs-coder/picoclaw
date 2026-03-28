@@ -179,7 +179,7 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 				agent.Tools.TickTTL()
 
 				// Continue loop with rejection feedback
-				finalContent, _, err := al.runLLMIteration(ctx, pending.agent, pending.messages, pending.opts)
+				finalContent, _, metrics, err := al.runLLMIteration(ctx, pending.agent, pending.messages, pending.opts)
 				if err != nil {
 					return "", err
 				}
@@ -188,7 +188,11 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 				if finalContent == "" {
 					finalContent = pending.opts.DefaultResponse
 				}
-				agent.Sessions.AddMessage(sessionKey, "assistant", finalContent)
+				agent.Sessions.AddFullMessage(sessionKey, providers.Message{
+					Role:    "assistant",
+					Content: finalContent,
+					Usage:   metrics.usage(),
+				})
 				agent.Sessions.Save(sessionKey)
 				return finalContent, nil
 			}
@@ -249,7 +253,7 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 				agent.Tools.TickTTL()
 
 				// Continue loop with execution feedback
-				finalContent, _, err := al.runLLMIteration(ctx, pending.agent, pending.messages, pending.opts)
+				finalContent, _, metrics, err := al.runLLMIteration(ctx, pending.agent, pending.messages, pending.opts)
 				if err != nil {
 					return "", err
 				}
@@ -258,7 +262,11 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 				if finalContent == "" {
 					finalContent = pending.opts.DefaultResponse
 				}
-				agent.Sessions.AddMessage(sessionKey, "assistant", finalContent)
+				agent.Sessions.AddFullMessage(sessionKey, providers.Message{
+					Role:    "assistant",
+					Content: finalContent,
+					Usage:   metrics.usage(),
+				})
 				agent.Sessions.Save(sessionKey)
 				return finalContent, nil
 			}

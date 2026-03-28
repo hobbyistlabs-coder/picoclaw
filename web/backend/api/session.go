@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"jane/pkg/bus"
 	"jane/pkg/config"
 	"jane/pkg/providers"
 	"jane/pkg/runtimepaths"
@@ -248,6 +249,40 @@ func truncateRunes(s string, maxLen int) string {
 	return string(runes[:maxLen]) + "..."
 }
 
+func buildSessionMetrics(messages []providers.Message) *bus.MessageMetrics {
+	metrics := &bus.MessageMetrics{}
+	hasUsage := false
+	costKnown := true
+
+	for _, msg := range messages {
+		metrics.ToolCalls += len(msg.ToolCalls)
+		if msg.Usage == nil {
+			continue
+		}
+
+		hasUsage = true
+		metrics.PromptTokens += msg.Usage.PromptTokens
+		metrics.CompletionTokens += msg.Usage.CompletionTokens
+		metrics.TotalTokens += msg.Usage.TotalTokens
+		if msg.Usage.HasEstimatedCost {
+			metrics.EstimatedCostUSD += msg.Usage.EstimatedCostUSD
+		} else {
+			costKnown = false
+		}
+	}
+
+	if !hasUsage && metrics.ToolCalls == 0 {
+		return nil
+	}
+
+	metrics.HasEstimatedCost = hasUsage && costKnown
+	if !metrics.HasEstimatedCost {
+		metrics.EstimatedCostUSD = 0
+	}
+
+	return metrics
+}
+
 // sessionsDir resolves the path to the gateway's session storage directory.
 // It reads the workspace from config, falling back to the resolved app home workspace.
 func (h *Handler) sessionsDir() (string, error) {
@@ -439,17 +474,30 @@ func (h *Handler) handleGetSession(w http.ResponseWriter, r *http.Request) {
 
 	// Convert to a simpler format for the frontend
 	type chatMessage struct {
-		Role    string `json:"role"`
-		Content string `json:"content"`
+		Role    string              `json:"role"`
+		Content string              `json:"content"`
+		Metrics *bus.MessageMetrics `json:"metrics,omitempty"`
 	}
 
 	messages := make([]chatMessage, 0, len(sess.Messages))
 	for _, msg := range sess.Messages {
 		// Only include user and assistant messages that have actual content
 		if (msg.Role == "user" || msg.Role == "assistant") && strings.TrimSpace(msg.Content) != "" {
+			var metrics *bus.MessageMetrics
+			if msg.Usage != nil {
+				metrics = &bus.MessageMetrics{
+					ToolCalls:        len(msg.ToolCalls),
+					PromptTokens:     msg.Usage.PromptTokens,
+					CompletionTokens: msg.Usage.CompletionTokens,
+					TotalTokens:      msg.Usage.TotalTokens,
+					EstimatedCostUSD: msg.Usage.EstimatedCostUSD,
+					HasEstimatedCost: msg.Usage.HasEstimatedCost,
+				}
+			}
 			messages = append(messages, chatMessage{
 				Role:    msg.Role,
 				Content: msg.Content,
+				Metrics: metrics,
 			})
 		}
 	}
@@ -458,6 +506,7 @@ func (h *Handler) handleGetSession(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{
 		"id":       sessionID,
 		"messages": messages,
+		"metrics":  buildSessionMetrics(sess.Messages),
 		"summary":  sess.Summary,
 		"created":  sess.Created.Format(time.RFC3339),
 		"updated":  sess.Updated.Format(time.RFC3339),

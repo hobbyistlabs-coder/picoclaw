@@ -3,6 +3,7 @@ package channels
 import (
 	"context"
 
+	"jane/pkg/bus"
 	"jane/pkg/commands"
 )
 
@@ -17,6 +18,12 @@ type TypingCapable interface {
 // messageID is always string; channels convert platform-specific types internally.
 type MessageEditor interface {
 	EditMessage(ctx context.Context, chatID string, messageID string, content string) error
+}
+
+// RichMessageEditor is an opt-in variant for channels that need the full
+// outbound payload when editing a placeholder into the final response.
+type RichMessageEditor interface {
+	EditOutboundMessage(ctx context.Context, msg bus.OutboundMessage, messageID string) error
 }
 
 // ReactionCapable — channels that can add a reaction (e.g. 👀) to an inbound message.

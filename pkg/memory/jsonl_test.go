@@ -153,6 +153,38 @@ func TestAddFullMessage_ToolCallID(t *testing.T) {
 	}
 }
 
+func TestAddFullMessage_UsageRoundtrip(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	msg := providers.Message{
+		Role:    "assistant",
+		Content: "Done",
+		Usage: &providers.UsageInfo{
+			PromptTokens:     42,
+			CompletionTokens: 8,
+			TotalTokens:      50,
+			EstimatedCostUSD: 0.0002,
+			HasEstimatedCost: true,
+		},
+	}
+
+	if err := store.AddFullMessage(ctx, "usage", msg); err != nil {
+		t.Fatalf("AddFullMessage: %v", err)
+	}
+
+	history, err := store.GetHistory(ctx, "usage")
+	if err != nil {
+		t.Fatalf("GetHistory: %v", err)
+	}
+	if len(history) != 1 || history[0].Usage == nil {
+		t.Fatalf("history = %+v", history)
+	}
+	if history[0].Usage.TotalTokens != 50 || !history[0].Usage.HasEstimatedCost {
+		t.Fatalf("usage = %+v", history[0].Usage)
+	}
+}
+
 func TestGetHistory_EmptySession(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()

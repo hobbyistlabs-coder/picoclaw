@@ -147,6 +147,9 @@ func (c *PicoChannel) Send(ctx context.Context, msg bus.OutboundMessage) error {
 	outMsg := newMessage(TypeMessageCreate, map[string]any{
 		"content": msg.Content,
 	})
+	if msg.Metrics != nil {
+		outMsg.Payload["metrics"] = msg.Metrics
+	}
 
 	return c.broadcastToSession(msg.ChatID, outMsg)
 }
@@ -158,6 +161,20 @@ func (c *PicoChannel) EditMessage(ctx context.Context, chatID string, messageID 
 		"content":    content,
 	})
 	return c.broadcastToSession(chatID, outMsg)
+}
+
+// EditOutboundMessage implements channels.RichMessageEditor.
+func (c *PicoChannel) EditOutboundMessage(
+	ctx context.Context, msg bus.OutboundMessage, messageID string,
+) error {
+	outMsg := newMessage(TypeMessageUpdate, map[string]any{
+		"message_id": messageID,
+		"content":    msg.Content,
+	})
+	if msg.Metrics != nil {
+		outMsg.Payload["metrics"] = msg.Metrics
+	}
+	return c.broadcastToSession(msg.ChatID, outMsg)
 }
 
 // StartTyping implements channels.TypingCapable.

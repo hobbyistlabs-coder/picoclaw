@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next"
 import { AssistantMessage } from "@/components/chat/assistant-message"
 import { ChatComposer } from "@/components/chat/chat-composer"
 import { ChatEmptyState } from "@/components/chat/chat-empty-state"
+import { ChatMetricsPills } from "@/components/chat/chat-metrics-pills"
 import { ModelSelector } from "@/components/chat/model-selector"
 import { SessionHistoryMenu } from "@/components/chat/session-history-menu"
 import { TypingIndicator } from "@/components/chat/typing-indicator"
@@ -15,6 +16,7 @@ import { useChatModels } from "@/hooks/use-chat-models"
 import { useGateway } from "@/hooks/use-gateway"
 import { usePicoChat } from "@/hooks/use-pico-chat"
 import { useSessionHistory } from "@/hooks/use-session-history"
+import { hasChatMetrics } from "@/lib/chat-metrics"
 
 export function ChatPage() {
   const { t } = useTranslation()
@@ -24,6 +26,7 @@ export function ChatPage() {
 
   const {
     messages,
+    sessionMetrics,
     isTyping,
     activeSessionId,
     sendMessage,
@@ -116,6 +119,17 @@ export function ChatPage() {
         />
       </PageHeader>
 
+      {hasChatMetrics(sessionMetrics) && (
+        <div className="border-b px-4 py-3 md:px-8 lg:px-24 xl:px-48">
+          <div className="mx-auto flex w-full max-w-250 flex-col gap-2">
+            <span className="text-muted-foreground text-xs tracking-[0.18em] uppercase">
+              {t("chat.metrics.session")}
+            </span>
+            <ChatMetricsPills metrics={sessionMetrics} />
+          </div>
+        </div>
+      )}
+
       <div
         ref={scrollRef}
         onScroll={handleScroll}
@@ -135,6 +149,7 @@ export function ChatPage() {
               {msg.role === "assistant" ? (
                 <AssistantMessage
                   content={msg.content}
+                  metrics={msg.metrics}
                   timestamp={msg.timestamp}
                 />
               ) : (

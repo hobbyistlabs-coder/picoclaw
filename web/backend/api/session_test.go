@@ -188,8 +188,14 @@ func TestHandleGetSession_JSONLStorage(t *testing.T) {
 	}
 
 	var resp struct {
-		ID       string `json:"id"`
-		Summary  string `json:"summary"`
+		ID      string `json:"id"`
+		Summary string `json:"summary"`
+		Metrics struct {
+			ToolCalls        int `json:"tool_calls"`
+			PromptTokens     int `json:"prompt_tokens"`
+			CompletionTokens int `json:"completion_tokens"`
+			TotalTokens      int `json:"total_tokens"`
+		} `json:"metrics"`
 		Messages []struct {
 			Role    string `json:"role"`
 			Content string `json:"content"`
@@ -207,11 +213,90 @@ func TestHandleGetSession_JSONLStorage(t *testing.T) {
 	if len(resp.Messages) != 2 {
 		t.Fatalf("len(resp.Messages) = %d, want 2", len(resp.Messages))
 	}
+	if resp.Metrics.ToolCalls != 0 || resp.Metrics.TotalTokens != 0 {
+		t.Fatalf("resp.Metrics = %+v, want zero-value metrics", resp.Metrics)
+	}
 	if resp.Messages[0].Role != "user" || resp.Messages[0].Content != "first" {
 		t.Fatalf("first message = %#v, want user/first", resp.Messages[0])
 	}
 	if resp.Messages[1].Role != "assistant" || resp.Messages[1].Content != "second" {
 		t.Fatalf("second message = %#v, want assistant/second", resp.Messages[1])
+	}
+}
+
+func TestHandleGetSession_IncludesUsageMetrics(t *testing.T) {
+	configPath, cleanup := setupOAuthTestEnv(t)
+	defer cleanup()
+
+	dir := sessionsTestDir(t, configPath)
+	store, err := memory.NewJSONLStore(dir)
+	if err != nil {
+		t.Fatalf("NewJSONLStore() error = %v", err)
+	}
+
+	sessionKey := picoSessionPrefix + "metrics-jsonl"
+	for _, msg := range []providers.Message{
+		{Role: "user", Content: "count my usage"},
+		{
+			Role:    "assistant",
+			Content: "Here are the metrics.",
+			ToolCalls: []providers.ToolCall{{
+				ID: "call_1",
+			}},
+			Usage: &providers.UsageInfo{
+				PromptTokens:     120,
+				CompletionTokens: 30,
+				TotalTokens:      150,
+				EstimatedCostUSD: 0.0012,
+				HasEstimatedCost: true,
+			},
+		},
+	} {
+		if err := store.AddFullMessage(nil, sessionKey, msg); err != nil {
+			t.Fatalf("AddFullMessage() error = %v", err)
+		}
+	}
+
+	h := NewHandler(configPath)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/sessions/metrics-jsonl", nil)
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var resp struct {
+		Metrics struct {
+			ToolCalls        int     `json:"tool_calls"`
+			PromptTokens     int     `json:"prompt_tokens"`
+			CompletionTokens int     `json:"completion_tokens"`
+			TotalTokens      int     `json:"total_tokens"`
+			EstimatedCostUSD float64 `json:"estimated_cost_usd"`
+			HasEstimatedCost bool    `json:"has_estimated_cost"`
+		} `json:"metrics"`
+		Messages []struct {
+			Metrics struct {
+				TotalTokens      int     `json:"total_tokens"`
+				EstimatedCostUSD float64 `json:"estimated_cost_usd"`
+				HasEstimatedCost bool    `json:"has_estimated_cost"`
+			} `json:"metrics"`
+		} `json:"messages"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Unmarshal() error = %v", err)
+	}
+	if resp.Metrics.ToolCalls != 1 || resp.Metrics.TotalTokens != 150 {
+		t.Fatalf("resp.Metrics = %+v", resp.Metrics)
+	}
+	if !resp.Metrics.HasEstimatedCost || resp.Metrics.EstimatedCostUSD != 0.0012 {
+		t.Fatalf("resp.Metrics cost = %+v", resp.Metrics)
+	}
+	if len(resp.Messages) != 2 || resp.Messages[1].Metrics.TotalTokens != 150 {
+		t.Fatalf("resp.Messages = %+v", resp.Messages)
 	}
 }
 

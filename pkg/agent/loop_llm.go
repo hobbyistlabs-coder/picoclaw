@@ -71,7 +71,7 @@ func (al *AgentLoop) runAgentLoop(
 
 	// 3. Run LLM iteration loop
 	startTime := time.Now()
-	finalContent, iteration, err := al.runLLMIteration(ctx, agent, messages, opts)
+	finalContent, iteration, metrics, err := al.runLLMIteration(ctx, agent, messages, opts)
 	metricsIterationDuration.Add(time.Since(startTime).Seconds())
 	if err != nil {
 		metricsFailureCounts.Add(1)
@@ -87,7 +87,11 @@ func (al *AgentLoop) runAgentLoop(
 	}
 
 	// 5. Save final assistant message to session
-	agent.Sessions.AddMessage(opts.SessionKey, "assistant", finalContent)
+	agent.Sessions.AddFullMessage(opts.SessionKey, providers.Message{
+		Role:    "assistant",
+		Content: finalContent,
+		Usage:   metrics.usage(),
+	})
 	agent.Sessions.Save(opts.SessionKey)
 
 	// 6. Optional: summarization
@@ -101,6 +105,7 @@ func (al *AgentLoop) runAgentLoop(
 			Channel: opts.Channel,
 			ChatID:  opts.ChatID,
 			Content: finalContent,
+			Metrics: metrics.outbound(),
 		})
 	}
 
@@ -179,9 +184,10 @@ func (al *AgentLoop) runLLMIteration(
 	agent *AgentInstance,
 	messages []providers.Message,
 	opts processOptions,
-) (string, int, error) {
+) (string, int, turnMetrics, error) {
 	iteration := 0
 	var finalContent string
+	var metrics turnMetrics
 
 	// Determine effective model tier for this conversation turn.
 	// selectCandidates evaluates routing once and the decision is sticky for
@@ -230,8 +236,9 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
-			return "", iteration, err
+			return "", iteration, metrics, err
 		}
+		metrics.addUsage(enrichUsageWithCost(activeModel, response.Usage))
 		go al.handleReasoning(
 			ctx,
 			response.Reasoning,
@@ -268,6 +275,7 @@ func (al *AgentLoop) runLLMIteration(
 		for _, tc := range response.ToolCalls {
 			normalizedToolCalls = append(normalizedToolCalls, providers.NormalizeToolCall(tc))
 		}
+		metrics.toolCalls += len(normalizedToolCalls)
 
 		// Log tool calls
 		toolNames := make([]string, 0, len(normalizedToolCalls))
@@ -354,7 +362,7 @@ func (al *AgentLoop) runLLMIteration(
 				Content: approvalMsg,
 			})
 
-			return "", iteration, nil
+			return "", iteration, metrics, nil
 		}
 		// --- End HITL ---
 
@@ -436,7 +444,7 @@ func (al *AgentLoop) runLLMIteration(
 		})
 	}
 
-	return finalContent, iteration, nil
+	return finalContent, iteration, metrics, nil
 }
 
 // selectCandidates returns the model candidates and resolved model name to use

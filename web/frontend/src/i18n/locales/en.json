@@ -48,6 +48,12 @@
       "apikey": "API Key",
       "oauth": "OAuth",
       "local": "Local"
+    },
+    "metrics": {
+      "session": "Session Metrics",
+      "tools": "Tools",
+      "tokens": "Tokens",
+      "cost": "Est. cost"
     }
   },
   "header": {

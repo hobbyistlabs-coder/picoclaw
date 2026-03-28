@@ -12,6 +12,8 @@ import { toast } from "sonner"
 
 import { getPicoToken } from "@/api/pico"
 import { getSessionHistory } from "@/api/sessions"
+import type { ChatMetrics } from "@/lib/chat-metrics"
+import { addChatMetrics, sumChatMetrics } from "@/lib/chat-metrics"
 import { gatewayAtom } from "@/store"
 
 // Pico Protocol message types
@@ -28,6 +30,8 @@ export interface ChatMessage {
   role: "user" | "assistant"
   content: string
   timestamp: number | string
+  metrics?: ChatMetrics
+  source: "history" | "live"
 }
 
 type ConnectionState = "disconnected" | "connecting" | "connected" | "error"
@@ -135,8 +139,10 @@ export function usePicoChat() {
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("disconnected")
   const [isTyping, setIsTyping] = useState(false)
-  const [activeSessionId, setActiveSessionId] =
-    useState<string>(() => readStoredSessionId() || generateSessionId())
+  const [historyMetrics, setHistoryMetrics] = useState<ChatMetrics | null>(null)
+  const [activeSessionId, setActiveSessionId] = useState<string>(
+    () => readStoredSessionId() || generateSessionId(),
+  )
 
   const wsRef = useRef<WebSocket | null>(null)
   const isConnectingRef = useRef(false)
@@ -149,9 +155,7 @@ export function usePicoChat() {
       setMessages((prev) => {
         const next =
           typeof nextState === "function"
-            ? (
-                nextState as (prevState: ChatMessage[]) => ChatMessage[]
-              )(prev)
+            ? (nextState as (prevState: ChatMessage[]) => ChatMessage[])(prev)
             : nextState
 
         if (next !== prev) {
@@ -174,12 +178,17 @@ export function usePicoChat() {
     const detail = await getSessionHistory(sessionId)
     const fallbackTime = detail.updated
 
-    return detail.messages.map((m, i) => ({
-      id: `hist-${i}-${Date.now()}`,
-      role: m.role as "user" | "assistant",
-      content: m.content,
-      timestamp: fallbackTime,
-    }))
+    return {
+      messages: detail.messages.map((m, i) => ({
+        id: `hist-${i}-${Date.now()}`,
+        role: m.role as "user" | "assistant",
+        content: m.content,
+        timestamp: fallbackTime,
+        metrics: m.metrics,
+        source: "history" as const,
+      })),
+      metrics: detail.metrics ?? null,
+    }
   }, [])
 
   useEffect(() => {
@@ -191,7 +200,7 @@ export function usePicoChat() {
     const restoreRevision = messagesRevisionRef.current
     let cancelled = false
     void loadSessionMessages(storedSessionId)
-      .then((historyMessages) => {
+      .then(({ messages: historyMessages, metrics }) => {
         if (cancelled) {
           return
         }
@@ -202,6 +211,7 @@ export function usePicoChat() {
           return
         }
         setTrackedMessages(historyMessages)
+        setHistoryMetrics(metrics)
         setIsTyping(false)
       })
       .catch((err) => {
@@ -217,6 +227,7 @@ export function usePicoChat() {
         }
         localStorage.removeItem(LAST_SESSION_STORAGE_KEY)
         setTrackedMessages([])
+        setHistoryMetrics(null)
         setIsTyping(false)
       })
 
@@ -225,64 +236,80 @@ export function usePicoChat() {
     }
   }, [loadSessionMessages, setTrackedMessages])
 
-  const handlePicoMessage = useCallback((msg: PicoMessage) => {
-    const payload = msg.payload || {}
+  const handlePicoMessage = useCallback(
+    (msg: PicoMessage) => {
+      const payload = msg.payload || {}
 
-    switch (msg.type) {
-      case "message.create": {
-        const content = (payload.content as string) || ""
-        const messageId = (payload.message_id as string) || `pico-${Date.now()}`
-        // Use provided timestamp or current time
-        const timestampRaw =
-          msg.timestamp !== undefined && Number.isFinite(Number(msg.timestamp))
-            ? normalizeUnixTimestamp(Number(msg.timestamp))
-            : Date.now()
+      switch (msg.type) {
+        case "message.create": {
+          const content = (payload.content as string) || ""
+          const messageId =
+            (payload.message_id as string) || `pico-${Date.now()}`
+          // Use provided timestamp or current time
+          const timestampRaw =
+            msg.timestamp !== undefined &&
+            Number.isFinite(Number(msg.timestamp))
+              ? normalizeUnixTimestamp(Number(msg.timestamp))
+              : Date.now()
 
-        setTrackedMessages((prev) => [
-          ...prev,
-          {
-            id: messageId,
-            role: "assistant",
-            content,
-            timestamp: timestampRaw,
-          },
-        ])
-        setIsTyping(false)
-        break
+          setTrackedMessages((prev) => [
+            ...prev,
+            {
+              id: messageId,
+              role: "assistant",
+              content,
+              timestamp: timestampRaw,
+              metrics: payload.metrics as ChatMetrics | undefined,
+              source: "live",
+            },
+          ])
+          setIsTyping(false)
+          break
+        }
+
+        case "message.update": {
+          const content = (payload.content as string) || ""
+          const messageId = payload.message_id as string
+          if (!messageId) break
+
+          setTrackedMessages((prev) =>
+            prev.map((m) =>
+              m.id === messageId
+                ? {
+                    ...m,
+                    content,
+                    metrics:
+                      (payload.metrics as ChatMetrics | undefined) ?? m.metrics,
+                  }
+                : m,
+            ),
+          )
+          break
+        }
+
+        case "typing.start":
+          setIsTyping(true)
+          break
+
+        case "typing.stop":
+          setIsTyping(false)
+          break
+
+        case "error":
+          console.error("Pico error:", payload)
+          setIsTyping(false)
+          break
+
+        case "pong":
+          // heartbeat response, ignore
+          break
+
+        default:
+          console.log("Unknown pico message type:", msg.type)
       }
-
-      case "message.update": {
-        const content = (payload.content as string) || ""
-        const messageId = payload.message_id as string
-        if (!messageId) break
-
-        setTrackedMessages((prev) =>
-          prev.map((m) => (m.id === messageId ? { ...m, content } : m)),
-        )
-        break
-      }
-
-      case "typing.start":
-        setIsTyping(true)
-        break
-
-      case "typing.stop":
-        setIsTyping(false)
-        break
-
-      case "error":
-        console.error("Pico error:", payload)
-        setIsTyping(false)
-        break
-
-      case "pong":
-        // heartbeat response, ignore
-        break
-
-      default:
-        console.log("Unknown pico message type:", msg.type)
-    }
-  }, [setTrackedMessages])
+    },
+    [setTrackedMessages],
+  )
 
   const connect = useCallback(async () => {
     if (
@@ -394,32 +421,35 @@ export function usePicoChat() {
     return () => disconnect()
   }, [disconnect])
 
-  const sendMessage = useCallback((content: string) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.warn("WebSocket not connected")
-      return
-    }
+  const sendMessage = useCallback(
+    (content: string) => {
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        console.warn("WebSocket not connected")
+        return
+      }
 
-    const id = `msg-${++msgIdCounter.current}-${Date.now()}`
-    const timestampRaw = Date.now()
+      const id = `msg-${++msgIdCounter.current}-${Date.now()}`
+      const timestampRaw = Date.now()
 
-    // Add user message to local state
-    setTrackedMessages((prev) => [
-      ...prev,
-      { id, role: "user", content, timestamp: timestampRaw },
-    ])
+      // Add user message to local state
+      setTrackedMessages((prev) => [
+        ...prev,
+        { id, role: "user", content, timestamp: timestampRaw, source: "live" },
+      ])
 
-    // Show typing indicator immediately
-    setIsTyping(true)
+      // Show typing indicator immediately
+      setIsTyping(true)
 
-    // Send via Pico Protocol
-    const picoMsg: PicoMessage = {
-      type: "message.send",
-      id,
-      payload: { content },
-    }
-    wsRef.current.send(JSON.stringify(picoMsg))
-  }, [setTrackedMessages])
+      // Send via Pico Protocol
+      const picoMsg: PicoMessage = {
+        type: "message.send",
+        id,
+        payload: { content },
+      }
+      wsRef.current.send(JSON.stringify(picoMsg))
+    },
+    [setTrackedMessages],
+  )
 
   // Switch to a historical session
   const switchSession = useCallback(
@@ -429,13 +459,15 @@ export function usePicoChat() {
       }
 
       try {
-        const historyMessages = await loadSessionMessages(sessionId)
+        const { messages: historyMessages, metrics } =
+          await loadSessionMessages(sessionId)
 
         // Only switch the active websocket session after history has loaded successfully.
         disconnect()
         setActiveSessionId(sessionId)
         setIsTyping(false)
         setTrackedMessages(historyMessages)
+        setHistoryMetrics(metrics)
       } catch (err) {
         console.error("Failed to load session history:", err)
         toast.error(t("chat.historyOpenFailed"))
@@ -448,7 +480,14 @@ export function usePicoChat() {
         }
       }, 100)
     },
-    [connect, disconnect, gatewayState, loadSessionMessages, setTrackedMessages, t],
+    [
+      connect,
+      disconnect,
+      gatewayState,
+      loadSessionMessages,
+      setTrackedMessages,
+      t,
+    ],
   )
 
   // Start a new empty chat
@@ -461,6 +500,7 @@ export function usePicoChat() {
     const newId = generateSessionId()
     setActiveSessionId(newId)
     setTrackedMessages([])
+    setHistoryMetrics(null)
     setIsTyping(false)
 
     // Reconnect with the fresh session
@@ -471,8 +511,18 @@ export function usePicoChat() {
     }, 100)
   }, [disconnect, connect, gatewayState, messages.length, setTrackedMessages])
 
+  const sessionMetrics = addChatMetrics(
+    historyMetrics,
+    sumChatMetrics(
+      messages
+        .filter((message) => message.source === "live")
+        .map((message) => message.metrics),
+    ),
+  )
+
   return {
     messages,
+    sessionMetrics,
     connectionState,
     isTyping,
     activeSessionId,

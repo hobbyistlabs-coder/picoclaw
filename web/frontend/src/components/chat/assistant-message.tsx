@@ -3,17 +3,21 @@ import { useState } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
+import { ChatMetricsPills } from "@/components/chat/chat-metrics-pills"
 import { Button } from "@/components/ui/button"
 import { formatMessageTime } from "@/hooks/use-pico-chat"
+import type { ChatMetrics } from "@/lib/chat-metrics"
 
 interface AssistantMessageProps {
   content: string
   timestamp?: string | number
+  metrics?: ChatMetrics
 }
 
 export function AssistantMessage({
   content,
   timestamp = "",
+  metrics,
 }: AssistantMessageProps) {
   const [isCopied, setIsCopied] = useState(false)
   const formattedTimestamp =
@@ -39,6 +43,8 @@ export function AssistantMessage({
           )}
         </div>
       </div>
+
+      <ChatMetricsPills metrics={metrics} />
 
       <div className="bg-card text-card-foreground relative overflow-hidden rounded-xl border">
         <div className="prose dark:prose-invert prose-p:my-2 prose-pre:my-2 prose-pre:rounded-lg prose-pre:border prose-pre:bg-zinc-950 prose-pre:p-3 max-w-none p-4 text-[15px] leading-relaxed">

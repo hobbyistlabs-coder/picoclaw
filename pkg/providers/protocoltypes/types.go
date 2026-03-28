@@ -42,9 +42,11 @@ type ReasoningDetail struct {
 }
 
 type UsageInfo struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
+	PromptTokens     int     `json:"prompt_tokens"`
+	CompletionTokens int     `json:"completion_tokens"`
+	TotalTokens      int     `json:"total_tokens"`
+	EstimatedCostUSD float64 `json:"estimated_cost_usd,omitempty"`
+	HasEstimatedCost bool    `json:"has_estimated_cost,omitempty"`
 }
 
 // CacheControl marks a content block for LLM-side prefix caching.
@@ -70,6 +72,7 @@ type Message struct {
 	SystemParts      []ContentBlock `json:"system_parts,omitempty"` // structured system blocks for cache-aware adapters
 	ToolCalls        []ToolCall     `json:"tool_calls,omitempty"`
 	ToolCallID       string         `json:"tool_call_id,omitempty"`
+	Usage            *UsageInfo     `json:"usage,omitempty"`
 }
 
 type ToolDefinition struct {
