@@ -29,30 +29,44 @@ func NewAgentRegistry(
 
 	agentConfigs := cfg.Agents.List
 	if len(agentConfigs) == 0 {
-		implicitAgent := &config.AgentConfig{
-			ID:      "main",
-			Default: true,
+		registry.registerImplicitMain(cfg, provider, "Created implicit main agent (no agents.list configured)")
+		return registry
+	}
+
+	hasMain := false
+	for i := range agentConfigs {
+		ac := &agentConfigs[i]
+		id := routing.NormalizeAgentID(ac.ID)
+		if id == routing.DefaultAgentID {
+			hasMain = true
 		}
-		instance := NewAgentInstance(implicitAgent, &cfg.Agents.Defaults, cfg, provider)
-		registry.agents["main"] = instance
-		logger.InfoCF("agent", "Created implicit main agent (no agents.list configured)", nil)
-	} else {
-		for i := range agentConfigs {
-			ac := &agentConfigs[i]
-			id := routing.NormalizeAgentID(ac.ID)
-			instance := NewAgentInstance(ac, &cfg.Agents.Defaults, cfg, provider)
-			registry.agents[id] = instance
-			logger.InfoCF("agent", "Registered agent",
-				map[string]any{
-					"agent_id":  id,
-					"name":      ac.Name,
-					"workspace": instance.Workspace,
-					"model":     instance.Model,
-				})
-		}
+		instance := NewAgentInstance(ac, &cfg.Agents.Defaults, cfg, provider)
+		registry.agents[id] = instance
+		logger.InfoCF("agent", "Registered agent",
+			map[string]any{
+				"agent_id":  id,
+				"name":      ac.Name,
+				"workspace": instance.Workspace,
+				"model":     instance.Model,
+			})
+	}
+
+	if !hasMain {
+		registry.registerImplicitMain(cfg, provider, "Created implicit main agent alongside configured agents")
 	}
 
 	return registry
+}
+
+func (r *AgentRegistry) registerImplicitMain(
+	cfg *config.Config,
+	provider providers.LLMProvider,
+	message string,
+) {
+	implicitAgent := &config.AgentConfig{ID: routing.DefaultAgentID}
+	instance := NewAgentInstance(implicitAgent, &cfg.Agents.Defaults, cfg, provider)
+	r.agents[routing.DefaultAgentID] = instance
+	logger.InfoCF("agent", message, nil)
 }
 
 // GetAgent returns the agent instance for a given ID.

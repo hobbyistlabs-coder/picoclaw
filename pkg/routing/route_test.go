@@ -39,6 +39,26 @@ func TestResolveRoute_DefaultAgent_NoBindings(t *testing.T) {
 	}
 }
 
+func TestResolveRoute_DefaultAgent_PrefersMainOverFirstPersona(t *testing.T) {
+	cfg := testConfig([]config.AgentConfig{
+		{ID: "medical"},
+		{ID: "billing"},
+	}, nil)
+	r := NewRouteResolver(cfg)
+
+	route := r.ResolveRoute(RouteInput{
+		Channel: "pico",
+		Peer:    &RoutePeer{Kind: "direct", ID: "user1"},
+	})
+
+	if route.AgentID != DefaultAgentID {
+		t.Errorf("AgentID = %q, want %q", route.AgentID, DefaultAgentID)
+	}
+	if route.MatchedBy != "default" {
+		t.Errorf("MatchedBy = %q, want 'default'", route.MatchedBy)
+	}
+}
+
 func TestResolveRoute_PeerBinding(t *testing.T) {
 	agents := []config.AgentConfig{
 		{ID: "sales", Default: true},
@@ -279,7 +299,7 @@ func TestResolveRoute_DefaultAgentSelection(t *testing.T) {
 	}
 }
 
-func TestResolveRoute_NoDefaultUsesFirst(t *testing.T) {
+func TestResolveRoute_NoDefaultUsesMain(t *testing.T) {
 	agents := []config.AgentConfig{
 		{ID: "alpha"},
 		{ID: "beta"},
@@ -291,7 +311,7 @@ func TestResolveRoute_NoDefaultUsesFirst(t *testing.T) {
 		Channel: "cli",
 	})
 
-	if route.AgentID != "alpha" {
-		t.Errorf("AgentID = %q, want 'alpha' (first in list)", route.AgentID)
+	if route.AgentID != DefaultAgentID {
+		t.Errorf("AgentID = %q, want %q", route.AgentID, DefaultAgentID)
 	}
 }

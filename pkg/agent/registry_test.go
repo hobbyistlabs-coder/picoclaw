@@ -64,8 +64,13 @@ func TestNewAgentRegistry_ExplicitAgents(t *testing.T) {
 	registry := NewAgentRegistry(cfg, &mockRegistryProvider{})
 
 	ids := registry.ListAgentIDs()
-	if len(ids) != 2 {
-		t.Fatalf("expected 2 agents, got %d: %v", len(ids), ids)
+	if len(ids) != 3 {
+		t.Fatalf("expected 3 agents including implicit main, got %d: %v", len(ids), ids)
+	}
+
+	mainAgent, ok := registry.GetAgent("main")
+	if !ok || mainAgent == nil {
+		t.Fatal("expected to find implicit 'main' agent")
 	}
 
 	sales, ok := registry.GetAgent("sales")
@@ -108,6 +113,9 @@ func TestAgentRegistry_GetDefaultAgent(t *testing.T) {
 	agent := registry.GetDefaultAgent()
 	if agent == nil {
 		t.Fatal("expected a default agent")
+	}
+	if agent.ID != "main" {
+		t.Errorf("agent.ID = %q, want 'main'", agent.ID)
 	}
 }
 

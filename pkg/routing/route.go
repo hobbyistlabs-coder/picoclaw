@@ -245,8 +245,10 @@ func (r *RouteResolver) resolveDefaultAgentID() string {
 			}
 		}
 	}
-	if id := strings.TrimSpace(agents[0].ID); id != "" {
-		return NormalizeAgentID(id)
+	for _, a := range agents {
+		if NormalizeAgentID(a.ID) == DefaultAgentID {
+			return DefaultAgentID
+		}
 	}
 	return DefaultAgentID
 }
