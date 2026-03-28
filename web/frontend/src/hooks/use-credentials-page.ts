@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
+import { getAppConfig, patchAppConfig } from "@/api/channels"
 import {
   type OAuthFlowState,
   type OAuthProvider,
@@ -37,6 +38,8 @@ export function useCredentialsPage() {
 
   const [openAIToken, setOpenAIToken] = useState("")
   const [anthropicToken, setAnthropicToken] = useState("")
+  const [openRouterToken, setOpenRouterToken] = useState("")
+  const [openRouterConfigured, setOpenRouterConfigured] = useState(false)
 
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
   const [logoutConfirmProvider, setLogoutConfirmProvider] = useState<
@@ -48,8 +51,21 @@ export function useCredentialsPage() {
 
   const loadProviders = useCallback(async () => {
     try {
-      const data = await getOAuthProviders()
+      const [data, appConfig] = await Promise.all([
+        getOAuthProviders(),
+        getAppConfig(),
+      ])
       setProviders(data.providers)
+      const providers = appConfig.providers as
+        | Record<string, unknown>
+        | undefined
+      const openrouter = providers?.openrouter as
+        | Record<string, unknown>
+        | undefined
+      setOpenRouterConfigured(
+        typeof openrouter?.api_key === "string" &&
+          openrouter.api_key.trim() !== "",
+      )
       setError("")
     } catch (err) {
       setError(
@@ -314,6 +330,31 @@ export function useCredentialsPage() {
     [loadProviders, t],
   )
 
+  const saveOpenRouterToken = useCallback(async () => {
+    setActiveAction("openrouter:token")
+    setError("")
+
+    try {
+      await patchAppConfig({
+        providers: {
+          openrouter: {
+            api_key: openRouterToken.trim(),
+          },
+        },
+      })
+      setOpenRouterToken("")
+      await loadProviders()
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : t("credentials.errors.loginFailed"),
+      )
+    } finally {
+      setActiveAction("")
+    }
+  }, [loadProviders, openRouterToken, t])
+
   const doLogout = useCallback(
     async (provider: OAuthProvider) => {
       const actionID = `${provider}:logout`
@@ -422,6 +463,8 @@ export function useCredentialsPage() {
     openaiStatus,
     anthropicStatus,
     antigravityStatus,
+    openRouterToken,
+    openRouterConfigured,
     logoutDialogOpen,
     logoutConfirmProvider,
     logoutProviderLabel,
@@ -429,10 +472,12 @@ export function useCredentialsPage() {
     deviceFlow,
     setOpenAIToken,
     setAnthropicToken,
+    setOpenRouterToken,
     startBrowserOAuth,
     startOpenAIDeviceCode,
     stopLoading,
     saveToken,
+    saveOpenRouterToken,
     askLogout,
     handleConfirmLogout,
     handleLogoutDialogOpenChange,

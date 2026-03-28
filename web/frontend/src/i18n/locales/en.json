@@ -84,6 +84,10 @@
       "openai": {
         "description": "Supports browser OAuth, device code, and token login."
       },
+      "openrouter": {
+        "description": "Stores the API key used by OpenRouter-backed models.",
+        "restartHint": "After saving a new key, restart the gateway container so the running provider reloads it."
+      },
       "anthropic": {
         "description": "Uses token login for Claude access."
       },
@@ -110,7 +114,8 @@
     },
     "fields": {
       "openaiToken": "OpenAI token",
-      "anthropicToken": "Anthropic token"
+      "anthropicToken": "Anthropic token",
+      "openrouterToken": "OpenRouter API key"
     },
     "labels": {
       "account": "Account",

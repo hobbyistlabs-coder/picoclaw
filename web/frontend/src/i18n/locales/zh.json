@@ -84,6 +84,10 @@
       "openai": {
         "description": "支持浏览器 OAuth、设备码和 Token 登录。"
       },
+      "openrouter": {
+        "description": "保存 OpenRouter 模型实际使用的 API Key。",
+        "restartHint": "保存新 Key 后，需要重启 gateway 容器，运行中的 provider 才会重新加载。"
+      },
       "anthropic": {
         "description": "使用 Token 登录 Claude。"
       },
@@ -110,7 +114,8 @@
     },
     "fields": {
       "openaiToken": "OpenAI Token",
-      "anthropicToken": "Anthropic Token"
+      "anthropicToken": "Anthropic Token",
+      "openrouterToken": "OpenRouter API Key"
     },
     "labels": {
       "account": "账号",

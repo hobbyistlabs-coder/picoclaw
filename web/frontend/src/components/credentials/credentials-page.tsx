@@ -1,7 +1,9 @@
 import { IconLoader2 } from "@tabler/icons-react"
+import { Link } from "@tanstack/react-router"
 import { useTranslation } from "react-i18next"
 
 import { PageHeader } from "@/components/page-header"
+import { Button } from "@/components/ui/button"
 import { useCredentialsPage } from "@/hooks/use-credentials-page"
 
 import { AnthropicCredentialCard } from "./anthropic-credential-card"
@@ -9,6 +11,7 @@ import { AntigravityCredentialCard } from "./antigravity-credential-card"
 import { DeviceCodeSheet } from "./device-code-sheet"
 import { LogoutConfirmDialog } from "./logout-confirm-dialog"
 import { OpenAICredentialCard } from "./openai-credential-card"
+import { OpenRouterCredentialCard } from "./openrouter-credential-card"
 
 export function CredentialsPage() {
   const { t } = useTranslation()
@@ -20,9 +23,11 @@ export function CredentialsPage() {
     flowHint,
     openAIToken,
     anthropicToken,
+    openRouterToken,
     openaiStatus,
     anthropicStatus,
     antigravityStatus,
+    openRouterConfigured,
     logoutDialogOpen,
     logoutConfirmProvider,
     logoutProviderLabel,
@@ -30,10 +35,12 @@ export function CredentialsPage() {
     deviceFlow,
     setOpenAIToken,
     setAnthropicToken,
+    setOpenRouterToken,
     startBrowserOAuth,
     startOpenAIDeviceCode,
     stopLoading,
     saveToken,
+    saveOpenRouterToken,
     askLogout,
     handleConfirmLogout,
     handleLogoutDialogOpenChange,
@@ -42,7 +49,11 @@ export function CredentialsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader title={t("navigation.credentials")} />
+      <PageHeader title={t("navigation.credentials")}>
+        <Button variant="outline" asChild>
+          <Link to="/config/raw">{t("pages.config.raw_json_title")}</Link>
+        </Button>
+      </PageHeader>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-6">
         <div className="pt-2">
@@ -71,6 +82,14 @@ export function CredentialsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 py-5 lg:auto-rows-fr lg:grid-cols-3">
+            <OpenRouterCredentialCard
+              configured={openRouterConfigured}
+              activeAction={activeAction}
+              token={openRouterToken}
+              onTokenChange={setOpenRouterToken}
+              onSaveToken={() => void saveOpenRouterToken()}
+            />
+
             <OpenAICredentialCard
               status={openaiStatus}
               activeAction={activeAction}
