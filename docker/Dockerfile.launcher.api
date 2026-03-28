@@ -1,0 +1,23 @@
+FROM golang:1.26.0-alpine AS builder
+
+RUN apk add --no-cache git
+
+WORKDIR /src
+
+COPY go.mod ./
+RUN go mod download
+
+COPY . .
+RUN mkdir -p /src/web/backend/dist && \
+	printf '%s\n' '<!doctype html><title>API only</title>' > /src/web/backend/dist/index.html && \
+	go mod tidy && \
+	go build -o /src/build/jane-ai-launcher ./web/backend
+
+FROM alpine:3.23
+
+RUN apk add --no-cache ca-certificates tzdata
+
+COPY --from=builder /src/build/jane-ai-launcher /usr/local/bin/jane-ai-launcher
+
+ENTRYPOINT ["jane-ai-launcher"]
+CMD ["-public", "-no-browser"]

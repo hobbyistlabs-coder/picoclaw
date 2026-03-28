@@ -3,8 +3,14 @@
 build/
 .jane-ai/
 config/
+.codex/
 .env
 .env.example
 *.md
 LICENSE
 assets/
+backend
+docker/data/
+web/backend/dist/
+web/frontend/dist/
+web/frontend/node_modules/

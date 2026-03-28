@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea"
 
 interface PersonasSectionProps {
   personas: PersonaForm[]
+  sectionId?: string
   disabled?: boolean
   onAdd: () => void
   onRemove: (key: string) => void
@@ -28,6 +29,7 @@ interface PersonasSectionProps {
 
 export function PersonasSection({
   personas,
+  sectionId,
   disabled,
   onAdd,
   onRemove,
@@ -36,7 +38,7 @@ export function PersonasSection({
   const { t } = useTranslation()
 
   return (
-    <Card size="sm">
+    <Card id={sectionId} size="sm">
       <CardHeader className="border-border border-b">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
@@ -63,7 +65,11 @@ export function PersonasSection({
           </div>
         ) : (
           personas.map((persona, index) => (
-            <Card key={persona.key} className="border-border/70">
+            <Card
+              key={persona.key}
+              id={`persona-${persona.id.trim() || persona.key}`}
+              className="border-border/70"
+            >
               <CardHeader className="border-border/60 border-b pb-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>

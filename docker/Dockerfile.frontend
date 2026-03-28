@@ -1,0 +1,14 @@
+FROM oven/bun:1 AS builder
+
+WORKDIR /src/web/frontend
+
+COPY web/frontend/package.json web/frontend/pnpm-lock.yaml ./
+RUN bun install
+
+COPY web/frontend ./
+RUN bun run build
+
+FROM nginx:1.29-alpine
+
+COPY docker/frontend.nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /src/web/frontend/dist /usr/share/nginx/html

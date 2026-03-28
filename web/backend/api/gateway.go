@@ -45,6 +45,9 @@ func (h *Handler) registerGatewayRoutes(mux *http.ServeMux) {
 // TryAutoStartGateway checks whether gateway start preconditions are met and
 // starts it when possible. Intended to be called by the backend at startup.
 func (h *Handler) TryAutoStartGateway() {
+	if !h.managesGatewayProcess() {
+		return
+	}
 	gateway.mu.Lock()
 	defer gateway.mu.Unlock()
 
@@ -239,6 +242,15 @@ func (h *Handler) startGatewayLocked() (int, error) {
 //
 //	POST /api/gateway/start
 func (h *Handler) handleGatewayStart(w http.ResponseWriter, r *http.Request) {
+	if !h.managesGatewayProcess() {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]any{
+			"status":  "externally_managed",
+			"message": "gateway is managed externally",
+		})
+		return
+	}
 	gateway.mu.Lock()
 	defer gateway.mu.Unlock()
 
@@ -292,6 +304,15 @@ func (h *Handler) handleGatewayStart(w http.ResponseWriter, r *http.Request) {
 //
 //	POST /api/gateway/stop
 func (h *Handler) handleGatewayStop(w http.ResponseWriter, r *http.Request) {
+	if !h.managesGatewayProcess() {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]any{
+			"status":  "externally_managed",
+			"message": "gateway is managed externally",
+		})
+		return
+	}
 	gateway.mu.Lock()
 	defer gateway.mu.Unlock()
 
@@ -331,6 +352,15 @@ func (h *Handler) handleGatewayStop(w http.ResponseWriter, r *http.Request) {
 //
 //	POST /api/gateway/restart
 func (h *Handler) handleGatewayRestart(w http.ResponseWriter, r *http.Request) {
+	if !h.managesGatewayProcess() {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]any{
+			"status":  "externally_managed",
+			"message": "gateway is managed externally",
+		})
+		return
+	}
 	gateway.mu.Lock()
 
 	// Stop existing process if running
@@ -375,6 +405,11 @@ func (h *Handler) handleGatewayClearLogs(w http.ResponseWriter, r *http.Request)
 //
 //	GET /api/gateway/status
 func (h *Handler) handleGatewayStatus(w http.ResponseWriter, r *http.Request) {
+	if !h.managesGatewayProcess() {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(h.remoteGatewayStatus())
+		return
+	}
 	data := map[string]any{}
 
 	// Check process state
@@ -500,6 +535,22 @@ func (h *Handler) handleGatewayEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
+	if !h.managesGatewayProcess() {
+		fmt.Fprintf(w, "data: %s\n\n", h.currentGatewayStatus())
+		flusher.Flush()
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-r.Context().Done():
+				return
+			case <-ticker.C:
+				fmt.Fprintf(w, "data: %s\n\n", h.currentGatewayStatus())
+				flusher.Flush()
+			}
+		}
+	}
+
 	// Subscribe to gateway events
 	ch := gateway.events.Subscribe()
 	defer gateway.events.Unsubscribe(ch)
@@ -525,6 +576,10 @@ func (h *Handler) handleGatewayEvents(w http.ResponseWriter, r *http.Request) {
 
 // currentGatewayStatus returns the current gateway status as a JSON string.
 func (h *Handler) currentGatewayStatus() string {
+	if !h.managesGatewayProcess() {
+		encoded, _ := json.Marshal(h.remoteGatewayStatus())
+		return string(encoded)
+	}
 	gateway.mu.Lock()
 	defer gateway.mu.Unlock()
 

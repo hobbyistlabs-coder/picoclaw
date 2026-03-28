@@ -79,6 +79,18 @@ export function ConfigPage() {
   }, [data])
 
   useEffect(() => {
+    if (!data) return
+    const hash = window.location.hash.replace(/^#/, "")
+    if (!hash) return
+    window.setTimeout(() => {
+      document.getElementById(hash)?.scrollIntoView({
+        block: "start",
+        behavior: "smooth",
+      })
+    }, 50)
+  }, [data])
+
+  useEffect(() => {
     if (!launcherConfig) return
     const parsed: LauncherForm = {
       port: String(launcherConfig.port),
@@ -313,6 +325,7 @@ export function ConfigPage() {
         })
 
         setBaseline(form)
+        window.dispatchEvent(new Event("jane-config-updated"))
         queryClient.invalidateQueries({ queryKey: ["config"] })
       }
 
@@ -396,6 +409,7 @@ export function ConfigPage() {
               <AgentDefaultsSection form={form} onFieldChange={updateField} />
 
               <PersonasSection
+                sectionId="personas-section"
                 personas={form.personas}
                 disabled={saving}
                 onAdd={addPersona}

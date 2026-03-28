@@ -1,28 +1,10 @@
 services:
-  picoclaw-agent:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.full
-    container_name: picoclaw-agent-full
-    profiles: ["agent"]
-    env_file: ["../.env.local"]
-    environment:
-      PICOCLAW_HOME: /root/.picoclaw
-      PICOCLAW_CONFIG: /root/.picoclaw/config.json
-    volumes:
-      - ../config:/root/.picoclaw
-      - picoclaw-workspace:/root/.picoclaw/workspace
-      - picoclaw-npm-cache:/root/.npm
-    entrypoint: ["picoclaw", "agent"]
-    stdin_open: true
-    tty: true
   picoclaw-gateway:
     build:
       context: ..
       dockerfile: docker/Dockerfile.full
-    container_name: picoclaw-gateway-full
+    container_name: picoclaw-gateway-dev
     restart: unless-stopped
-    profiles: ["gateway", "launcher"]
     env_file: ["../.env.local"]
     environment:
       PICOCLAW_HOME: /root/.picoclaw
@@ -34,13 +16,13 @@ services:
       - picoclaw-workspace:/root/.picoclaw/workspace
       - picoclaw-npm-cache:/root/.npm
     command: ["gateway"]
+
   picoclaw-launcher:
     build:
       context: ..
       dockerfile: docker/Dockerfile.launcher.api
-    container_name: picoclaw-launcher-full
+    container_name: picoclaw-launcher-dev
     restart: unless-stopped
-    profiles: ["launcher"]
     env_file: ["../.env.local"]
     environment:
       PICOCLAW_HOME: /root/.picoclaw
@@ -51,19 +33,24 @@ services:
       - picoclaw-gateway
     volumes:
       - ../config:/root/.picoclaw
-    expose:
-      - "18800"
-  picoclaw-frontend:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.frontend
-    container_name: picoclaw-frontend-full
-    restart: unless-stopped
-    profiles: ["launcher"]
+    ports:
+      - "127.0.0.1:18801:18800"
+
+  picoclaw-frontend-dev:
+    image: oven/bun:1
+    container_name: picoclaw-frontend-dev
+    working_dir: /app
+    command: sh -lc "bun install && bun run dev --host 0.0.0.0 --port 5173"
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      VITE_API_PROXY_TARGET: http://picoclaw-launcher:18800
     depends_on:
       - picoclaw-launcher
+    volumes:
+      - ../web/frontend:/app
     ports:
-      - "127.0.0.1:18800:80"
+      - "127.0.0.1:5173:5173"
+
 volumes:
   picoclaw-workspace:
   picoclaw-npm-cache:

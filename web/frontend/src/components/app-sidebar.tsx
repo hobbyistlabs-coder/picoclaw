@@ -5,6 +5,7 @@ import {
   IconChevronsUp,
   IconKey,
   IconListDetails,
+  IconMasksTheater,
   IconMessageCircle,
   IconSettings,
   IconSparkles,
@@ -31,10 +32,12 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import { useSidebarChannels } from "@/hooks/use-sidebar-channels"
+import { useSidebarPersonas } from "@/hooks/use-sidebar-personas"
 
 interface NavItem {
   title: string
-  url: string
+  to: string
+  hash?: string
   icon: React.ComponentType<{ className?: string }>
   translateTitle?: boolean
 }
@@ -75,6 +78,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     showAllChannels,
     toggleShowAllChannels,
   } = useSidebarChannels({ t })
+  const personaItems = useSidebarPersonas()
 
   const navGroups: NavGroup[] = React.useMemo(() => {
     return [
@@ -83,7 +87,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         items: [
           {
             title: "navigation.chat",
-            url: "/",
+            to: "/",
             icon: IconMessageCircle,
             translateTitle: true,
           },
@@ -94,13 +98,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         items: [
           {
             title: "navigation.models",
-            url: "/models",
+            to: "/models",
             icon: IconAtom,
             translateTitle: true,
           },
           {
             title: "navigation.credentials",
-            url: "/credentials",
+            to: "/credentials",
             icon: IconKey,
             translateTitle: true,
           },
@@ -111,7 +115,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         defaultOpen: true,
         items: channelItems.map((item) => ({
           title: item.title,
-          url: item.url,
+          to: item.url,
           icon: item.icon,
           translateTitle: false,
         })),
@@ -122,16 +126,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         items: [
           {
             title: "navigation.skills",
-            url: "/agent/skills",
+            to: "/agent/skills",
             icon: IconSparkles,
             translateTitle: true,
           },
           {
             title: "navigation.tools",
-            url: "/agent/tools",
+            to: "/agent/tools",
             icon: IconTools,
             translateTitle: true,
           },
+          {
+            title: "navigation.personas",
+            to: "/config",
+            hash: "personas-section",
+            icon: IconMasksTheater,
+            translateTitle: true,
+          },
+          ...personaItems,
         ],
       },
       {
@@ -139,20 +151,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         items: [
           {
             title: "navigation.config",
-            url: "/config",
+            to: "/config",
             icon: IconSettings,
             translateTitle: true,
           },
           {
             title: "navigation.logs",
-            url: "/logs",
+            to: "/logs",
             icon: IconListDetails,
             translateTitle: true,
           },
         ],
       },
     ]
-  }, [channelItems])
+  }, [channelItems, personaItems])
 
   return (
     <Sidebar
@@ -195,9 +207,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <SidebarMenu>
                     {group.items.map((item) => {
                       const isActive =
-                        currentPath === item.url ||
-                        (item.url !== "/" &&
-                          currentPath.startsWith(`${item.url}/`))
+                        currentPath === item.to ||
+                        (item.to !== "/" &&
+                          currentPath.startsWith(`${item.to}/`))
                       return (
                         <SidebarMenuItem key={item.title}>
                           <SidebarMenuButton
@@ -205,7 +217,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                             isActive={isActive}
                             className={`h-9 px-3 ${isActive ? "bg-accent/80 text-foreground font-medium" : "text-muted-foreground hover:bg-muted/60"}`}
                           >
-                            <Link to={item.url}>
+                            <Link to={item.to} hash={item.hash}>
                               <item.icon
                                 className={`size-4 ${isActive ? "opacity-100" : "opacity-60"}`}
                               />

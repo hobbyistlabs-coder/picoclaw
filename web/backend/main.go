@@ -118,7 +118,9 @@ func main() {
 	apiHandler.RegisterRoutes(mux)
 
 	// Frontend Embedded Assets
-	registerEmbedRoutes(mux)
+	if launcherUIMode() == launcherUIModeStatic {
+		registerEmbedRoutes(mux)
+	}
 
 	accessControlledMux, err := middleware.IPAllowlist(launcherCfg.AllowedCIDRs, mux)
 	if err != nil {
@@ -146,7 +148,7 @@ func main() {
 	fmt.Println()
 
 	// Auto-open browser
-	if !*noBrowser {
+	if launcherUIMode() == launcherUIModeStatic && !*noBrowser {
 		go func() {
 			time.Sleep(500 * time.Millisecond)
 			url := "http://localhost:" + effectivePort

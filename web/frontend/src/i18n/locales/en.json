@@ -5,6 +5,7 @@
     "models": "Models",
     "credentials": "Credentials",
     "agent_group": "Agent",
+    "personas": "Personas",
     "skills": "Skills",
     "tools": "Tools",
     "services": "Services",
