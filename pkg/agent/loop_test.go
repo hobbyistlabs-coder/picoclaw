@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,6 +19,48 @@ import (
 	"jane/pkg/routing"
 	"jane/pkg/tools"
 )
+
+type approvalMockProvider struct{}
+
+func (p *approvalMockProvider) Chat(
+	ctx context.Context,
+	messages []providers.Message,
+	toolDefs []providers.ToolDefinition,
+	model string,
+	opts map[string]any,
+) (*providers.LLMResponse, error) {
+	return &providers.LLMResponse{
+		ToolCalls: []providers.ToolCall{{
+			ID:   "tool-approval-1",
+			Name: "approval_tool",
+			Function: &providers.FunctionCall{
+				Name:      "approval_tool",
+				Arguments: `{"command":"ls -la"}`,
+			},
+		}},
+	}, nil
+}
+
+func (p *approvalMockProvider) GetDefaultModel() string { return "mock-model" }
+
+type approvalTool struct{}
+
+func (t *approvalTool) Name() string { return "approval_tool" }
+func (t *approvalTool) Description() string {
+	return "Tool that always requires approval for testing"
+}
+func (t *approvalTool) Parameters() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"command": map[string]any{"type": "string"},
+		},
+	}
+}
+func (t *approvalTool) Execute(ctx context.Context, args map[string]any) *tools.ToolResult {
+	return &tools.ToolResult{ForLLM: "approved"}
+}
+func (t *approvalTool) RequiresApproval() bool { return true }
 
 type fakeChannel struct{ id string }
 
@@ -817,6 +860,83 @@ func TestProcessDirectWithChannel_InitializesMCPInAgentMode(t *testing.T) {
 
 	if !al.mcp.hasManager() {
 		t.Fatal("expected MCP manager to be initialized in direct agent mode")
+	}
+}
+
+func TestRunAgentLoop_PausesWithoutFallbackOnApproval(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "agent-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	cfg := &config.Config{
+		Agents: config.AgentsConfig{
+			Defaults: config.AgentDefaults{
+				Workspace:         tmpDir,
+				Model:             "test-model",
+				MaxTokens:         4096,
+				MaxToolIterations: 10,
+			},
+		},
+	}
+
+	msgBus := bus.NewMessageBus()
+	al := NewAgentLoop(cfg, msgBus, &approvalMockProvider{})
+	defaultAgent := al.registry.GetDefaultAgent()
+	if defaultAgent == nil {
+		t.Fatal("No default agent found")
+	}
+	defaultAgent.Tools.Register(&approvalTool{})
+
+	sessionKey := "agent:main:test:direct:test:approval-session"
+	response, err := al.runAgentLoop(context.Background(), defaultAgent, processOptions{
+		SessionKey:      sessionKey,
+		Channel:         "test",
+		ChatID:          "chat-1",
+		UserMessage:     "explore host machine",
+		DefaultResponse: defaultResponse,
+		EnableSummary:   false,
+		SendResponse:    false,
+	})
+	if err != nil {
+		t.Fatalf("runAgentLoop() error = %v", err)
+	}
+	if response != "" {
+		t.Fatalf("response = %q, want empty while awaiting approval", response)
+	}
+
+	outbound, ok := msgBus.SubscribeOutbound(context.Background())
+	if !ok {
+		t.Fatal("expected approval outbound message")
+	}
+	if !strings.Contains(outbound.Content, "requires your approval") {
+		t.Fatalf("outbound.Content = %q", outbound.Content)
+	}
+
+	history := defaultAgent.Sessions.GetHistory(sessionKey)
+	if len(history) != 2 {
+		t.Fatalf("len(history) = %d, want 2", len(history))
+	}
+	if history[0].Role != "user" {
+		t.Fatalf("history[0].Role = %q, want user", history[0].Role)
+	}
+	if history[1].Role != "assistant" {
+		t.Fatalf("history[1].Role = %q, want assistant tool-call message", history[1].Role)
+	}
+	if strings.Contains(history[1].Content, "I've completed processing but have no response to give") {
+		t.Fatalf("unexpected fallback assistant content persisted: %q", history[1].Content)
+	}
+	if len(history[1].ToolCalls) != 1 {
+		t.Fatalf("len(history[1].ToolCalls) = %d, want 1", len(history[1].ToolCalls))
+	}
+
+	var args map[string]any
+	if err := json.Unmarshal([]byte(history[1].ToolCalls[0].Function.Arguments), &args); err != nil {
+		t.Fatalf("tool call arguments decode error = %v", err)
+	}
+	if args["command"] != "ls -la" {
+		t.Fatalf("tool call args = %#v, want command", args)
 	}
 }
 

@@ -24,6 +24,7 @@ import (
 var (
 	metricsIterationDuration = expvar.NewFloat("agentloop_iteration_duration_seconds")
 	metricsFailureCounts     = expvar.NewInt("agentloop_failure_counts")
+	errApprovalPending       = errors.New("agent approval pending")
 )
 
 // runAgentLoop is the core message processing logic.
@@ -74,6 +75,14 @@ func (al *AgentLoop) runAgentLoop(
 	finalContent, iteration, metrics, err := al.runLLMIteration(ctx, agent, messages, opts)
 	metricsIterationDuration.Add(time.Since(startTime).Seconds())
 	if err != nil {
+		if errors.Is(err, errApprovalPending) {
+			logger.InfoCF("agent", "Turn paused pending approval", map[string]any{
+				"agent_id":    agent.ID,
+				"session_key": opts.SessionKey,
+				"iterations":  iteration,
+			})
+			return "", nil
+		}
 		metricsFailureCounts.Add(1)
 		return "", err
 	}
@@ -362,7 +371,7 @@ func (al *AgentLoop) runLLMIteration(
 				Content: approvalMsg,
 			})
 
-			return "", iteration, metrics, nil
+			return "", iteration, metrics, errApprovalPending
 		}
 		// --- End HITL ---
 
