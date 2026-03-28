@@ -15,7 +15,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <div className="flex flex-1 overflow-hidden">
           <AppSidebar />
           <div className="flex w-full flex-col overflow-hidden">
-            <main className="flex min-h-0 w-full max-w-full flex-1 flex-col overflow-hidden">
+            <main className="flex min-h-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-[linear-gradient(180deg,rgba(9,19,29,0.72),rgba(11,17,28,0.96))]">
               {children}
             </main>
           </div>

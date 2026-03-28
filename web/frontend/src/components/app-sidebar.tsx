@@ -157,9 +157,26 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar
       {...props}
-      className="bg-background border-r-border/20 border-r pt-3"
+      className="border-r-sidebar-border/60 bg-sidebar/95 border-r pt-3"
     >
       <SidebarContent className="bg-background">
+        <div className="text-sidebar-foreground mx-3 mb-4 rounded-3xl border border-white/10 bg-white/6 p-3 shadow-lg shadow-black/20">
+          <div className="mb-3 flex items-center gap-3">
+            <img className="size-11 rounded-2xl" src="/jane-mark.svg" alt="" />
+            <div>
+              <p className="font-serif text-base font-semibold tracking-[0.24em] uppercase">
+                JANE-ai
+              </p>
+              <p className="text-sidebar-foreground/60 text-xs tracking-[0.28em] uppercase">
+                Endgame mesh
+              </p>
+            </div>
+          </div>
+          <p className="text-sidebar-foreground/72 text-xs leading-5">
+            Tactical reasoning, model routing, and channel control from one
+            quiet interface.
+          </p>
+        </div>
         {navGroups.map((group) => (
           <Collapsible
             key={group.label}

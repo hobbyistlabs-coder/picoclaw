@@ -1,5 +1,4 @@
 import {
-  IconBook,
   IconLanguage,
   IconLoader2,
   IconMenu2,
@@ -73,9 +72,13 @@ export function AppHeader() {
         <SidebarTrigger className="text-muted-foreground hover:bg-accent hover:text-foreground flex h-9 w-9 items-center justify-center rounded-lg sm:hidden [&>svg]:size-5">
           <IconMenu2 />
         </SidebarTrigger>
-        <div className="hidden w-36 shrink-0 items-center sm:flex">
+        <div className="hidden shrink-0 items-center sm:flex">
           <Link to="/">
-            <img className="w-full" src="/logo_with_text.png" alt="Logo" />
+            <img
+              className="h-10 w-auto"
+              src="/jane-wordmark.svg"
+              alt="JANE-ai"
+            />
           </Link>
         </div>
       </div>
@@ -149,13 +152,6 @@ export function AppHeader() {
           className="mx-4 my-2 hidden md:block"
           orientation="vertical"
         />
-
-        {/* Docs Link */}
-        <Button variant="ghost" size="icon" className="size-8" asChild>
-          <a href="https://docs.picoclaw.io" target="_blank" rel="noreferrer">
-            <IconBook className="size-4.5" />
-          </a>
-        </Button>
 
         {/* Language Switcher */}
         <DropdownMenu>

@@ -16,7 +16,7 @@ export function PageHeader({ title, titleExtra, children }: PageHeaderProps) {
         <SidebarTrigger className="border-border/60 bg-background text-muted-foreground hover:bg-accent hover:text-foreground hidden h-9 w-9 rounded-lg border sm:flex [&>svg]:size-5">
           <IconMenu2 />
         </SidebarTrigger>
-        <h2 className="text-foreground/90 text-xl font-medium tracking-tight">
+        <h2 className="font-serif text-xl font-semibold tracking-[0.08em] text-white/92">
           {title}
         </h2>
         {titleExtra}

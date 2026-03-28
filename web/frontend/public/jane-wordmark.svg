@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
-  <title id="title">JANE-ai mark</title>
-  <desc id="desc">A luminous J linked into an ansible-style network.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 128" role="img" aria-labelledby="title desc">
+  <title id="title">JANE-ai wordmark</title>
+  <desc id="desc">JANE-ai wordmark paired with the networked mark.</desc>
   <defs>
     <linearGradient id="bg" x1="18" y1="16" x2="112" y2="112" gradientUnits="userSpaceOnUse">
       <stop stop-color="#163447"/>
@@ -11,8 +11,13 @@
       <stop offset=".55" stop-color="#74e3d5"/>
       <stop offset="1" stop-color="#f2c46d"/>
     </linearGradient>
+    <linearGradient id="text" x1="150" y1="26" x2="446" y2="110" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f8fbff"/>
+      <stop offset=".7" stop-color="#d8f1f0"/>
+      <stop offset="1" stop-color="#f2c46d"/>
+    </linearGradient>
   </defs>
-  <rect width="128" height="128" rx="32" fill="url(#bg)"/>
+  <rect x="0" y="0" width="128" height="128" rx="32" fill="url(#bg)"/>
   <path d="M92 28H54c-6.627 0-12 5.373-12 12v34c0 6.627 5.373 12 12 12h8c6.627 0 12-5.373 12-12V52" fill="none" stroke="url(#stroke)" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
   <path d="M28 36 42 40M84 22l10 8M30 90l16-6M80 102l14-16M22 62h14M97 58h11" fill="none" stroke="#4e8da0" stroke-linecap="round" stroke-width="4"/>
   <circle cx="22" cy="62" r="5" fill="#f2c46d"/>
@@ -20,4 +25,7 @@
   <circle cx="94" cy="30" r="5" fill="#74e3d5"/>
   <circle cx="30" cy="90" r="5" fill="#f2c46d"/>
   <circle cx="94" cy="86" r="5" fill="#74e3d5"/>
+  <text x="156" y="62" fill="url(#text)" font-family="Iowan Old Style, Palatino Linotype, Book Antiqua, Georgia, serif" font-size="46" font-weight="700" letter-spacing="3">JANE</text>
+  <text x="385" y="62" fill="#74e3d5" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="34" font-weight="600" letter-spacing="2">-ai</text>
+  <text x="158" y="92" fill="#84a9b4" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" letter-spacing="4">STRATEGIC MESH INTELLIGENCE</text>
 </svg>

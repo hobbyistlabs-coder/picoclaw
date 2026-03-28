@@ -15,9 +15,9 @@
     "logs": "日志"
   },
   "chat": {
-    "welcome": "今天我能为您做些什么？",
-    "welcomeDesc": "您可以询问我天气、设置或其他任何任务，我随时为您效劳。",
-    "placeholder": "输入新消息...",
+    "welcome": "今天要 JANE-ai 为您处理什么？",
+    "welcomeDesc": "在一个战略控制台中规划、路由并整合您的模型与渠道能力。",
+    "placeholder": "向 JANE-ai 发送指令...",
     "newChat": "新建对话",
     "notConnected": "服务未运行，请先启动以进行对话。",
     "thinking": {

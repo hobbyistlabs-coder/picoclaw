@@ -15,9 +15,9 @@
     "logs": "Logs"
   },
   "chat": {
-    "welcome": "How can I help you today?",
-    "welcomeDesc": "Ask me about weather, settings, or any other tasks. I'm here to assist you.",
-    "placeholder": "Start a new message...",
+    "welcome": "What do you need from JANE-ai?",
+    "welcomeDesc": "Plan, route, and synthesize across your models and channels from a single strategic console.",
+    "placeholder": "Send a directive to JANE-ai...",
     "newChat": "New Chat",
     "notConnected": "Gateway is not running. Start it to chat.",
     "thinking": {
