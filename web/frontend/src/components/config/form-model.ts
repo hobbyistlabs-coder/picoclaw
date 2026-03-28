@@ -1,5 +1,21 @@
 export type JsonRecord = Record<string, unknown>
 
+export interface PersonaForm {
+  key: string
+  id: string
+  name: string
+  isDefault: boolean
+  workspace: string
+  primaryModel: string
+  fallbackModelsText: string
+  systemPrompt: string
+  skillsText: string
+  mcpServersText: string
+  allowedAgentsText: string
+  subagentModel: string
+  subagentFallbacksText: string
+}
+
 export interface CoreConfigForm {
   workspace: string
   restrictToWorkspace: boolean
@@ -13,6 +29,7 @@ export interface CoreConfigForm {
   heartbeatInterval: string
   devicesEnabled: boolean
   monitorUSB: boolean
+  personas: PersonaForm[]
 }
 
 export interface LauncherForm {
@@ -65,6 +82,7 @@ export const EMPTY_FORM: CoreConfigForm = {
   heartbeatInterval: "30",
   devicesEnabled: false,
   monitorUSB: true,
+  personas: [],
 }
 
 export const EMPTY_LAUNCHER_FORM: LauncherForm = {
@@ -84,6 +102,10 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value : ""
 }
 
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : []
+}
+
 function asBool(value: unknown): boolean {
   return value === true
 }
@@ -98,10 +120,65 @@ function asNumberString(value: unknown, fallback: string): string {
   return fallback
 }
 
+function asStringArray(value: unknown): string[] {
+  return asArray(value).filter(
+    (item): item is string => typeof item === "string",
+  )
+}
+
+let personaSequence = 0
+
+function nextPersonaKey() {
+  personaSequence += 1
+  return `persona-${personaSequence}`
+}
+
+export function createEmptyPersona(): PersonaForm {
+  return {
+    key: nextPersonaKey(),
+    id: "",
+    name: "",
+    isDefault: false,
+    workspace: "",
+    primaryModel: "",
+    fallbackModelsText: "",
+    systemPrompt: "",
+    skillsText: "",
+    mcpServersText: "",
+    allowedAgentsText: "",
+    subagentModel: "",
+    subagentFallbacksText: "",
+  }
+}
+
+function buildPersonaForm(value: unknown): PersonaForm {
+  const record = asRecord(value)
+  const model = asRecord(record.model)
+  const subagents = asRecord(record.subagents)
+  const subagentModel = asRecord(subagents.model)
+
+  return {
+    key: nextPersonaKey(),
+    id: asString(record.id),
+    name: asString(record.name),
+    isDefault: asBool(record.default),
+    workspace: asString(record.workspace),
+    primaryModel: asString(model.primary || record.model),
+    fallbackModelsText: asStringArray(model.fallbacks).join("\n"),
+    systemPrompt: asString(record.system_prompt),
+    skillsText: asStringArray(record.skills).join("\n"),
+    mcpServersText: asStringArray(record.mcp_servers).join("\n"),
+    allowedAgentsText: asStringArray(subagents.allow_agents).join("\n"),
+    subagentModel: asString(subagentModel.primary || subagents.model),
+    subagentFallbacksText: asStringArray(subagentModel.fallbacks).join("\n"),
+  }
+}
+
 export function buildFormFromConfig(config: unknown): CoreConfigForm {
   const root = asRecord(config)
   const agents = asRecord(root.agents)
   const defaults = asRecord(agents.defaults)
+  const personas = asArray(agents.list).map(buildPersonaForm)
   const session = asRecord(root.session)
   const heartbeat = asRecord(root.heartbeat)
   const devices = asRecord(root.devices)
@@ -148,6 +225,7 @@ export function buildFormFromConfig(config: unknown): CoreConfigForm {
       devices.monitor_usb === undefined
         ? EMPTY_FORM.monitorUSB
         : asBool(devices.monitor_usb),
+    personas,
   }
 }
 
@@ -170,6 +248,10 @@ export function parseIntField(
 }
 
 export function parseCIDRText(raw: string): string[] {
+  return parseListText(raw)
+}
+
+export function parseListText(raw: string): string[] {
   if (!raw.trim()) {
     return []
   }

@@ -24,9 +24,12 @@ import {
   EMPTY_LAUNCHER_FORM,
   type LauncherForm,
   buildFormFromConfig,
+  createEmptyPersona,
   parseCIDRText,
   parseIntField,
+  parseListText,
 } from "@/components/config/form-model"
+import { PersonasSection } from "@/components/config/personas-section"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 
@@ -119,6 +122,35 @@ export function ConfigPage() {
     setLauncherForm((prev) => ({ ...prev, [key]: value }))
   }
 
+  const updatePersonaField = <
+    K extends keyof CoreConfigForm["personas"][number],
+  >(
+    personaKey: string,
+    key: K,
+    value: CoreConfigForm["personas"][number][K],
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      personas: prev.personas.map((persona) =>
+        persona.key === personaKey ? { ...persona, [key]: value } : persona,
+      ),
+    }))
+  }
+
+  const addPersona = () => {
+    setForm((prev) => ({
+      ...prev,
+      personas: [...prev.personas, createEmptyPersona()],
+    }))
+  }
+
+  const removePersona = (personaKey: string) => {
+    setForm((prev) => ({
+      ...prev,
+      personas: prev.personas.filter((persona) => persona.key !== personaKey),
+    }))
+  }
+
   const handleReset = () => {
     setForm(baseline)
     setLauncherForm(launcherBaseline)
@@ -139,6 +171,40 @@ export function ConfigPage() {
         }
         if (!dmScope) {
           throw new Error("Session scope is required.")
+        }
+        const normalizedPersonas = form.personas.map((persona, index) => {
+          const id = persona.id.trim()
+          if (!id) {
+            throw new Error(`Persona ${index + 1} must have an id.`)
+          }
+          return {
+            id,
+            default: persona.isDefault,
+            name: persona.name.trim(),
+            workspace: persona.workspace.trim(),
+            system_prompt: persona.systemPrompt.trim(),
+            model: {
+              primary: persona.primaryModel.trim(),
+              fallbacks: parseListText(persona.fallbackModelsText),
+            },
+            skills: parseListText(persona.skillsText),
+            mcp_servers: parseListText(persona.mcpServersText),
+            subagents: {
+              allow_agents: parseListText(persona.allowedAgentsText),
+              model: {
+                primary: persona.subagentModel.trim(),
+                fallbacks: parseListText(persona.subagentFallbacksText),
+              },
+            },
+          }
+        })
+        const duplicatePersona = normalizedPersonas.find(
+          (persona, index) =>
+            normalizedPersonas.findIndex((item) => item.id === persona.id) !==
+            index,
+        )
+        if (duplicatePersona) {
+          throw new Error(`Persona id "${duplicatePersona.id}" must be unique.`)
         }
 
         const maxTokens = parseIntField(form.maxTokens, "Max tokens", {
@@ -175,6 +241,58 @@ export function ConfigPage() {
               summarize_message_threshold: summarizeMessageThreshold,
               summarize_token_percent: summarizeTokenPercent,
             },
+            list: normalizedPersonas.map((persona) => ({
+              id: persona.id,
+              ...(persona.default ? { default: true } : {}),
+              ...(persona.name ? { name: persona.name } : {}),
+              ...(persona.workspace ? { workspace: persona.workspace } : {}),
+              ...(persona.system_prompt
+                ? { system_prompt: persona.system_prompt }
+                : {}),
+              ...(persona.model.primary || persona.model.fallbacks.length > 0
+                ? {
+                    model: {
+                      ...(persona.model.primary
+                        ? { primary: persona.model.primary }
+                        : {}),
+                      ...(persona.model.fallbacks.length > 0
+                        ? { fallbacks: persona.model.fallbacks }
+                        : {}),
+                    },
+                  }
+                : {}),
+              ...(persona.skills.length > 0 ? { skills: persona.skills } : {}),
+              ...(persona.mcp_servers.length > 0
+                ? { mcp_servers: persona.mcp_servers }
+                : {}),
+              ...(persona.subagents.allow_agents.length > 0 ||
+              persona.subagents.model.primary ||
+              persona.subagents.model.fallbacks.length > 0
+                ? {
+                    subagents: {
+                      ...(persona.subagents.allow_agents.length > 0
+                        ? { allow_agents: persona.subagents.allow_agents }
+                        : {}),
+                      ...(persona.subagents.model.primary ||
+                      persona.subagents.model.fallbacks.length > 0
+                        ? {
+                            model: {
+                              ...(persona.subagents.model.primary
+                                ? { primary: persona.subagents.model.primary }
+                                : {}),
+                              ...(persona.subagents.model.fallbacks.length > 0
+                                ? {
+                                    fallbacks:
+                                      persona.subagents.model.fallbacks,
+                                  }
+                                : {}),
+                            },
+                          }
+                        : {}),
+                    },
+                  }
+                : {}),
+            })),
           },
           session: {
             dm_scope: dmScope,
@@ -276,6 +394,14 @@ export function ConfigPage() {
               )}
 
               <AgentDefaultsSection form={form} onFieldChange={updateField} />
+
+              <PersonasSection
+                personas={form.personas}
+                disabled={saving}
+                onAdd={addPersona}
+                onRemove={removePersona}
+                onChange={updatePersonaField}
+              />
 
               <RuntimeSection form={form} onFieldChange={updateField} />
 

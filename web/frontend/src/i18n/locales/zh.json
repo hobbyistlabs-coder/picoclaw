@@ -70,7 +70,8 @@
     "save": "保存",
     "saving": "保存中...",
     "reset": "重置",
-    "confirm": "确认"
+    "confirm": "确认",
+    "remove": "删除"
   },
   "labels": {
     "loading": "加载中..."
@@ -424,8 +425,32 @@
       "allowed_cidrs": "允许访问网段",
       "allowed_cidrs_hint": "仅允许这些 CIDR 网段的客户端访问服务。可按行或逗号分隔；留空表示允许所有来源。",
       "allowed_cidrs_placeholder": "192.168.1.0/24\n10.0.0.0/8",
+      "personas_description": "创建并编辑通过启动器暴露的 persona 智能体。",
+      "add_persona": "新增 Persona",
+      "personas_empty": "当前还没有配置 persona。",
+      "persona": "Persona",
+      "persona_card_hint": "每个 persona 都对应 agents.list 中的一项。",
+      "persona_id": "Persona ID",
+      "persona_name": "显示名称",
+      "persona_default": "默认 Persona",
+      "persona_default_hint": "当路由未显式选择其他智能体时使用该 persona。",
+      "persona_workspace": "Persona 工作区",
+      "persona_workspace_hint": "该 persona 的可选工作区覆盖。",
+      "persona_model": "主模型",
+      "persona_model_hint": "该 persona 使用的 model_list 模型名。",
+      "persona_fallbacks": "回退模型",
+      "persona_prompt": "系统提示词",
+      "persona_prompt_hint": "定义该 persona 行为和指令。",
+      "persona_skills": "技能",
+      "persona_mcp_servers": "MCP 服务",
+      "persona_allowed_agents": "允许的子智能体",
+      "persona_subagent_model": "子智能体模型",
+      "persona_subagent_model_hint": "子智能体执行时的可选模型覆盖。",
+      "persona_subagent_fallbacks": "子智能体回退模型",
+      "persona_list_hint": "每行一个，也可用逗号分隔。",
       "sections": {
         "agent": "智能体",
+        "personas": "Personas",
         "runtime": "运行时",
         "launcher": "服务参数",
         "devices": "设备"

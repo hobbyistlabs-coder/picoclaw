@@ -70,7 +70,8 @@
     "save": "Save",
     "saving": "Saving...",
     "reset": "Reset",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "remove": "Remove"
   },
   "labels": {
     "loading": "Loading..."
@@ -424,8 +425,32 @@
       "allowed_cidrs": "Allowed Network CIDRs",
       "allowed_cidrs_hint": "Only clients from these CIDR ranges can access the service. One per line or comma-separated. Leave empty to allow all.",
       "allowed_cidrs_placeholder": "192.168.1.0/24\n10.0.0.0/8",
+      "personas_description": "Create and edit persona-specific agents exposed through the launcher.",
+      "add_persona": "Add Persona",
+      "personas_empty": "No personas configured yet.",
+      "persona": "Persona",
+      "persona_card_hint": "Each persona maps to one entry in agents.list.",
+      "persona_id": "Persona ID",
+      "persona_name": "Display Name",
+      "persona_default": "Default Persona",
+      "persona_default_hint": "Use this persona when routing does not select another agent explicitly.",
+      "persona_workspace": "Persona Workspace",
+      "persona_workspace_hint": "Optional workspace override for this persona.",
+      "persona_model": "Primary Model",
+      "persona_model_hint": "Model name from model_list used by this persona.",
+      "persona_fallbacks": "Fallback Models",
+      "persona_prompt": "System Prompt",
+      "persona_prompt_hint": "Behavior and instructions that define this persona.",
+      "persona_skills": "Skills",
+      "persona_mcp_servers": "MCP Servers",
+      "persona_allowed_agents": "Allowed Subagents",
+      "persona_subagent_model": "Subagent Model",
+      "persona_subagent_model_hint": "Optional override for subagent execution.",
+      "persona_subagent_fallbacks": "Subagent Fallbacks",
+      "persona_list_hint": "One item per line or comma-separated.",
       "sections": {
         "agent": "Agent",
+        "personas": "Personas",
         "runtime": "Runtime",
         "launcher": "Service",
         "devices": "Devices"
