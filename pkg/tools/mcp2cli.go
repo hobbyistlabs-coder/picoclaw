@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
 	"jane/pkg/config"
 	janemcp "jane/pkg/mcp"
 )
