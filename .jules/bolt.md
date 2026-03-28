@@ -15,6 +15,3 @@
 ## 2025-03-25 - Efficient HTTP Response Prefix Checking
 **Learning:** Using `strings.ToLower(string(body))` on large HTTP response payloads (which can be megabytes in size) to check for a small case-insensitive prefix (like `<html` or `<!doctype`) causes massive memory allocation, large garbage collection overhead, and $O(N)$ string iterations.
 **Action:** Use bounded byte slice checks combined with `bytes.EqualFold` (e.g., `bytes.EqualFold(body[:5], []byte("<html"))`) for large payloads. This makes the check $O(1)$ without any string allocations or full-body case conversions.
-## 2025-03-01 - Avoid allocating memory on string lowercasing
-**Learning:** For case-insensitive checks of input messages (like HITL approvals checking "yes" or "no"), `strings.EqualFold` is a better option than using `strings.ToLower(msg)` as it avoids allocating a new string on the heap, especially when the string being tested against might be long.
-**Action:** Replace `strings.ToLower(str) == "target"` with `strings.EqualFold(str, "target")` whenever checking equality against a known constant.
