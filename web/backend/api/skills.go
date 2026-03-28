@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"jane/pkg/config"
+	"jane/pkg/runtimepaths"
 	"jane/pkg/skills"
 )
 
@@ -309,18 +310,11 @@ func loadSkillContent(path string) (string, error) {
 }
 
 func globalConfigDir() string {
-	if home := os.Getenv("PICOCLAW_HOME"); home != "" {
-		return home
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(home, ".picoclaw")
+	return runtimepaths.HomeDir()
 }
 
 func builtinSkillsDir() string {
-	if path := os.Getenv("PICOCLAW_BUILTIN_SKILLS"); path != "" {
+	if path := runtimepaths.BuiltinSkillsOverride(); path != "" {
 		return path
 	}
 	wd, err := os.Getwd()

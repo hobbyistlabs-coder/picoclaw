@@ -32,20 +32,25 @@ export interface ChatMessage {
 
 type ConnectionState = "disconnected" | "connecting" | "connected" | "error"
 
-const LAST_SESSION_STORAGE_KEY = "picoclaw:last-session-id"
+const LAST_SESSION_STORAGE_KEY = "jane-ai:last-session-id"
+const LEGACY_SESSION_STORAGE_KEY = "picoclaw:last-session-id"
 
 function readStoredSessionId(): string {
-  const value = localStorage.getItem(LAST_SESSION_STORAGE_KEY)?.trim()
+  const value =
+    localStorage.getItem(LAST_SESSION_STORAGE_KEY)?.trim() ||
+    localStorage.getItem(LEGACY_SESSION_STORAGE_KEY)?.trim()
   return value || ""
 }
 
 function writeStoredSessionId(sessionId: string) {
   if (sessionId) {
     localStorage.setItem(LAST_SESSION_STORAGE_KEY, sessionId)
+    localStorage.setItem(LEGACY_SESSION_STORAGE_KEY, sessionId)
     return
   }
 
   localStorage.removeItem(LAST_SESSION_STORAGE_KEY)
+  localStorage.removeItem(LEGACY_SESSION_STORAGE_KEY)
 }
 
 function generateSessionId(): string {

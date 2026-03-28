@@ -2,14 +2,13 @@ package configstore
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
 
 	picoclawconfig "jane/pkg/config"
+	"jane/pkg/runtimepaths"
 )
 
 const (
-	configDirName  = ".picoclaw"
 	configFileName = "config.json"
 )
 
@@ -22,11 +21,7 @@ func ConfigPath() (string, error) {
 }
 
 func ConfigDir() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, configDirName), nil
+	return runtimepaths.HomeDir(), nil
 }
 
 func Load() (*picoclawconfig.Config, error) {

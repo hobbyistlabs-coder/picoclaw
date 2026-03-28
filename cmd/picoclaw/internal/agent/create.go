@@ -12,6 +12,7 @@ import (
 
 	"jane/cmd/picoclaw/internal"
 	"jane/pkg/config"
+	"jane/pkg/runtimepaths"
 )
 
 func NewCreateCommand() *cobra.Command {
@@ -65,7 +66,7 @@ func createAgentCmd(name, workspace, sysPrompt, model string, interactive bool) 
 		}
 
 		if workspace == "" {
-			fmt.Printf("Workspace path (default: ~/.picoclaw/workspace/%s): ", strings.ToLower(strings.ReplaceAll(name, " ", "_")))
+			fmt.Printf("Workspace path (default: %s/workspace/%s): ", runtimepaths.HomeDir(), strings.ToLower(strings.ReplaceAll(name, " ", "_")))
 			workspaceInput, _ := reader.ReadString('\n')
 			workspaceInput = strings.TrimSpace(workspaceInput)
 			if workspaceInput != "" {
@@ -95,14 +96,7 @@ func createAgentCmd(name, workspace, sysPrompt, model string, interactive bool) 
 	}
 
 	if workspace == "" {
-		var homePath string
-		if picoclawHome := os.Getenv("PICOCLAW_HOME"); picoclawHome != "" {
-			homePath = picoclawHome
-		} else {
-			userHome, _ := os.UserHomeDir()
-			homePath = filepath.Join(userHome, ".picoclaw")
-		}
-		workspace = filepath.Join(homePath, "workspace", strings.ToLower(strings.ReplaceAll(name, " ", "_")))
+		workspace = filepath.Join(runtimepaths.HomeDir(), "workspace", strings.ToLower(strings.ReplaceAll(name, " ", "_")))
 	}
 
 	var modelCfg *config.AgentModelConfig

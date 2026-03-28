@@ -11,6 +11,7 @@ import (
 	"github.com/mdp/qrterminal/v3"
 	"github.com/rs/zerolog"
 	"jane/pkg/logger"
+	"jane/pkg/runtimepaths"
 
 	"go.mau.fi/mautrix-gmessages/pkg/libgm"
 	"go.mau.fi/mautrix-gmessages/pkg/libgm/events"
@@ -30,11 +31,7 @@ type GMClient struct {
 func (c *GMessagesChannel) initClient(ctx context.Context) error {
 	dataDir := c.cfg.DataDir
 	if dataDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return fmt.Errorf("could not get home dir and data_dir is empty: %w", err)
-		}
-		dataDir = filepath.Join(home, ".picoclaw", "gmessages")
+		dataDir = filepath.Join(runtimepaths.HomeDir(), "gmessages")
 	}
 
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
