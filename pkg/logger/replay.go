@@ -36,11 +36,17 @@ type ReplayEvent struct {
 	ErrorMessage  string              `json:"error_message,omitempty"`
 }
 
-var replayMutex sync.Mutex
+var sessionMutexes sync.Map
+
+func getSessionMutex(sessionID string) *sync.Mutex {
+	v, _ := sessionMutexes.LoadOrStore(sessionID, &sync.Mutex{})
+	return v.(*sync.Mutex)
+}
 
 func LogSessionEvent(workspacePath, sessionID string, event ReplayEvent) error {
-	replayMutex.Lock()
-	defer replayMutex.Unlock()
+	mu := getSessionMutex(sessionID)
+	mu.Lock()
+	defer mu.Unlock()
 
 	dirPath := filepath.Join(workspacePath, "logs", sessionID, "events")
 	if err := os.MkdirAll(dirPath, 0755); err != nil {

@@ -1,8 +1,6 @@
 package internal
 
 import (
-	"path/filepath"
-
 	"jane/pkg/config"
 	"jane/pkg/runtimepaths"
 )
