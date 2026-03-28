@@ -153,9 +153,10 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 	if val, ok := al.pendingApprovals.Load(sessionKey); ok {
 		pending := val.(pendingApprovalState)
 
-		responseStr := strings.ToLower(strings.TrimSpace(msg.Content))
-		isYes := responseStr == "yes" || responseStr == "y"
-		isNo := responseStr == "no" || responseStr == "n"
+		responseStr := strings.TrimSpace(msg.Content)
+		// Bolt: Fast path to avoid strings.ToLower memory allocation and full string pass
+		isYes := strings.EqualFold(responseStr, "yes") || strings.EqualFold(responseStr, "y")
+		isNo := strings.EqualFold(responseStr, "no") || strings.EqualFold(responseStr, "n")
 
 		if isYes || isNo {
 			al.pendingApprovals.Delete(sessionKey)
