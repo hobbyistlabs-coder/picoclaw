@@ -1,0 +1,29 @@
+groups:
+- name: picoclaw_alerts
+  rules:
+  - alert: HighGoroutineCount
+    expr: picoclaw_sys_goroutines > 100
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High number of active Goroutines"
+      description: "The active goroutines count has been continuously over 100 for 5 minutes. Value: {{ $value }}"
+
+  - alert: HighMemoryAllocation
+    expr: picoclaw_sys_memory_alloc_mb > 10
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "High Heap Memory Allocation"
+      description: "Heap allocation has exceeded 10MB budget for 1 minute. Value: {{ $value }}MB"
+
+  - alert: HighGCRate
+    expr: rate(picoclaw_sys_num_gc[1m]) > 5
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High Garbage Collection Rate"
+      description: "GC operations rate is very high, indicating memory churn."
