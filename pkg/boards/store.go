@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -62,12 +63,18 @@ type ReviewSchedule struct {
 type CreateBoardInput struct {
 	Name        string
 	Description string
+	Columns     []BoardColumnInput
 }
 
 type UpdateCardInput struct {
 	Title       *string
 	Description *string
 	ColumnID    *string
+}
+
+type BoardColumnInput struct {
+	Key  string
+	Name string
 }
 
 type Store struct {
@@ -183,6 +190,7 @@ func (s *Store) ListBoards(ctx context.Context) ([]Board, error) {
 		}
 		board.CreatedAt = parseTime(created)
 		board.UpdatedAt = parseTime(updated)
+		board.Columns = []BoardColumn{}
 		out = append(out, board)
 	}
 	return out, rows.Err()
@@ -207,20 +215,12 @@ func (s *Store) CreateBoard(ctx context.Context, input CreateBoardInput) (*Board
 		return nil, fmt.Errorf("boards: insert board: %w", err)
 	}
 
-	defs := []struct {
-		Key      string
-		Name     string
-		Position int
-	}{
-		{Key: ColumnTodo, Name: "Todo", Position: 0},
-		{Key: ColumnDoing, Name: "In Progress", Position: 1},
-		{Key: ColumnDone, Name: "Done", Position: 2},
-	}
-	for _, def := range defs {
+	defs := normalizeColumnInputs(input.Columns)
+	for i, def := range defs {
 		if _, err = tx.ExecContext(ctx, `
 			INSERT INTO board_columns (id, board_id, column_key, name, position, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?)
-		`, newID(), boardID, def.Key, def.Name, def.Position, now, now); err != nil {
+		`, newID(), boardID, def.Key, def.Name, i, now, now); err != nil {
 			return nil, fmt.Errorf("boards: seed columns: %w", err)
 		}
 	}
@@ -229,6 +229,41 @@ func (s *Store) CreateBoard(ctx context.Context, input CreateBoardInput) (*Board
 		return nil, fmt.Errorf("boards: commit create board: %w", err)
 	}
 	return s.GetBoard(ctx, boardID)
+}
+
+func (s *Store) AddColumn(
+	ctx context.Context, boardID string, input BoardColumnInput,
+) (*BoardColumn, error) {
+	name := trimColumnName(input.Name)
+	if name == "" {
+		return nil, fmt.Errorf("boards: column name is required")
+	}
+	key := sanitizeColumnKey(input.Key)
+	if key == "" {
+		key = sanitizeColumnKey(name)
+	}
+	position, err := s.nextColumnPosition(ctx, boardID)
+	if err != nil {
+		return nil, err
+	}
+	col := &BoardColumn{
+		ID:       newID(),
+		Key:      ensureUniqueColumnKey(ctx, s.db, boardID, key),
+		Name:     name,
+		Position: position,
+		Cards:    []BoardCard{},
+	}
+	now := nowText()
+	if _, err = s.db.ExecContext(ctx, `
+		INSERT INTO board_columns (id, board_id, column_key, name, position, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, col.ID, boardID, col.Key, col.Name, col.Position, now, now); err != nil {
+		return nil, fmt.Errorf("boards: add column: %w", err)
+	}
+	if err = s.touchBoard(ctx, boardID); err != nil {
+		return nil, err
+	}
+	return col, nil
 }
 
 func (s *Store) GetBoard(ctx context.Context, boardID string) (*Board, error) {
@@ -255,6 +290,9 @@ func (s *Store) GetBoard(ctx context.Context, boardID string) (*Board, error) {
 	}
 	for i := range columns {
 		columns[i].Cards = cards[columns[i].ID]
+		if columns[i].Cards == nil {
+			columns[i].Cards = []BoardCard{}
+		}
 	}
 	board.Columns = columns
 	board.Review, _ = s.GetReviewSchedule(ctx, boardID)
@@ -403,6 +441,7 @@ func (s *Store) listColumns(ctx context.Context, boardID string) ([]BoardColumn,
 		if err = rows.Scan(&col.ID, &col.Key, &col.Name, &col.Position); err != nil {
 			return nil, fmt.Errorf("boards: scan column: %w", err)
 		}
+		col.Cards = []BoardCard{}
 		cols = append(cols, col)
 	}
 	return cols, rows.Err()
@@ -482,6 +521,17 @@ func (s *Store) nextCardPosition(ctx context.Context, columnID string) (int, err
 	return pos, nil
 }
 
+func (s *Store) nextColumnPosition(ctx context.Context, boardID string) (int, error) {
+	var pos int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COALESCE(MAX(position), -1) + 1 FROM board_columns WHERE board_id = ?
+	`, boardID).Scan(&pos)
+	if err != nil {
+		return 0, fmt.Errorf("boards: next column position: %w", err)
+	}
+	return pos, nil
+}
+
 func (s *Store) reindexColumn(ctx context.Context, columnID string) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id FROM board_cards WHERE column_id = ?
@@ -529,4 +579,92 @@ func newID() string {
 		return fmt.Sprintf("%d", time.Now().UnixNano())
 	}
 	return hex.EncodeToString(b)
+}
+
+func normalizeColumnInputs(inputs []BoardColumnInput) []BoardColumnInput {
+	if len(inputs) == 0 {
+		return []BoardColumnInput{
+			{Key: ColumnTodo, Name: "Todo"},
+			{Key: ColumnDoing, Name: "In Progress"},
+			{Key: ColumnDone, Name: "Done"},
+		}
+	}
+	seen := map[string]struct{}{}
+	out := make([]BoardColumnInput, 0, len(inputs))
+	for _, input := range inputs {
+		name := trimColumnName(input.Name)
+		if name == "" {
+			continue
+		}
+		key := sanitizeColumnKey(input.Key)
+		if key == "" {
+			key = sanitizeColumnKey(name)
+		}
+		if key == "" {
+			continue
+		}
+		key = dedupeColumnKey(seen, key)
+		out = append(out, BoardColumnInput{Key: key, Name: name})
+	}
+	if len(out) == 0 {
+		return normalizeColumnInputs(nil)
+	}
+	return out
+}
+
+func trimColumnName(name string) string {
+	return strings.TrimSpace(name)
+}
+
+func sanitizeColumnKey(raw string) string {
+	raw = strings.TrimSpace(strings.ToLower(raw))
+	if raw == "" {
+		return ""
+	}
+	var b strings.Builder
+	lastDash := false
+	for _, r := range raw {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			b.WriteByte('-')
+			lastDash = true
+		}
+	}
+	return strings.Trim(b.String(), "-")
+}
+
+func dedupeColumnKey(seen map[string]struct{}, key string) string {
+	if _, ok := seen[key]; !ok {
+		seen[key] = struct{}{}
+		return key
+	}
+	for i := 2; ; i++ {
+		candidate := fmt.Sprintf("%s-%d", key, i)
+		if _, ok := seen[candidate]; ok {
+			continue
+		}
+		seen[candidate] = struct{}{}
+		return candidate
+	}
+}
+
+func ensureUniqueColumnKey(ctx context.Context, db *sql.DB, boardID, key string) string {
+	base := key
+	for i := 1; ; i++ {
+		var existing string
+		err := db.QueryRowContext(ctx, `
+			SELECT column_key FROM board_columns WHERE board_id = ? AND column_key = ?
+		`, boardID, key).Scan(&existing)
+		if err == sql.ErrNoRows {
+			return key
+		}
+		if err != nil {
+			return fmt.Sprintf("%s-%d", base, time.Now().UnixNano())
+		}
+		key = fmt.Sprintf("%s-%d", base, i+1)
+	}
 }

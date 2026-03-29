@@ -68,6 +68,20 @@ func BuildReviewPrompt(boardID string) string {
 	return b.String()
 }
 
+func BuildCardActionPrompt(boardID, cardID string) string {
+	var b strings.Builder
+	b.WriteString("Review and act on this kanban card now.\n")
+	b.WriteString("Use the boards tool.\n")
+	b.WriteString("Board ID: ")
+	b.WriteString(boardID)
+	b.WriteString("\n")
+	b.WriteString("Card ID: ")
+	b.WriteString(cardID)
+	b.WriteString("\n")
+	b.WriteString("Update progress, move the card if appropriate, and refine the card details with blockers or next steps when justified by the current context.")
+	return b.String()
+}
+
 func normalizeChannel(channel string) string {
 	if channel == "" {
 		return "cli"

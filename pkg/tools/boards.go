@@ -32,7 +32,8 @@ func (t *BoardsTool) Parameters() map[string]any {
 				"type": "string",
 				"enum": []string{
 					"list_boards", "get_board", "create_board", "add_card",
-					"update_card", "move_card", "delete_card", "set_review_schedule",
+					"add_column", "update_card", "move_card", "delete_card",
+					"set_review_schedule",
 				},
 			},
 			"board_id":      map[string]any{"type": "string"},
@@ -60,6 +61,8 @@ func (t *BoardsTool) Execute(ctx context.Context, args map[string]any) *ToolResu
 		return t.createBoard(ctx, args)
 	case "add_card":
 		return t.addCard(ctx, args)
+	case "add_column":
+		return t.addColumn(ctx, args)
 	case "update_card":
 		return t.updateCard(ctx, args, false)
 	case "move_card":
@@ -107,6 +110,19 @@ func (t *BoardsTool) createBoard(ctx context.Context, args map[string]any) *Tool
 		return ErrorResult(err.Error())
 	}
 	return jsonResult(board)
+}
+
+func (t *BoardsTool) addColumn(ctx context.Context, args map[string]any) *ToolResult {
+	boardID, _ := args["board_id"].(string)
+	title, _ := args["title"].(string)
+	desc, _ := args["description"].(string)
+	column, err := t.store.AddColumn(ctx, boardID, boards.BoardColumnInput{
+		Key: desc, Name: title,
+	})
+	if err != nil {
+		return ErrorResult(err.Error())
+	}
+	return jsonResult(column)
 }
 
 func (t *BoardsTool) addCard(ctx context.Context, args map[string]any) *ToolResult {

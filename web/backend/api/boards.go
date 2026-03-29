@@ -19,6 +19,17 @@ type boardCardRequest struct {
 	ColumnID    string `json:"column_id"`
 }
 
+type boardColumnRequest struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+}
+
+type boardCreateRequest struct {
+	Name        string               `json:"name"`
+	Description string               `json:"description"`
+	Columns     []boardColumnRequest `json:"columns"`
+}
+
 type boardCardPatchRequest struct {
 	Title       *string `json:"title"`
 	Description *string `json:"description"`
@@ -36,7 +47,9 @@ func (h *Handler) registerBoardRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/boards", h.handleListBoards)
 	mux.HandleFunc("POST /api/boards", h.handleCreateBoard)
 	mux.HandleFunc("GET /api/boards/{id}", h.handleGetBoard)
+	mux.HandleFunc("POST /api/boards/{id}/columns", h.handleCreateColumn)
 	mux.HandleFunc("POST /api/boards/{id}/cards", h.handleCreateCard)
+	mux.HandleFunc("POST /api/boards/{id}/cards/{cardID}/run", h.handleRunCardAgent)
 	mux.HandleFunc("PATCH /api/boards/{id}/cards/{cardID}", h.handleUpdateCard)
 	mux.HandleFunc("DELETE /api/boards/{id}/cards/{cardID}", h.handleDeleteCard)
 	mux.HandleFunc("PUT /api/boards/{id}/review", h.handleSetBoardReview)
@@ -63,7 +76,35 @@ func (h *Handler) handleListBoards(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleCreateBoard(w http.ResponseWriter, r *http.Request) {
-	var req boardCardRequest
+	var req boardCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, fmt.Sprintf("invalid JSON: %v", err), http.StatusBadRequest)
+		return
+	}
+	store, cleanup, err := h.openBoardsStore()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer cleanup()
+	columns := make([]boards.BoardColumnInput, 0, len(req.Columns))
+	for _, col := range req.Columns {
+		columns = append(columns, boards.BoardColumnInput{
+			Key: col.Key, Name: col.Name,
+		})
+	}
+	board, err := store.CreateBoard(r.Context(), boards.CreateBoardInput{
+		Name: req.Name, Description: req.Description, Columns: columns,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, board)
+}
+
+func (h *Handler) handleCreateColumn(w http.ResponseWriter, r *http.Request) {
+	var req boardColumnRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, fmt.Sprintf("invalid JSON: %v", err), http.StatusBadRequest)
 		return
@@ -75,14 +116,14 @@ func (h *Handler) handleCreateBoard(w http.ResponseWriter, r *http.Request) {
 	}
 	defer cleanup()
 
-	board, err := store.CreateBoard(r.Context(), boards.CreateBoardInput{
-		Name: req.Title, Description: req.Description,
+	column, err := store.AddColumn(r.Context(), r.PathValue("id"), boards.BoardColumnInput{
+		Key: req.Key, Name: req.Name,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, board)
+	writeJSON(w, column)
 }
 
 func (h *Handler) handleGetBoard(w http.ResponseWriter, r *http.Request) {

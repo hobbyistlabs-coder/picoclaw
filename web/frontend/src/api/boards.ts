@@ -13,6 +13,11 @@ export interface BoardColumn {
   cards: BoardCard[]
 }
 
+export interface BoardColumnInput {
+  key?: string
+  name: string
+}
+
 export interface BoardReview {
   enabled: boolean
   every_minutes: number
@@ -28,6 +33,21 @@ export interface Board {
   review?: BoardReview | null
 }
 
+export interface BoardRunResponse {
+  status: string
+  session_id: string
+}
+
+function normalizeBoard(board: Board): Board {
+  return {
+    ...board,
+    columns: (board.columns ?? []).map((column) => ({
+      ...column,
+      cards: column.cards ?? [],
+    })),
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, options)
   if (!res.ok) {
@@ -37,22 +57,52 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export function getBoards() {
-  return request<Board[]>("/api/boards")
+  return request<Board[]>("/api/boards").then((boards) =>
+    boards.map(normalizeBoard),
+  )
 }
 
 export function getBoard(id: string) {
-  return request<Board>(`/api/boards/${encodeURIComponent(id)}`)
+  return request<Board>(`/api/boards/${encodeURIComponent(id)}`).then(
+    normalizeBoard,
+  )
+}
+
+export function createBoard(payload: {
+  name: string
+  description: string
+  columns?: BoardColumnInput[]
+}) {
+  return request<Board>("/api/boards", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(normalizeBoard)
+}
+
+export function createBoardColumn(boardID: string, payload: BoardColumnInput) {
+  return request<BoardColumn>(
+    `/api/boards/${encodeURIComponent(boardID)}/columns`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  )
 }
 
 export function createCard(
   boardID: string,
   payload: { title: string; description: string; column_id?: string },
 ) {
-  return request<BoardCard>(`/api/boards/${encodeURIComponent(boardID)}/cards`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  })
+  return request<BoardCard>(
+    `/api/boards/${encodeURIComponent(boardID)}/cards`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  )
 }
 
 export function updateCard(
@@ -77,9 +127,21 @@ export function deleteCard(boardID: string, cardID: string) {
   )
 }
 
+export function runCardAgent(boardID: string, cardID: string) {
+  return request<BoardRunResponse>(
+    `/api/boards/${encodeURIComponent(boardID)}/cards/${encodeURIComponent(cardID)}/run`,
+    { method: "POST" },
+  )
+}
+
 export function updateBoardReview(
   boardID: string,
-  payload: { enabled: boolean; every_minutes: number; channel?: string; chat_id?: string },
+  payload: {
+    enabled: boolean
+    every_minutes: number
+    channel?: string
+    chat_id?: string
+  },
 ) {
   return request<BoardReview>(
     `/api/boards/${encodeURIComponent(boardID)}/review`,
