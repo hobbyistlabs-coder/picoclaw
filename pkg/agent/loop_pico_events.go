@@ -38,6 +38,34 @@ func buildToolEvent(tc providers.ToolCall, status string, result *tools.ToolResu
 	return event
 }
 
+func buildSubagentEvent(
+	tc providers.ToolCall,
+	task *tools.SubagentTask,
+	event *tools.SubagentProgressEvent,
+) *bus.ToolCallEvent {
+	if task == nil || event == nil {
+		return nil
+	}
+	return &bus.ToolCallEvent{
+		ID:              tc.ID,
+		Name:            tc.Name,
+		Kind:            "subagent",
+		Status:          task.Status,
+		Label:           task.Label,
+		Summary:         event.Message,
+		Result:          task.LastOutputExcerpt,
+		EventType:       event.EventType,
+		TaskID:          task.ID,
+		Codename:        task.Codename,
+		ParentSessionID: task.ParentSessionID,
+		LatestEvent:     task.LatestEvent,
+		ProgressPercent: task.ProgressPercent,
+		Error:           task.Error,
+		ToolName:        task.ToolName,
+		ToolStatus:      task.ToolStatus,
+	}
+}
+
 func publishToolEvent(ctx context.Context, al *AgentLoop, opts processOptions, event *bus.ToolCallEvent) {
 	if event == nil || opts.Channel != "pico" {
 		return

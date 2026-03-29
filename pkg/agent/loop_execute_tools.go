@@ -90,8 +90,10 @@ func (al *AgentLoop) executeToolBatch(
 			// as an inbound system message so processSystemMessage routes it
 			// back to the user via the normal agent loop.
 			asyncCallback := func(_ context.Context, result *tools.ToolResult) {
-				publishToolEvent(context.Background(), al, opts,
-					buildToolEvent(tc, "completed", result, time.Since(startToolTime).Milliseconds()))
+				if tc.Name != "spawn" {
+					publishToolEvent(context.Background(), al, opts,
+						buildToolEvent(tc, "completed", result, time.Since(startToolTime).Milliseconds()))
+				}
 
 				// Determine content for the agent loop (ForLLM or error).
 				content := result.ForLLM
@@ -126,7 +128,13 @@ func (al *AgentLoop) executeToolBatch(
 				})
 			}
 
+			progressCallback := func(task *tools.SubagentTask, event *tools.SubagentProgressEvent) {
+				publishToolEvent(context.Background(), al, opts, buildSubagentEvent(tc, task, event))
+			}
 			toolCtx := tools.WithToolSessionKey(ctx, opts.SessionKey)
+			toolCtx = tools.WithToolCallID(toolCtx, tc.ID)
+			toolCtx = tools.WithToolAsyncBatchID(toolCtx, asyncBatchID)
+			toolCtx = tools.WithSubagentProgress(toolCtx, progressCallback)
 			toolResult := agent.Tools.ExecuteWithContext(
 				toolCtx,
 				tc.Name,

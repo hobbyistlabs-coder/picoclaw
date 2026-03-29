@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"jane/pkg/providers"
 )
@@ -43,6 +44,29 @@ func (m *MockLLMProvider) SupportsTools() bool {
 func (m *MockLLMProvider) GetContextWindow() int {
 	return 4096
 }
+
+type toolCallingProvider struct{}
+
+func (p *toolCallingProvider) Chat(
+	ctx context.Context,
+	messages []providers.Message,
+	tools []providers.ToolDefinition,
+	model string,
+	options map[string]any,
+) (*providers.LLMResponse, error) {
+	if len(messages) == 2 {
+		return &providers.LLMResponse{
+			ToolCalls: []providers.ToolCall{{
+				ID:        "call-1",
+				Name:      "calculator",
+				Arguments: map[string]any{"expression": "1+1"},
+			}},
+		}, nil
+	}
+	return &providers.LLMResponse{Content: "done"}, nil
+}
+
+func (p *toolCallingProvider) GetDefaultModel() string { return "test-model" }
 
 func TestSubagentManager_SetLLMOptions_AppliesToRunToolLoop(t *testing.T) {
 	provider := &MockLLMProvider{}
@@ -323,5 +347,103 @@ func TestSubagentTool_ForUserTruncation(t *testing.T) {
 	// ForLLM should have full content
 	if !strings.Contains(result.ForLLM, longTask[:50]) {
 		t.Error("ForLLM should contain reference to original task")
+	}
+}
+
+func TestSubagentManager_TracksProgressAndEvents(t *testing.T) {
+	provider := &toolCallingProvider{}
+	manager := NewSubagentManager(provider, "test-model", "/tmp/test")
+	manager.RegisterTool(NewCalculatorTool())
+	var seen []SubagentProgressEvent
+	ctx := WithToolSessionKey(context.Background(), "agent:main:session-1")
+	ctx = WithToolCallID(ctx, "tool-call-1")
+	ctx = WithToolAsyncBatchID(ctx, "batch-1")
+	ctx = WithSubagentProgress(ctx, func(task *SubagentTask, event *SubagentProgressEvent) {
+		seen = append(seen, *event)
+	})
+
+	message, err := manager.Spawn(ctx, "calculate a result", "math", "", "pico", "chat-1", "agent:main:session-1", nil)
+	if err != nil {
+		t.Fatalf("Spawn returned error: %v", err)
+	}
+	if !strings.Contains(message, "Petra") {
+		t.Fatalf("expected generated codename in spawn message, got %q", message)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		tasks := manager.ListTasks()
+		if len(tasks) == 1 && tasks[0].Status == SubagentCompleted {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	tasks := manager.ListTasks()
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	task := tasks[0]
+	if task.ParentSessionID != "agent:main:session-1" {
+		t.Fatalf("parent session = %q", task.ParentSessionID)
+	}
+	if task.BatchID != "batch-1" {
+		t.Fatalf("batch id = %q", task.BatchID)
+	}
+	if task.ParentToolCallID != "tool-call-1" {
+		t.Fatalf("parent tool call id = %q", task.ParentToolCallID)
+	}
+	if task.Codename != "Petra" {
+		t.Fatalf("codename = %q", task.Codename)
+	}
+
+	events := manager.GetSubagentEvents(task.ID, 0)
+	if len(events) < 4 {
+		t.Fatalf("expected multiple progress events, got %d", len(events))
+	}
+	hasToolStart := false
+	hasCompletion := false
+	for _, event := range events {
+		if event.EventType == "tool.started" {
+			hasToolStart = true
+		}
+		if event.EventType == "task.completed" {
+			hasCompletion = true
+		}
+	}
+	if !hasToolStart {
+		t.Fatal("expected tool.started event")
+	}
+	if !hasCompletion {
+		t.Fatal("expected task.completed event")
+	}
+	if len(seen) == 0 {
+		t.Fatal("expected progress callback events")
+	}
+
+	batch := manager.GetBatchStatus("batch-1")
+	if batch == nil || batch.Completed != 1 {
+		t.Fatalf("unexpected batch status: %+v", batch)
+	}
+}
+
+func TestSubagentManager_GetStalledSubagents(t *testing.T) {
+	manager := NewSubagentManager(&MockLLMProvider{}, "test-model", "/tmp/test")
+	manager.tasks["subagent-9"] = &SubagentTask{
+		ID:              "subagent-9",
+		Codename:        "Iris",
+		ParentSessionID: "agent:main:session-2",
+		Status:          SubagentRunning,
+		Created:         time.Now().Add(-2 * time.Minute).UnixMilli(),
+		Updated:         time.Now().Add(-2 * time.Minute).UnixMilli(),
+	}
+
+	stalled := manager.GetStalledSubagents(30 * time.Second)
+	if len(stalled) != 1 {
+		t.Fatalf("expected 1 stalled task, got %d", len(stalled))
+	}
+	active := manager.ListActiveSubagents("agent:main:session-2")
+	if len(active) != 1 {
+		t.Fatalf("expected 1 active task, got %d", len(active))
 	}
 }

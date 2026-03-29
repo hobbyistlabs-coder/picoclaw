@@ -31,6 +31,15 @@ export interface ChatToolEvent {
   kind: string
   status: string
   label?: string
+  eventType?: string
+  taskId?: string
+  codename?: string
+  parentSessionId?: string
+  latestEvent?: string
+  progressPercent?: number
+  error?: string
+  toolName?: string
+  toolStatus?: string
   arguments?: Record<string, unknown>
   summary?: string
   result?: string
@@ -401,6 +410,22 @@ export function usePicoChat() {
             kind: String(raw.kind || "tool"),
             status: String(raw.status || "started"),
             label: raw.label ? String(raw.label) : undefined,
+            eventType: raw.event_type ? String(raw.event_type) : undefined,
+            taskId: raw.task_id ? String(raw.task_id) : undefined,
+            codename: raw.codename ? String(raw.codename) : undefined,
+            parentSessionId: raw.parent_session_id
+              ? String(raw.parent_session_id)
+              : undefined,
+            latestEvent: raw.latest_event
+              ? String(raw.latest_event)
+              : undefined,
+            progressPercent:
+              typeof raw.progress_percent === "number"
+                ? raw.progress_percent
+                : undefined,
+            error: raw.error ? String(raw.error) : undefined,
+            toolName: raw.tool_name ? String(raw.tool_name) : undefined,
+            toolStatus: raw.tool_status ? String(raw.tool_status) : undefined,
             arguments: (raw.arguments as Record<string, unknown>) || undefined,
             summary: raw.summary ? String(raw.summary) : undefined,
             result: raw.result ? String(raw.result) : undefined,

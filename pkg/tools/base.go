@@ -22,9 +22,12 @@ type Tool interface {
 type toolCtxKey struct{ name string }
 
 var (
-	ctxKeyChannel = &toolCtxKey{"channel"}
-	ctxKeyChatID  = &toolCtxKey{"chatID"}
-	ctxKeySession = &toolCtxKey{"sessionKey"}
+	ctxKeyChannel          = &toolCtxKey{"channel"}
+	ctxKeyChatID           = &toolCtxKey{"chatID"}
+	ctxKeySession          = &toolCtxKey{"sessionKey"}
+	ctxKeyToolCallID       = &toolCtxKey{"toolCallID"}
+	ctxKeyAsyncBatchID     = &toolCtxKey{"asyncBatchID"}
+	ctxKeySubagentProgress = &toolCtxKey{"subagentProgress"}
 )
 
 // WithToolContext returns a child context carrying channel and chatID.
@@ -54,6 +57,39 @@ func WithToolSessionKey(ctx context.Context, sessionKey string) context.Context 
 // ToolSessionKey extracts the session key from ctx, or "" if unset.
 func ToolSessionKey(ctx context.Context) string {
 	v, _ := ctx.Value(ctxKeySession).(string)
+	return v
+}
+
+// WithToolCallID returns a child context carrying the current tool call ID.
+func WithToolCallID(ctx context.Context, callID string) context.Context {
+	return context.WithValue(ctx, ctxKeyToolCallID, callID)
+}
+
+// ToolCallID extracts the current tool call ID from ctx, or "" if unset.
+func ToolCallID(ctx context.Context) string {
+	v, _ := ctx.Value(ctxKeyToolCallID).(string)
+	return v
+}
+
+// WithToolAsyncBatchID returns a child context carrying the current async batch ID.
+func WithToolAsyncBatchID(ctx context.Context, batchID string) context.Context {
+	return context.WithValue(ctx, ctxKeyAsyncBatchID, batchID)
+}
+
+// ToolAsyncBatchID extracts the async batch ID from ctx, or "" if unset.
+func ToolAsyncBatchID(ctx context.Context) string {
+	v, _ := ctx.Value(ctxKeyAsyncBatchID).(string)
+	return v
+}
+
+// WithSubagentProgress returns a child context carrying a subagent progress callback.
+func WithSubagentProgress(ctx context.Context, cb SubagentProgressCallback) context.Context {
+	return context.WithValue(ctx, ctxKeySubagentProgress, cb)
+}
+
+// ToolSubagentProgress extracts the subagent progress callback from ctx.
+func ToolSubagentProgress(ctx context.Context) SubagentProgressCallback {
+	v, _ := ctx.Value(ctxKeySubagentProgress).(SubagentProgressCallback)
 	return v
 }
 

@@ -102,7 +102,7 @@ export function AssistantMessage({
                   >
                     <div className="flex flex-wrap items-center gap-2 text-sm">
                       <span className="font-medium">
-                        {event.label || event.name}
+                        {event.codename || event.label || event.name}
                       </span>
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs uppercase">
                         {event.kind}
@@ -110,11 +110,28 @@ export function AssistantMessage({
                       <span className="rounded-full bg-slate-900 px-2 py-0.5 text-xs text-white uppercase">
                         {event.status}
                       </span>
+                      {event.toolName && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs uppercase text-amber-900">
+                          {event.toolName}
+                        </span>
+                      )}
                     </div>
+                    {event.codename && event.label && (
+                      <p className="mt-2 text-sm text-slate-500">{event.label}</p>
+                    )}
                     {event.summary && (
                       <p className="mt-2 text-sm text-slate-600">
                         {event.summary}
                       </p>
+                    )}
+                    {typeof event.progressPercent === "number" &&
+                      event.progressPercent > 0 && (
+                        <p className="mt-2 text-xs text-slate-500">
+                          Progress {event.progressPercent}%
+                        </p>
+                      )}
+                    {event.error && (
+                      <p className="mt-2 text-sm text-red-600">{event.error}</p>
                     )}
                     {event.arguments && (
                       <pre className="mt-2 overflow-x-auto rounded-md bg-slate-950 p-3 text-xs text-slate-50">

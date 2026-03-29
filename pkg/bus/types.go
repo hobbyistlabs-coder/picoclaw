@@ -47,15 +47,24 @@ type OutboundStreamMessage struct {
 }
 
 type ToolCallEvent struct {
-	ID         string         `json:"id"`
-	Name       string         `json:"name"`
-	Kind       string         `json:"kind,omitempty"`
-	Status     string         `json:"status"`
-	Label      string         `json:"label,omitempty"`
-	Arguments  map[string]any `json:"arguments,omitempty"`
-	Summary    string         `json:"summary,omitempty"`
-	Result     string         `json:"result,omitempty"`
-	DurationMS int64          `json:"duration_ms,omitempty"`
+	ID              string         `json:"id"`
+	Name            string         `json:"name"`
+	Kind            string         `json:"kind,omitempty"`
+	Status          string         `json:"status"`
+	Label           string         `json:"label,omitempty"`
+	Arguments       map[string]any `json:"arguments,omitempty"`
+	Summary         string         `json:"summary,omitempty"`
+	Result          string         `json:"result,omitempty"`
+	DurationMS      int64          `json:"duration_ms,omitempty"`
+	EventType       string         `json:"event_type,omitempty"`
+	TaskID          string         `json:"task_id,omitempty"`
+	Codename        string         `json:"codename,omitempty"`
+	ParentSessionID string         `json:"parent_session_id,omitempty"`
+	LatestEvent     string         `json:"latest_event,omitempty"`
+	ProgressPercent int            `json:"progress_percent,omitempty"`
+	Error           string         `json:"error,omitempty"`
+	ToolName        string         `json:"tool_name,omitempty"`
+	ToolStatus      string         `json:"tool_status,omitempty"`
 }
 
 // MediaPart describes a single media attachment to send.

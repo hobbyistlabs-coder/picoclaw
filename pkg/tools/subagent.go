@@ -7,34 +7,50 @@ import (
 	"time"
 
 	"jane/pkg/providers"
+	"jane/pkg/utils"
 )
 
 type SubagentTask struct {
-	ID            string
-	Task          string
-	Label         string
-	AgentID       string
-	OriginChannel string
-	OriginChatID  string
-	OriginSession string
-	Status        string
-	Result        string
-	Created       int64
+	ID                string
+	Task              string
+	Label             string
+	Codename          string
+	AgentID           string
+	ParentToolCallID  string
+	BatchID           string
+	OriginChannel     string
+	OriginChatID      string
+	OriginSession     string
+	ParentSessionID   string
+	Status            string
+	Result            string
+	Summary           string
+	LatestEvent       string
+	LastOutputExcerpt string
+	Error             string
+	ToolName          string
+	ToolStatus        string
+	ProgressPercent   int
+	Created           int64
+	Started           int64
+	Updated           int64
 }
 
 type SubagentManager struct {
-	tasks          map[string]*SubagentTask
-	mu             sync.RWMutex
-	provider       providers.LLMProvider
-	defaultModel   string
-	workspace      string
-	tools          *ToolRegistry
-	maxIterations  int
-	maxTokens      int
-	temperature    float64
-	hasMaxTokens   bool
-	hasTemperature bool
-	nextID         int
+	tasks             map[string]*SubagentTask
+	events            map[string][]SubagentProgressEvent
+	progressCallbacks map[string]SubagentProgressCallback
+	mu                sync.RWMutex
+	provider          providers.LLMProvider
+	defaultModel      string
+	workspace         string
+	tools             *ToolRegistry
+	maxIterations     int
+	maxTokens         int
+	temperature       float64
+	hasMaxTokens      bool
+	hasTemperature    bool
+	nextID            int
 }
 
 func NewSubagentManager(
@@ -42,13 +58,15 @@ func NewSubagentManager(
 	defaultModel, workspace string,
 ) *SubagentManager {
 	return &SubagentManager{
-		tasks:         make(map[string]*SubagentTask),
-		provider:      provider,
-		defaultModel:  defaultModel,
-		workspace:     workspace,
-		tools:         NewToolRegistry(),
-		maxIterations: 10,
-		nextID:        1,
+		tasks:             make(map[string]*SubagentTask),
+		events:            make(map[string][]SubagentProgressEvent),
+		progressCallbacks: make(map[string]SubagentProgressCallback),
+		provider:          provider,
+		defaultModel:      defaultModel,
+		workspace:         workspace,
+		tools:             NewToolRegistry(),
+		maxIterations:     10,
+		nextID:            1,
 	}
 }
 
@@ -63,7 +81,6 @@ func (sm *SubagentManager) SetLLMOptions(maxTokens int, temperature float64) {
 }
 
 // SetTools sets the tool registry for subagent execution.
-// If not set, subagent will have access to the provided tools.
 func (sm *SubagentManager) SetTools(tools *ToolRegistry) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -83,65 +100,71 @@ func (sm *SubagentManager) Spawn(
 	callback AsyncCallback,
 ) (string, error) {
 	sm.mu.Lock()
-	defer sm.mu.Unlock()
-
-	taskID := fmt.Sprintf("subagent-%d", sm.nextID)
+	index := sm.nextID
+	taskID := fmt.Sprintf("subagent-%d", index)
 	sm.nextID++
-
+	now := time.Now().UnixMilli()
+	batchID := ToolAsyncBatchID(ctx)
+	if batchID == "" {
+		batchID = originSession
+	}
 	subagentTask := &SubagentTask{
-		ID:            taskID,
-		Task:          task,
-		Label:         label,
-		AgentID:       agentID,
-		OriginChannel: originChannel,
-		OriginChatID:  originChatID,
-		OriginSession: originSession,
-		Status:        "running",
-		Created:       time.Now().UnixMilli(),
+		ID:               taskID,
+		Task:             task,
+		Label:            label,
+		Codename:         nextCodename(index),
+		AgentID:          agentID,
+		ParentToolCallID: ToolCallID(ctx),
+		BatchID:          batchID,
+		OriginChannel:    originChannel,
+		OriginChatID:     originChatID,
+		OriginSession:    originSession,
+		ParentSessionID:  originSession,
+		Status:           SubagentQueued,
+		Summary:          "Queued for execution",
+		LatestEvent:      "task.queued",
+		Created:          now,
+		Updated:          now,
 	}
 	sm.tasks[taskID] = subagentTask
+	if cb := ToolSubagentProgress(ctx); cb != nil {
+		sm.progressCallbacks[taskID] = cb
+	}
+	sm.mu.Unlock()
 
-	// Start task in background with context cancellation support
-	go sm.runTask(ctx, subagentTask, callback)
+	go sm.runTask(ctx, taskID, callback)
 
 	if label != "" {
-		return fmt.Sprintf("Spawned subagent '%s' for task: %s", label, task), nil
+		return fmt.Sprintf("Spawned subagent %s (%s) for task: %s",
+			subagentTask.Codename, label, task), nil
 	}
-	return fmt.Sprintf("Spawned subagent for task: %s", task), nil
+	return fmt.Sprintf("Spawned subagent %s for task: %s", subagentTask.Codename, task), nil
 }
 
-func (sm *SubagentManager) runTask(ctx context.Context, task *SubagentTask, callback AsyncCallback) {
-	task.Status = "running"
-	task.Created = time.Now().UnixMilli()
+func (sm *SubagentManager) runTask(ctx context.Context, taskID string, callback AsyncCallback) {
+	sm.emit(taskID, "task.started", SubagentRunning, "Started delegated task", nil)
+	sm.emit(taskID, "task.progress", SubagentRunning, "Building delegated prompt", nil)
 
-	// Build system prompt for subagent
+	task, ok := sm.GetTask(taskID)
+	if !ok {
+		return
+	}
 	systemPrompt := `You are a subagent. Complete the given task independently and report the result.
 You have access to tools - use them as needed to complete your task.
 After completing the task, provide a clear summary of what was done.`
-
 	messages := []providers.Message{
-		{
-			Role:    "system",
-			Content: systemPrompt,
-		},
-		{
-			Role:    "user",
-			Content: task.Task,
-		},
+		{Role: "system", Content: systemPrompt},
+		{Role: "user", Content: task.Task},
 	}
 
-	// Check if context is already canceled before starting
 	select {
 	case <-ctx.Done():
-		sm.mu.Lock()
-		task.Status = "canceled"
-		task.Result = "Task canceled before execution"
-		sm.mu.Unlock()
+		sm.emit(taskID, "task.failed", SubagentCancelled, "Task cancelled before execution",
+			map[string]any{"error": "context cancelled"})
 		return
 	default:
 	}
 
-	// Run tool loop with access to tools
 	sm.mu.RLock()
 	tools := sm.tools
 	maxIter := sm.maxIterations
@@ -168,49 +191,38 @@ After completing the task, provide a clear summary of what was done.`
 		Tools:         tools,
 		MaxIterations: maxIter,
 		LLMOptions:    llmOptions,
+		OnToolCall: func(tc providers.ToolCall, status string, result *ToolResult) {
+			sm.recordToolEvent(taskID, tc, status, result)
+		},
 	}, messages, task.OriginChannel, task.OriginChatID)
 
-	sm.mu.Lock()
 	var result *ToolResult
-	defer func() {
-		sm.mu.Unlock()
-		// Call callback if provided and result is set
-		if callback != nil && result != nil {
-			callback(ctx, result)
-		}
-	}()
-
 	if err != nil {
-		task.Status = "failed"
-		task.Result = fmt.Sprintf("Error: %v", err)
-		// Check if it was canceled
+		status := SubagentFailed
+		message := fmt.Sprintf("Delegated task failed: %v", err)
 		if ctx.Err() != nil {
-			task.Status = "canceled"
-			task.Result = "Task canceled during execution"
+			status = SubagentCancelled
+			message = "Task cancelled during execution"
 		}
-		result = &ToolResult{
-			ForLLM:  task.Result,
-			ForUser: "",
-			Silent:  false,
-			IsError: true,
-			Async:   false,
-			Err:     err,
-		}
+		sm.emit(taskID, "task.failed", status, message, map[string]any{"error": err.Error()})
+		result = ErrorResult(message).WithError(err)
 	} else {
-		task.Status = "completed"
-		task.Result = loopResult.Content
+		sm.emit(taskID, "task.completed", SubagentCompleted, "Delegated task completed",
+			map[string]any{
+				"result":           utils.Truncate(loopResult.Content, 240),
+				"progress_percent": 100,
+			})
 		result = &ToolResult{
-			ForLLM: fmt.Sprintf(
-				"Subagent '%s' completed (iterations: %d): %s",
-				task.Label,
-				loopResult.Iterations,
-				loopResult.Content,
-			),
+			ForLLM: fmt.Sprintf("Subagent '%s' completed (iterations: %d): %s",
+				task.Codename, loopResult.Iterations, loopResult.Content),
 			ForUser: loopResult.Content,
 			Silent:  false,
 			IsError: false,
 			Async:   false,
 		}
+	}
+	if callback != nil && result != nil {
+		callback(ctx, result)
 	}
 }
 
@@ -218,31 +230,235 @@ func (sm *SubagentManager) GetTask(taskID string) (*SubagentTask, bool) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	task, ok := sm.tasks[taskID]
-	return task, ok
+	if !ok {
+		return nil, false
+	}
+	clone := *task
+	return &clone, true
 }
 
 func (sm *SubagentManager) ListTasks() []*SubagentTask {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
-
 	tasks := make([]*SubagentTask, 0, len(sm.tasks))
 	for _, task := range sm.tasks {
-		tasks = append(tasks, task)
+		clone := *task
+		tasks = append(tasks, &clone)
 	}
 	return tasks
 }
 
+func (sm *SubagentManager) ListActiveSubagents(sessionID string) []*SubagentTask {
+	tasks := sm.ListTasks()
+	out := make([]*SubagentTask, 0, len(tasks))
+	for _, task := range tasks {
+		if sessionID != "" && task.ParentSessionID != sessionID {
+			continue
+		}
+		switch task.Status {
+		case SubagentQueued, SubagentRunning, SubagentWaitingForTool, SubagentBlocked:
+			out = append(out, task)
+		}
+	}
+	return out
+}
+
+func (sm *SubagentManager) GetSubagentStatus(taskID string) (*SubagentTask, bool) {
+	return sm.GetTask(taskID)
+}
+
+func (sm *SubagentManager) GetSubagentEvents(taskID string, limit int) []SubagentProgressEvent {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	events := sm.events[taskID]
+	if limit <= 0 || limit >= len(events) {
+		out := make([]SubagentProgressEvent, len(events))
+		copy(out, events)
+		return out
+	}
+	out := make([]SubagentProgressEvent, limit)
+	copy(out, events[len(events)-limit:])
+	return out
+}
+
+func (sm *SubagentManager) GetBatchStatus(batchID string) *SubagentBatchStatus {
+	if batchID == "" {
+		return nil
+	}
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	status := &SubagentBatchStatus{BatchID: batchID}
+	for _, task := range sm.tasks {
+		if task.BatchID != batchID {
+			continue
+		}
+		status.Total++
+		if task.Updated > status.LatestUpdate {
+			status.LatestUpdate = task.Updated
+			status.Summary = task.Summary
+		}
+		switch task.Status {
+		case SubagentQueued, SubagentRunning, SubagentWaitingForTool:
+			status.Running++
+		case SubagentBlocked:
+			status.Blocked++
+		case SubagentFailed:
+			status.Failed++
+		case SubagentCompleted:
+			status.Completed++
+		case SubagentCancelled:
+			status.Cancelled++
+		}
+	}
+	if status.Total == 0 {
+		return nil
+	}
+	return status
+}
+
+func (sm *SubagentManager) GetStalledSubagents(threshold time.Duration) []*SubagentTask {
+	if threshold <= 0 {
+		return nil
+	}
+	now := time.Now().UnixMilli()
+	tasks := sm.ListTasks()
+	out := make([]*SubagentTask, 0, len(tasks))
+	for _, task := range tasks {
+		if task.Status != SubagentQueued &&
+			task.Status != SubagentRunning &&
+			task.Status != SubagentWaitingForTool {
+			continue
+		}
+		if now-task.Updated >= threshold.Milliseconds() {
+			out = append(out, task)
+		}
+	}
+	return out
+}
+
+func (sm *SubagentManager) recordToolEvent(
+	taskID string,
+	tc providers.ToolCall,
+	status string,
+	result *ToolResult,
+) {
+	message := fmt.Sprintf("Using tool %s", tc.Name)
+	taskStatus := SubagentWaitingForTool
+	meta := map[string]any{"tool_name": tc.Name, "tool_status": status}
+	if status == "completed" {
+		taskStatus = SubagentRunning
+		message = fmt.Sprintf("Completed tool %s", tc.Name)
+		if result != nil {
+			meta["result"] = utils.Truncate(toolResultSnippet(result), 180)
+		}
+	}
+	sm.emit(taskID, "tool."+status, taskStatus, message, meta)
+}
+
+func (sm *SubagentManager) emit(
+	taskID string,
+	eventType string,
+	status string,
+	message string,
+	meta map[string]any,
+) {
+	sm.mu.Lock()
+	task, ok := sm.tasks[taskID]
+	if !ok {
+		sm.mu.Unlock()
+		return
+	}
+	now := time.Now().UnixMilli()
+	if task.Started == 0 && status != SubagentQueued {
+		task.Started = now
+	}
+	task.Updated = now
+	task.Status = status
+	task.LatestEvent = eventType
+	if message != "" {
+		task.Summary = message
+	}
+	if meta != nil {
+		if toolName, _ := meta["tool_name"].(string); toolName != "" {
+			task.ToolName = toolName
+		}
+		if toolStatus, _ := meta["tool_status"].(string); toolStatus != "" {
+			task.ToolStatus = toolStatus
+		}
+		if result, _ := meta["result"].(string); result != "" {
+			task.LastOutputExcerpt = result
+			task.Result = result
+		}
+		if errMsg, _ := meta["error"].(string); errMsg != "" {
+			task.Error = errMsg
+		}
+		if progress, ok := meta["progress_percent"].(int); ok {
+			task.ProgressPercent = progress
+		}
+	}
+	event := SubagentProgressEvent{
+		TaskID:     task.ID,
+		Codename:   task.Codename,
+		Timestamp:  now,
+		EventType:  eventType,
+		Status:     task.Status,
+		Message:    message,
+		ToolName:   task.ToolName,
+		ToolStatus: task.ToolStatus,
+		Error:      task.Error,
+		Metadata:   meta,
+	}
+	sm.events[taskID] = append(sm.events[taskID], event)
+	snapshot := *task
+	cb := sm.progressCallbacks[taskID]
+	if isTerminalStatus(task.Status) {
+		delete(sm.progressCallbacks, taskID)
+	}
+	sm.mu.Unlock()
+	if cb != nil {
+		cb(&snapshot, &event)
+	}
+}
+
+func toolResultSnippet(result *ToolResult) string {
+	if result == nil {
+		return ""
+	}
+	if result.ForUser != "" {
+		return result.ForUser
+	}
+	if result.ForLLM != "" {
+		return result.ForLLM
+	}
+	if result.Err != nil {
+		return result.Err.Error()
+	}
+	return ""
+}
+
+func isTerminalStatus(status string) bool {
+	return status == SubagentCompleted ||
+		status == SubagentFailed ||
+		status == SubagentCancelled
+}
+
+func nextCodename(index int) string {
+	names := []string{"Petra", "Bean", "Shen", "Dink", "Mica", "Rune", "Vale", "Iris"}
+	base := names[(index-1)%len(names)]
+	round := (index-1)/len(names) + 1
+	if round == 1 {
+		return base
+	}
+	return fmt.Sprintf("%s-%d", base, round)
+}
+
 // SubagentTool executes a subagent task synchronously and returns the result.
-// Unlike SpawnTool which runs tasks asynchronously, SubagentTool waits for completion
-// and returns the result directly in the ToolResult.
 type SubagentTool struct {
 	manager *SubagentManager
 }
 
 func NewSubagentTool(manager *SubagentManager) *SubagentTool {
-	return &SubagentTool{
-		manager: manager,
-	}
+	return &SubagentTool{manager: manager}
 }
 
 func (t *SubagentTool) Name() string {
@@ -275,26 +491,15 @@ func (t *SubagentTool) Execute(ctx context.Context, args map[string]any) *ToolRe
 	if !ok {
 		return ErrorResult("task is required").WithError(fmt.Errorf("task parameter is required"))
 	}
-
 	label, _ := args["label"].(string)
-
 	if t.manager == nil {
 		return ErrorResult("Subagent manager not configured").WithError(fmt.Errorf("manager is nil"))
 	}
-
-	// Build messages for subagent
 	messages := []providers.Message{
-		{
-			Role:    "system",
-			Content: "You are a subagent. Complete the given task independently and provide a clear, concise result.",
-		},
-		{
-			Role:    "user",
-			Content: task,
-		},
+		{Role: "system", Content: "You are a subagent. Complete the given task independently and provide a clear, concise result."},
+		{Role: "user", Content: task},
 	}
 
-	// Use RunToolLoop to execute with tools (same as async SpawnTool)
 	sm := t.manager
 	sm.mu.RLock()
 	tools := sm.tools
@@ -316,8 +521,6 @@ func (t *SubagentTool) Execute(ctx context.Context, args map[string]any) *ToolRe
 		}
 	}
 
-	// Fall back to "cli"/"direct" for non-conversation callers (e.g., CLI, tests)
-	// to preserve the same defaults as the original NewSubagentTool constructor.
 	channel := ToolChannel(ctx)
 	if channel == "" {
 		channel = "cli"
@@ -338,21 +541,16 @@ func (t *SubagentTool) Execute(ctx context.Context, args map[string]any) *ToolRe
 		return ErrorResult(fmt.Sprintf("Subagent execution failed: %v", err)).WithError(err)
 	}
 
-	// ForUser: Brief summary for user (truncated if too long)
 	userContent := loopResult.Content
-	maxUserLen := 500
-	if len(userContent) > maxUserLen {
-		userContent = userContent[:maxUserLen] + "..."
+	if len(userContent) > 500 {
+		userContent = userContent[:500] + "..."
 	}
-
-	// ForLLM: Full execution details
 	labelStr := label
 	if labelStr == "" {
 		labelStr = "(unnamed)"
 	}
 	llmContent := fmt.Sprintf("Subagent task completed:\nLabel: %s\nIterations: %d\nResult: %s",
 		labelStr, loopResult.Iterations, loopResult.Content)
-
 	return &ToolResult{
 		ForLLM:  llmContent,
 		ForUser: userContent,
