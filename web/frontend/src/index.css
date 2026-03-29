@@ -193,6 +193,40 @@
   }
 }
 
+.code-block .token.property,
+.code-block .token.keyword,
+.code-block .token.tag {
+  color: rgb(var(--theme-ember-rgb));
+}
+
+.code-block .token.string,
+.code-block .token.attr-value,
+.code-block .token.selector {
+  color: #9dd3b7;
+}
+
+.code-block .token.number,
+.code-block .token.boolean,
+.code-block .token.constant {
+  color: #ffd98b;
+}
+
+.code-block .token.function,
+.code-block .token.class-name {
+  color: #8cc3ff;
+}
+
+.code-block .token.punctuation,
+.code-block .token.operator {
+  color: rgb(var(--theme-cream-rgb));
+  opacity: 0.72;
+}
+
+.code-block .token.comment {
+  color: rgb(var(--theme-smoke-rgb));
+  font-style: italic;
+}
+
 /* Offset sidebar below the full-width header */
 [data-slot="sidebar-container"] {
   top: 3.5rem !important;

@@ -10,6 +10,7 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
 import { ChatMetricsPills } from "@/components/chat/chat-metrics-pills"
+import { CodeBlock } from "@/components/chat/code-block"
 import { Button } from "@/components/ui/button"
 import {
   Collapsible,
@@ -43,6 +44,27 @@ export function AssistantMessage({
   const hasReasoning = Boolean(reasoningContent?.trim())
   const hasToolEvents = toolEvents.length > 0
 
+  const formatStructured = (value: unknown) => {
+    if (!value) return ""
+    if (typeof value === "string") {
+      try {
+        return JSON.stringify(JSON.parse(value), null, 2)
+      } catch {
+        return value
+      }
+    }
+    return JSON.stringify(value, null, 2)
+  }
+
+  const getResultLanguage = (value: string) => {
+    try {
+      JSON.parse(value)
+      return "json"
+    } catch {
+      return "text"
+    }
+  }
+
   const handleCopy = () => {
     navigator.clipboard.writeText(content).then(() => {
       setIsCopied(true)
@@ -68,16 +90,16 @@ export function AssistantMessage({
 
       {hasReasoning && (
         <Collapsible defaultOpen={pending}>
-          <div className="rounded-xl border border-amber-200/70 bg-amber-50/80">
+          <div className="border-primary/18 bg-primary/8 rounded-xl border">
             <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left">
-              <span className="flex items-center gap-2 text-sm font-medium">
+              <span className="text-primary flex items-center gap-2 text-sm font-medium">
                 <IconBrain className="size-4" />
                 Thinking
               </span>
               <IconChevronDown className="size-4 opacity-60" />
             </CollapsibleTrigger>
-            <CollapsibleContent className="border-t px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
-              {reasoningContent}
+            <CollapsibleContent className="text-foreground/88 border-t border-white/8 px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
+              <CodeBlock code={reasoningContent || ""} language="markdown" />
             </CollapsibleContent>
           </div>
         </Collapsible>
@@ -85,63 +107,82 @@ export function AssistantMessage({
 
       {hasToolEvents && (
         <Collapsible defaultOpen={pending}>
-          <div className="rounded-xl border border-slate-200 bg-slate-50/80">
+          <div className="border-border/80 bg-card/88 rounded-xl border">
             <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left">
-              <span className="flex items-center gap-2 text-sm font-medium">
+              <span className="text-foreground flex items-center gap-2 text-sm font-medium">
                 <IconTool className="size-4" />
                 Tool Activity
               </span>
               <IconChevronDown className="size-4 opacity-60" />
             </CollapsibleTrigger>
-            <CollapsibleContent className="border-t px-4 py-3">
+            <CollapsibleContent className="border-border/70 border-t px-4 py-3">
               <div className="flex flex-col gap-3">
                 {toolEvents.map((event) => (
                   <div
                     key={event.id}
-                    className="rounded-lg border bg-white p-3"
+                    className="border-border/70 bg-background/70 rounded-xl border p-4"
                   >
                     <div className="flex flex-wrap items-center gap-2 text-sm">
-                      <span className="font-medium">
+                      <span className="text-foreground font-medium">
                         {event.codename || event.label || event.name}
                       </span>
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs uppercase">
+                      <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs uppercase">
                         {event.kind}
                       </span>
-                      <span className="rounded-full bg-slate-900 px-2 py-0.5 text-xs text-white uppercase">
+                      <span className="bg-primary/14 text-primary rounded-full px-2 py-0.5 text-xs font-medium uppercase">
                         {event.status}
                       </span>
                       {event.toolName && (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs uppercase text-amber-900">
+                        <span className="bg-secondary text-secondary-foreground rounded-full px-2 py-0.5 text-xs uppercase">
                           {event.toolName}
                         </span>
                       )}
                     </div>
                     {event.codename && event.label && (
-                      <p className="mt-2 text-sm text-slate-500">{event.label}</p>
+                      <p className="text-muted-foreground mt-2 text-sm">
+                        {event.label}
+                      </p>
                     )}
                     {event.summary && (
-                      <p className="mt-2 text-sm text-slate-600">
+                      <p className="text-foreground/78 mt-2 text-sm">
                         {event.summary}
                       </p>
                     )}
                     {typeof event.progressPercent === "number" &&
                       event.progressPercent > 0 && (
-                        <p className="mt-2 text-xs text-slate-500">
+                        <p className="text-muted-foreground mt-2 text-xs">
                           Progress {event.progressPercent}%
                         </p>
                       )}
                     {event.error && (
-                      <p className="mt-2 text-sm text-red-600">{event.error}</p>
+                      <div className="mt-3">
+                        <p className="text-destructive mb-2 text-[11px] font-semibold tracking-[0.2em] uppercase">
+                          Execution failed
+                        </p>
+                        <CodeBlock code={event.error} language="text" />
+                      </div>
                     )}
                     {event.arguments && (
-                      <pre className="mt-2 overflow-x-auto rounded-md bg-slate-950 p-3 text-xs text-slate-50">
-                        {JSON.stringify(event.arguments, null, 2)}
-                      </pre>
+                      <div className="mt-3">
+                        <p className="text-muted-foreground mb-2 text-[11px] font-semibold tracking-[0.2em] uppercase">
+                          Request
+                        </p>
+                        <CodeBlock
+                          code={formatStructured(event.arguments)}
+                          language="json"
+                        />
+                      </div>
                     )}
                     {event.result && (
-                      <p className="mt-2 text-sm whitespace-pre-wrap text-slate-600">
-                        {event.result}
-                      </p>
+                      <div className="mt-3">
+                        <p className="text-muted-foreground mb-2 text-[11px] font-semibold tracking-[0.2em] uppercase">
+                          Result
+                        </p>
+                        <CodeBlock
+                          code={formatStructured(event.result)}
+                          language={getResultLanguage(event.result)}
+                        />
+                      </div>
                     )}
                   </div>
                 ))}
@@ -152,9 +193,30 @@ export function AssistantMessage({
       )}
 
       <div className="bg-card text-card-foreground relative overflow-hidden rounded-xl border">
-        <div className="prose dark:prose-invert prose-p:my-2 prose-pre:my-2 prose-pre:rounded-lg prose-pre:border prose-pre:bg-zinc-950 prose-pre:p-3 max-w-none p-4 text-[15px] leading-relaxed">
+        <div className="prose dark:prose-invert prose-p:my-2 max-w-none p-4 text-[15px] leading-relaxed">
           {content ? (
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                code(props) {
+                  const { className, children } = props
+                  const match = /language-(\w+)/.exec(className || "")
+                  const code = String(children).replace(/\n$/, "")
+
+                  if (!match) {
+                    return (
+                      <code className="rounded bg-black/12 px-1.5 py-0.5 text-[0.9em]">
+                        {children}
+                      </code>
+                    )
+                  }
+
+                  return <CodeBlock code={code} language={match[1]} />
+                },
+              }}
+            >
+              {content}
+            </ReactMarkdown>
           ) : (
             <p className="text-muted-foreground m-0 text-sm">
               {pending ? "Working..." : "No final response content."}

@@ -1,4 +1,4 @@
-import { IconPlus } from "@tabler/icons-react"
+import { IconDownload, IconPlus } from "@tabler/icons-react"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -16,13 +16,19 @@ import { useChatModels } from "@/hooks/use-chat-models"
 import { useGateway } from "@/hooks/use-gateway"
 import { usePicoChat } from "@/hooks/use-pico-chat"
 import { useSessionHistory } from "@/hooks/use-session-history"
+import {
+  buildConversationMarkdown,
+  downloadConversationMarkdown,
+} from "@/lib/chat-export"
 import { hasChatMetrics } from "@/lib/chat-metrics"
+import { getUserDisplayName } from "@/lib/user-profile"
 
 export function ChatPage() {
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [input, setInput] = useState("")
+  const userDisplayName = getUserDisplayName()
 
   const {
     messages,
@@ -117,6 +123,22 @@ export function ChatPage() {
           <span className="hidden sm:inline">{t("chat.newChat")}</span>
         </Button>
 
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 gap-2"
+          onClick={() =>
+            downloadConversationMarkdown(
+              buildConversationMarkdown(messages, userDisplayName),
+              activeSessionId,
+            )
+          }
+          disabled={messages.length === 0}
+        >
+          <IconDownload className="size-4" />
+          <span className="hidden sm:inline">{t("chat.export")}</span>
+        </Button>
+
         <SessionHistoryMenu
           sessions={sessions}
           activeSessionId={activeSessionId}
@@ -195,7 +217,10 @@ export function ChatPage() {
                   pending={msg.pending}
                 />
               ) : (
-                <UserMessage content={msg.content} />
+                <UserMessage
+                  content={msg.content}
+                  displayName={userDisplayName}
+                />
               )}
             </div>
           ))}

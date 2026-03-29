@@ -34,6 +34,7 @@
     "historyOpenFailed": "Failed to open this chat history",
     "loadingMore": "Loading more...",
     "deleteSession": "Delete session",
+    "export": "Export Markdown",
     "messagesCount": "{{count}} messages",
     "noModel": "Select model",
     "status": {
