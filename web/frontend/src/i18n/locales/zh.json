@@ -35,6 +35,23 @@
     "deleteSession": "删除会话",
     "messagesCount": "{{count}} 条消息",
     "noModel": "选择模型",
+    "status": {
+      "connected": "网关在线",
+      "disconnected": "网关离线",
+      "connectedDescription": "已准备好使用 {{model}} 开始对话，并可使用会话历史与路由能力。",
+      "sessions": "已加载 {{count}} 个会话"
+    },
+    "composer": {
+      "gatewayRequired": "需要先启动网关",
+      "modelRequired": "请先选择默认模型",
+      "ready": "可以开始发送指令",
+      "shortcut": "按 Enter 发送，Shift+Enter 换行。"
+    },
+    "starters": {
+      "plan": "帮我规划今天的工作",
+      "review": "检查当前工作区状态",
+      "route": "为这个任务选择合适模型"
+    },
     "empty": {
       "noConfiguredModel": "尚未配置模型",
       "noConfiguredModelDescription": "请先配置至少一个带有 API Key 的 AI 模型，才能开始对话。",
@@ -63,6 +80,11 @@
       },
       "status": {
         "starting": "服务启动中..."
+      },
+      "label": {
+        "running": "网关运行中",
+        "starting": "网关启动中",
+        "offline": "网关离线"
       }
     }
   },

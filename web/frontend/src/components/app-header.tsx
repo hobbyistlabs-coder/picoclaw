@@ -47,6 +47,16 @@ export function AppHeader() {
   const isRunning = gwState === "running"
   const isStarting = gwState === "starting"
   const isStopped = gwState === "stopped" || gwState === "unknown"
+  const gatewayTone = isRunning
+    ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
+    : isStarting
+      ? "border-sky-400/20 bg-sky-400/10 text-sky-100"
+      : "border-amber-400/20 bg-amber-400/10 text-amber-100"
+  const gatewayLabel = isRunning
+    ? t("header.gateway.label.running")
+    : isStarting
+      ? t("header.gateway.label.starting")
+      : t("header.gateway.label.offline")
   const showNotConnectedHint =
     canStart && (gwState === "stopped" || gwState === "error")
 
@@ -72,7 +82,7 @@ export function AppHeader() {
         <SidebarTrigger className="text-muted-foreground hover:bg-accent hover:text-foreground flex h-9 w-9 items-center justify-center rounded-lg sm:hidden [&>svg]:size-5">
           <IconMenu2 />
         </SidebarTrigger>
-        <div className="hidden shrink-0 items-center sm:flex">
+        <div className="flex shrink-0 items-center">
           <Link to="/">
             <img
               className="h-10 w-auto"
@@ -85,14 +95,19 @@ export function AppHeader() {
 
       {/* Center prominent connection status */}
       <div className="pointer-events-none absolute left-1/2 hidden h-full -translate-x-1/2 items-center justify-center lg:flex">
-        {showNotConnectedHint && (
-          <div className="text-muted-foreground flex items-center gap-2 rounded-full border border-dashed px-4 py-1.5 text-xs shadow-sm backdrop-blur-md">
-            <span className="bg-destructive/50 relative flex size-2 shrink-0 items-center justify-center rounded-full">
-              <span className="bg-destructive absolute inline-flex size-full animate-ping rounded-full opacity-75"></span>
-            </span>
-            {t("chat.notConnected")}
-          </div>
-        )}
+        <div
+          className={`flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs shadow-sm backdrop-blur-md ${gatewayTone}`}
+        >
+          <span className="relative flex size-2 shrink-0 items-center justify-center rounded-full bg-current/50">
+            {!isRunning ? (
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-70"></span>
+            ) : null}
+          </span>
+          {gatewayLabel}
+          {showNotConnectedHint ? (
+            <span className="text-current/65">{t("chat.notConnected")}</span>
+          ) : null}
+        </div>
       </div>
 
       <AlertDialog open={showStopDialog} onOpenChange={setShowStopDialog}>

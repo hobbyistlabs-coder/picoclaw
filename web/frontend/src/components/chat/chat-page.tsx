@@ -71,15 +71,30 @@ export function ChatPage() {
   }, [messages, isTyping, isAtBottom])
 
   const handleSend = () => {
-    if (!input.trim() || !isConnected) return
+    if (!input.trim() || !isConnected || !defaultModelName) return
     sendMessage(input.trim())
     setInput("")
   }
+
+  const statusTone = isConnected
+    ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
+    : "border-amber-400/20 bg-amber-400/10 text-amber-100"
+  const statusLabel = isConnected
+    ? t("chat.status.connected")
+    : t("chat.status.disconnected")
+  const statusDescription = !hasConfiguredModels
+    ? t("chat.empty.noConfiguredModelDescription")
+    : !defaultModelName
+      ? t("chat.empty.noSelectedModelDescription")
+      : isConnected
+        ? t("chat.status.connectedDescription", { model: defaultModelName })
+        : t("chat.empty.notRunningDescription")
 
   return (
     <div className="flex h-full flex-col bg-transparent">
       <PageHeader
         title={t("navigation.chat")}
+        description={t("chat.welcomeDesc")}
         titleExtra={
           hasConfiguredModels && (
             <ModelSelector
@@ -119,6 +134,29 @@ export function ChatPage() {
         />
       </PageHeader>
 
+      <div className="px-4 pb-3 md:px-8 lg:px-24 xl:px-48">
+        <div
+          className={`mx-auto flex w-full max-w-250 flex-col gap-3 rounded-[1.5rem] border px-4 py-3 shadow-lg shadow-black/10 md:flex-row md:items-center md:justify-between ${statusTone}`}
+        >
+          <div className="min-w-0">
+            <p className="text-xs font-semibold tracking-[0.22em] uppercase">
+              {statusLabel}
+            </p>
+            <p className="mt-1 text-sm leading-6 opacity-80">
+              {statusDescription}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="rounded-full border border-white/10 bg-black/10 px-3 py-1.5">
+              {t("chat.status.sessions", { count: sessions.length })}
+            </span>
+            <span className="rounded-full border border-white/10 bg-black/10 px-3 py-1.5">
+              {defaultModelName || t("chat.noModel")}
+            </span>
+          </div>
+        </div>
+      </div>
+
       {hasChatMetrics(sessionMetrics) && (
         <div className="border-b px-4 py-3 md:px-8 lg:px-24 xl:px-48">
           <div className="mx-auto flex w-full max-w-250 flex-col gap-2">
@@ -141,6 +179,7 @@ export function ChatPage() {
               hasConfiguredModels={hasConfiguredModels}
               defaultModelName={defaultModelName}
               isConnected={isConnected}
+              onPromptSelect={setInput}
             />
           )}
 

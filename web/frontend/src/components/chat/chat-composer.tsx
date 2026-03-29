@@ -23,6 +23,11 @@ export function ChatComposer({
 }: ChatComposerProps) {
   const { t } = useTranslation()
   const canInput = isConnected && hasDefaultModel
+  const disabledReason = !isConnected
+    ? t("chat.composer.gatewayRequired")
+    : !hasDefaultModel
+      ? t("chat.composer.modelRequired")
+      : t("chat.composer.ready")
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return
@@ -49,14 +54,21 @@ export function ChatComposer({
           maxRows={8}
         />
 
-        <div className="mt-2 flex items-center justify-between px-1">
-          <div className="flex items-center gap-1">{/* action buttons */}</div>
+        <div className="mt-3 flex items-center justify-between gap-3 px-1">
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium tracking-[0.22em] text-[#74e3d5] uppercase">
+              {disabledReason}
+            </p>
+            <p className="text-muted-foreground mt-1 text-xs">
+              {t("chat.composer.shortcut")}
+            </p>
+          </div>
 
           <Button
             size="icon"
             className="size-8 rounded-full bg-[#74e3d5] text-[#07131b] transition-transform hover:bg-[#99efe4] active:scale-95"
             onClick={onSend}
-            disabled={!input.trim() || !isConnected}
+            disabled={!input.trim() || !canInput}
           >
             <IconArrowUp className="size-4" />
           </Button>

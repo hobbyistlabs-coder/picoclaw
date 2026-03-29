@@ -48,6 +48,7 @@ interface NavGroup {
   defaultOpen: boolean
   items: NavItem[]
   isChannelsGroup?: boolean
+  count?: number
 }
 
 const baseNavGroups: Omit<NavGroup, "items">[] = [
@@ -121,6 +122,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           translateTitle: false,
         })),
         isChannelsGroup: true,
+        count: channelItems.length,
       },
       {
         ...baseNavGroups[2],
@@ -146,6 +148,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           },
           ...personaItems,
         ],
+        count: personaItems.length,
       },
       {
         ...baseNavGroups[3],
@@ -205,7 +208,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarGroup className="px-2 py-0">
               <SidebarGroupLabel asChild>
                 <CollapsibleTrigger className="hover:bg-muted/60 flex w-full cursor-pointer items-center justify-between rounded-md px-2 py-1.5 transition-colors">
-                  <span>{t(group.label)}</span>
+                  <div className="flex items-center gap-2">
+                    <span>{t(group.label)}</span>
+                    {group.count ? (
+                      <span className="rounded-full border border-white/10 px-1.5 py-0.5 text-[10px] leading-none text-white/60">
+                        {group.count}
+                      </span>
+                    ) : null}
+                  </div>
                   <IconChevronRight className="size-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                 </CollapsibleTrigger>
               </SidebarGroupLabel>
