@@ -9,6 +9,8 @@ package agent
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"reflect"
 	"sync"
 	"time"
 
@@ -116,13 +118,39 @@ func registerSharedTools(
 			}
 		}
 
+		var browserActionTool *tools.BrowserActionTool
 		if cfg.Tools.IsToolEnabled("browser_action") {
-			browserActionTool := tools.NewBrowserActionTool()
+			browserActionTool = tools.NewBrowserActionTool()
 			agent.Tools.Register(browserActionTool)
 		}
 
 		if cfg.Tools.IsToolEnabled("go_eval") {
 			goEvalTool := tools.NewGoEvalTool(agent.Workspace)
+
+			bindings := map[string]reflect.Value{
+				"Workspace": reflect.ValueOf(&agent.Workspace).Elem(),
+			}
+
+			if browserActionTool != nil {
+				bindings["BrowserActionTool"] = reflect.ValueOf(browserActionTool)
+			} else {
+				bindings["BrowserActionTool"] = reflect.ValueOf(tools.NewBrowserActionTool())
+			}
+
+			bindings["HTTPClient"] = reflect.ValueOf(http.DefaultClient)
+
+			sendFunc := func(channel, chatID, content string) error {
+				pubCtx, pubCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer pubCancel()
+				return msgBus.PublishOutbound(pubCtx, bus.OutboundMessage{
+					Channel: channel,
+					ChatID:  chatID,
+					Content: content,
+				})
+			}
+			bindings["Send"] = reflect.ValueOf(sendFunc)
+
+			goEvalTool.SetBindings(bindings)
 			agent.Tools.Register(goEvalTool)
 		}
 
