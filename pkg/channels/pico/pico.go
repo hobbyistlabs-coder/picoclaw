@@ -144,6 +144,18 @@ func (c *PicoChannel) Send(ctx context.Context, msg bus.OutboundMessage) error {
 		return channels.ErrNotRunning
 	}
 
+	if msg.ToolEvent != nil {
+		return c.broadcastToSession(msg.ChatID, newMessage(TypeToolCall, map[string]any{
+			"tool_event": msg.ToolEvent,
+		}))
+	}
+
+	if msg.ReasoningContent != "" {
+		return c.broadcastToSession(msg.ChatID, newMessage(TypeReasoningSet, map[string]any{
+			"content": msg.ReasoningContent,
+		}))
+	}
+
 	outMsg := newMessage(TypeMessageCreate, map[string]any{
 		"content": msg.Content,
 	})

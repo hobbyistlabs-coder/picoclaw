@@ -151,6 +151,9 @@ export function ChatPage() {
                   content={msg.content}
                   metrics={msg.metrics}
                   timestamp={msg.timestamp}
+                  reasoningContent={msg.reasoningContent}
+                  toolEvents={msg.toolEvents}
+                  pending={msg.pending}
                 />
               ) : (
                 <UserMessage content={msg.content} />

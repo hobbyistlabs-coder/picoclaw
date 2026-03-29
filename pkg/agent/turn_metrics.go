@@ -12,6 +12,7 @@ type turnMetrics struct {
 	totalTokens      int
 	estimatedCostUSD float64
 	hasEstimatedCost bool
+	reasoningContent string
 }
 
 func (m *turnMetrics) addUsage(usage *providers.UsageInfo) {

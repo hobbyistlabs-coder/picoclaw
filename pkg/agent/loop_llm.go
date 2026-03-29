@@ -97,9 +97,10 @@ func (al *AgentLoop) runAgentLoop(
 
 	// 5. Save final assistant message to session
 	agent.Sessions.AddFullMessage(opts.SessionKey, providers.Message{
-		Role:    "assistant",
-		Content: finalContent,
-		Usage:   metrics.usage(),
+		Role:             "assistant",
+		Content:          finalContent,
+		ReasoningContent: metrics.reasoningContent,
+		Usage:            metrics.usage(),
 	})
 	agent.Sessions.Save(opts.SessionKey)
 
@@ -153,6 +154,16 @@ func (al *AgentLoop) handleReasoning(
 	// since PublishOutbound's select may race between send and ctx.Done().
 	if ctx.Err() != nil {
 		return
+	}
+
+	if channelName == "pico" {
+		pubCtx, pubCancel := context.WithTimeout(ctx, 5*time.Second)
+		defer pubCancel()
+		_ = al.bus.PublishOutbound(pubCtx, bus.OutboundMessage{
+			Channel:          channelName,
+			ChatID:           channelID,
+			ReasoningContent: reasoningContent,
+		})
 	}
 
 	// Use a short timeout so the goroutine does not block indefinitely when
@@ -254,6 +265,16 @@ func (al *AgentLoop) runLLMIteration(
 			opts.Channel,
 			al.targetReasoningChannelID(opts.Channel),
 		)
+		if response.ReasoningContent != "" {
+			metrics.reasoningContent = response.ReasoningContent
+			if opts.Channel == "pico" {
+				al.bus.PublishOutbound(ctx, bus.OutboundMessage{
+					Channel:          opts.Channel,
+					ChatID:           opts.ChatID,
+					ReasoningContent: response.ReasoningContent,
+				})
+			}
+		}
 
 		logger.DebugCF("agent", "LLM response",
 			map[string]any{

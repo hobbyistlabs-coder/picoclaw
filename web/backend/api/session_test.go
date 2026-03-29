@@ -300,6 +300,82 @@ func TestHandleGetSession_IncludesUsageMetrics(t *testing.T) {
 	}
 }
 
+func TestHandleGetSession_IncludesReasoningAndToolCalls(t *testing.T) {
+	configPath, cleanup := setupOAuthTestEnv(t)
+	defer cleanup()
+
+	dir := sessionsTestDir(t, configPath)
+	store, err := memory.NewJSONLStore(dir)
+	if err != nil {
+		t.Fatalf("NewJSONLStore() error = %v", err)
+	}
+
+	sessionKey := picoSessionPrefix + "reasoning-jsonl"
+	messages := []providers.Message{
+		{Role: "user", Content: "inspect tools"},
+		{
+			Role:             "assistant",
+			ReasoningContent: "Need to inspect repo and call tools.",
+			ToolCalls: []providers.ToolCall{{
+				ID:   "call_1",
+				Name: "mcp_docs_lookup",
+				Function: &providers.FunctionCall{
+					Name:      "mcp_docs_lookup",
+					Arguments: `{"topic":"frontend events"}`,
+				},
+			}},
+		},
+		{Role: "tool", Content: "lookup result"},
+		{Role: "assistant", Content: "I found the event schema."},
+	}
+
+	for _, msg := range messages {
+		if err := store.AddFullMessage(nil, sessionKey, msg); err != nil {
+			t.Fatalf("AddFullMessage() error = %v", err)
+		}
+	}
+
+	h := NewHandler(configPath)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/sessions/reasoning-jsonl", nil)
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var resp struct {
+		Messages []struct {
+			Role             string `json:"role"`
+			Content          string `json:"content"`
+			ReasoningContent string `json:"reasoning_content"`
+			ToolCalls        []struct {
+				ID   string `json:"id"`
+				Name string `json:"name"`
+				Kind string `json:"kind"`
+			} `json:"tool_calls"`
+		} `json:"messages"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Unmarshal() error = %v", err)
+	}
+	if len(resp.Messages) != 2 {
+		t.Fatalf("len(resp.Messages) = %d, want 2", len(resp.Messages))
+	}
+	if resp.Messages[1].ReasoningContent != "Need to inspect repo and call tools." {
+		t.Fatalf("reasoning = %q", resp.Messages[1].ReasoningContent)
+	}
+	if len(resp.Messages[1].ToolCalls) != 1 {
+		t.Fatalf("tool calls = %+v", resp.Messages[1].ToolCalls)
+	}
+	if resp.Messages[1].ToolCalls[0].Kind != "mcp" {
+		t.Fatalf("tool kind = %q, want mcp", resp.Messages[1].ToolCalls[0].Kind)
+	}
+}
+
 func TestHandleDeleteSession_JSONLStorage(t *testing.T) {
 	configPath, cleanup := setupOAuthTestEnv(t)
 	defer cleanup()

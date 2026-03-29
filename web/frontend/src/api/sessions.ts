@@ -16,6 +16,13 @@ export interface SessionDetail {
   messages: {
     role: "user" | "assistant"
     content: string
+    reasoning_content?: string
+    tool_calls?: {
+      id: string
+      name: string
+      kind?: string
+      arguments?: Record<string, unknown>
+    }[]
     metrics?: ChatMetrics
   }[]
   metrics?: ChatMetrics

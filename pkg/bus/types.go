@@ -35,6 +35,8 @@ type OutboundMessage struct {
 	Content          string          `json:"content"`
 	ReplyToMessageID string          `json:"reply_to_message_id,omitempty"`
 	Metrics          *MessageMetrics `json:"metrics,omitempty"`
+	ReasoningContent string          `json:"reasoning_content,omitempty"`
+	ToolEvent        *ToolCallEvent  `json:"tool_event,omitempty"`
 }
 
 type OutboundStreamMessage struct {
@@ -42,6 +44,18 @@ type OutboundStreamMessage struct {
 	ChatID      string `json:"chat_id"`
 	Content     string `json:"content"`
 	IsReasoning bool   `json:"is_reasoning"`
+}
+
+type ToolCallEvent struct {
+	ID         string         `json:"id"`
+	Name       string         `json:"name"`
+	Kind       string         `json:"kind,omitempty"`
+	Status     string         `json:"status"`
+	Label      string         `json:"label,omitempty"`
+	Arguments  map[string]any `json:"arguments,omitempty"`
+	Summary    string         `json:"summary,omitempty"`
+	Result     string         `json:"result,omitempty"`
+	DurationMS int64          `json:"duration_ms,omitempty"`
 }
 
 // MediaPart describes a single media attachment to send.

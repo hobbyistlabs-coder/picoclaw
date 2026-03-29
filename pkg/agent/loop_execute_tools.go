@@ -67,12 +67,17 @@ func (al *AgentLoop) executeToolBatch(
 					"tool":      tc.Name,
 					"iteration": iteration,
 				})
+			publishToolEvent(ctx, al, opts, buildToolEvent(tc, "started", nil, 0))
+			startToolTime := time.Now()
 
 			// Create async callback for tools that implement AsyncExecutor.
 			// When the background work completes, this publishes the result
 			// as an inbound system message so processSystemMessage routes it
 			// back to the user via the normal agent loop.
 			asyncCallback := func(_ context.Context, result *tools.ToolResult) {
+				publishToolEvent(context.Background(), al, opts,
+					buildToolEvent(tc, "completed", result, time.Since(startToolTime).Milliseconds()))
+
 				// Send ForUser content directly to the user (immediate feedback),
 				// mirroring the synchronous tool execution path.
 				if !result.Silent && result.ForUser != "" {
@@ -111,7 +116,6 @@ func (al *AgentLoop) executeToolBatch(
 				})
 			}
 
-			startToolTime := time.Now()
 			toolResult := agent.Tools.ExecuteWithContext(
 				ctx,
 				tc.Name,
@@ -122,6 +126,10 @@ func (al *AgentLoop) executeToolBatch(
 			)
 			metricsToolExecutionDuration.Add(time.Since(startToolTime).Seconds())
 			agentResults[idx].result = toolResult
+			if !toolResult.Async {
+				publishToolEvent(ctx, al, opts,
+					buildToolEvent(tc, "completed", toolResult, time.Since(startToolTime).Milliseconds()))
+			}
 		}(i, tc)
 	}
 	wg.Wait()

@@ -45,6 +45,13 @@ type sessionListItem struct {
 	Updated      string `json:"updated"`
 }
 
+type sessionToolCall struct {
+	ID        string         `json:"id"`
+	Name      string         `json:"name"`
+	Kind      string         `json:"kind,omitempty"`
+	Arguments map[string]any `json:"arguments,omitempty"`
+}
+
 // picoSessionPrefix is the key prefix used by the gateway's routing for Pico
 // channel sessions. The full key format is:
 //
@@ -372,14 +379,26 @@ func (h *Handler) handleGetSession(w http.ResponseWriter, r *http.Request) {
 
 func writeSessionResponse(w http.ResponseWriter, sessionID string, sess sessionFile) {
 	type chatMessage struct {
-		Role    string              `json:"role"`
-		Content string              `json:"content"`
-		Metrics *bus.MessageMetrics `json:"metrics,omitempty"`
+		Role             string              `json:"role"`
+		Content          string              `json:"content"`
+		ReasoningContent string              `json:"reasoning_content,omitempty"`
+		ToolCalls        []sessionToolCall   `json:"tool_calls,omitempty"`
+		Metrics          *bus.MessageMetrics `json:"metrics,omitempty"`
 	}
 
 	messages := make([]chatMessage, 0, len(sess.Messages))
+	var pendingReasoning string
+	var pendingTools []sessionToolCall
 	for _, msg := range sess.Messages {
-		// Only include user and assistant messages that have actual content
+		if msg.Role == "assistant" {
+			if msg.ReasoningContent != "" {
+				pendingReasoning = msg.ReasoningContent
+			}
+			if len(msg.ToolCalls) > 0 {
+				pendingTools = append(pendingTools, buildToolCalls(msg.ToolCalls)...)
+			}
+		}
+
 		if (msg.Role == "user" || msg.Role == "assistant") && strings.TrimSpace(msg.Content) != "" {
 			var metrics *bus.MessageMetrics
 			if msg.Usage != nil {
@@ -393,10 +412,14 @@ func writeSessionResponse(w http.ResponseWriter, sessionID string, sess sessionF
 				}
 			}
 			messages = append(messages, chatMessage{
-				Role:    msg.Role,
-				Content: msg.Content,
-				Metrics: metrics,
+				Role:             msg.Role,
+				Content:          msg.Content,
+				ReasoningContent: pendingReasoning,
+				ToolCalls:        pendingTools,
+				Metrics:          metrics,
 			})
+			pendingReasoning = ""
+			pendingTools = nil
 		}
 	}
 
@@ -409,6 +432,41 @@ func writeSessionResponse(w http.ResponseWriter, sessionID string, sess sessionF
 		"created":  sess.Created.Format(time.RFC3339),
 		"updated":  sess.Updated.Format(time.RFC3339),
 	})
+}
+
+func buildToolCalls(calls []providers.ToolCall) []sessionToolCall {
+	out := make([]sessionToolCall, 0, len(calls))
+	for _, call := range calls {
+		args := call.Arguments
+		name := call.Name
+		if name == "" && call.Function != nil {
+			name = call.Function.Name
+		}
+		if args == nil && call.Function != nil && call.Function.Arguments != "" {
+			var parsed map[string]any
+			if err := json.Unmarshal([]byte(call.Function.Arguments), &parsed); err == nil {
+				args = parsed
+			}
+		}
+		out = append(out, sessionToolCall{
+			ID:        call.ID,
+			Name:      name,
+			Kind:      sessionToolKind(name),
+			Arguments: args,
+		})
+	}
+	return out
+}
+
+func sessionToolKind(name string) string {
+	switch {
+	case name == "spawn" || name == "subagent":
+		return "subagent"
+	case name == "mcp2cli" || strings.HasPrefix(name, "mcp_"):
+		return "mcp"
+	default:
+		return "tool"
+	}
 }
 
 // handleDeleteSession deletes a specific session.
