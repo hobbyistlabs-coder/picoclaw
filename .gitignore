@@ -58,3 +58,7 @@ dist/
 !web/backend/dist/
 web/backend/dist/*
 !web/backend/dist/.gitkeep
+!web/backend/dist/placeholder.txt
+
+# Keep onboard workspace AGENTS.md
+!cmd/picoclaw/internal/onboard/workspace/AGENTS.md
