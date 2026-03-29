@@ -71,6 +71,12 @@ var toolCatalog = []toolCatalogEntry{
 		ConfigKey:   "exec",
 	},
 	{
+		Name:        "boards",
+		Description: "Manage kanban boards, cards, and recurring review schedules.",
+		Category:    "automation",
+		ConfigKey:   "boards",
+	},
+	{
 		Name:        "cron",
 		Description: "Schedule one-time or recurring reminders, jobs, and shell commands.",
 		Category:    "automation",

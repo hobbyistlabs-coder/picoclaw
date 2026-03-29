@@ -4,6 +4,7 @@ import {
   IconChevronsDown,
   IconChevronsUp,
   IconKey,
+  IconLayoutKanban,
   IconListDetails,
   IconMasksTheater,
   IconMessageCircle,
@@ -149,6 +150,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       {
         ...baseNavGroups[3],
         items: [
+          {
+            title: "navigation.boards",
+            to: "/boards",
+            icon: IconLayoutKanban,
+            translateTitle: true,
+          },
           {
             title: "navigation.config",
             to: "/config",

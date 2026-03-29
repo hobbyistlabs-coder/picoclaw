@@ -13,6 +13,7 @@ import { Route as ModelsRouteImport } from './routes/models'
 import { Route as LogsRouteImport } from './routes/logs'
 import { Route as CredentialsRouteImport } from './routes/credentials'
 import { Route as ConfigRouteImport } from './routes/config'
+import { Route as BoardsRouteImport } from './routes/boards'
 import { Route as AgentRouteImport } from './routes/agent'
 import { Route as ChannelsRouteRouteImport } from './routes/channels/route'
 import { Route as IndexRouteImport } from './routes/index'
@@ -39,6 +40,11 @@ const CredentialsRoute = CredentialsRouteImport.update({
 const ConfigRoute = ConfigRouteImport.update({
   id: '/config',
   path: '/config',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BoardsRoute = BoardsRouteImport.update({
+  id: '/boards',
+  path: '/boards',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgentRoute = AgentRouteImport.update({
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/channels': typeof ChannelsRouteRouteWithChildren
   '/agent': typeof AgentRouteWithChildren
+  '/boards': typeof BoardsRoute
   '/config': typeof ConfigRouteWithChildren
   '/credentials': typeof CredentialsRoute
   '/logs': typeof LogsRoute
@@ -94,6 +101,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/channels': typeof ChannelsRouteRouteWithChildren
   '/agent': typeof AgentRouteWithChildren
+  '/boards': typeof BoardsRoute
   '/config': typeof ConfigRouteWithChildren
   '/credentials': typeof CredentialsRoute
   '/logs': typeof LogsRoute
@@ -108,6 +116,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/channels': typeof ChannelsRouteRouteWithChildren
   '/agent': typeof AgentRouteWithChildren
+  '/boards': typeof BoardsRoute
   '/config': typeof ConfigRouteWithChildren
   '/credentials': typeof CredentialsRoute
   '/logs': typeof LogsRoute
@@ -123,6 +132,7 @@ export interface FileRouteTypes {
     | '/'
     | '/channels'
     | '/agent'
+    | '/boards'
     | '/config'
     | '/credentials'
     | '/logs'
@@ -136,6 +146,7 @@ export interface FileRouteTypes {
     | '/'
     | '/channels'
     | '/agent'
+    | '/boards'
     | '/config'
     | '/credentials'
     | '/logs'
@@ -149,6 +160,7 @@ export interface FileRouteTypes {
     | '/'
     | '/channels'
     | '/agent'
+    | '/boards'
     | '/config'
     | '/credentials'
     | '/logs'
@@ -163,6 +175,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChannelsRouteRoute: typeof ChannelsRouteRouteWithChildren
   AgentRoute: typeof AgentRouteWithChildren
+  BoardsRoute: typeof BoardsRoute
   ConfigRoute: typeof ConfigRouteWithChildren
   CredentialsRoute: typeof CredentialsRoute
   LogsRoute: typeof LogsRoute
@@ -197,6 +210,13 @@ declare module '@tanstack/react-router' {
       path: '/config'
       fullPath: '/config'
       preLoaderRoute: typeof ConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/boards': {
+      id: '/boards'
+      path: '/boards'
+      fullPath: '/boards'
+      preLoaderRoute: typeof BoardsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agent': {
@@ -290,6 +310,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChannelsRouteRoute: ChannelsRouteRouteWithChildren,
   AgentRoute: AgentRouteWithChildren,
+  BoardsRoute: BoardsRoute,
   ConfigRoute: ConfigRouteWithChildren,
   CredentialsRoute: CredentialsRoute,
   LogsRoute: LogsRoute,

@@ -369,6 +369,9 @@ func DefaultConfig() *Config {
 			Port: 18790,
 		},
 		Tools: ToolsConfig{
+			Boards: ToolConfig{
+				Enabled: true,
+			},
 			MediaCleanup: MediaCleanupConfig{
 				ToolConfig: ToolConfig{
 					Enabled: true,

@@ -108,6 +108,7 @@ type ReadFileToolConfig struct {
 
 type ToolsConfig struct {
 	Alpaca          AlpacaConfig       `json:"alpaca,omitempty"`
+	Boards          ToolConfig         `json:"boards"                                                   envPrefix:"PICOCLAW_TOOLS_BOARDS_"`
 	AllowReadPaths  []string           `json:"allow_read_paths"  env:"PICOCLAW_TOOLS_ALLOW_READ_PATHS"`
 	AllowWritePaths []string           `json:"allow_write_paths" env:"PICOCLAW_TOOLS_ALLOW_WRITE_PATHS"`
 	Web             WebToolsConfig     `json:"web"`
@@ -238,6 +239,8 @@ func (t *ToolsConfig) IsToolEnabled(name string) bool {
 		return t.MCP2Cli.Enabled
 	case "calculator":
 		return t.Calculator.Enabled
+	case "boards":
+		return t.Boards.Enabled
 	default:
 		return true
 	}

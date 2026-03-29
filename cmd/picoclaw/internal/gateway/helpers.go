@@ -10,6 +10,7 @@ import (
 
 	"jane/cmd/picoclaw/internal"
 	"jane/pkg/agent"
+	"jane/pkg/boards"
 	"jane/pkg/bus"
 	"jane/pkg/channels"
 	_ "jane/pkg/channels/dingtalk"
@@ -96,6 +97,9 @@ func gatewayCmd(debug bool) error {
 		execTimeout,
 		cfg,
 	)
+	if err := setupBoardsTool(agentLoop, cronService, cfg); err != nil {
+		return err
+	}
 
 	heartbeatService := heartbeat.NewHeartbeatService(
 		cfg.WorkspacePath(),
@@ -269,4 +273,21 @@ func setupCronTool(
 	}
 
 	return cronService
+}
+
+func setupBoardsTool(
+	agentLoop *agent.AgentLoop, cronService *cron.CronService, cfg *config.Config,
+) error {
+	if !cfg.Tools.IsToolEnabled("boards") {
+		return nil
+	}
+	store, err := boards.NewStore(boards.DBPath(cfg.WorkspacePath()))
+	if err != nil {
+		return fmt.Errorf("error creating boards store: %w", err)
+	}
+	if _, err = store.EnsureDefaultBoard(context.Background()); err != nil {
+		return fmt.Errorf("error ensuring default board: %w", err)
+	}
+	agentLoop.RegisterTool(tools.NewBoardsTool(store, cronService))
+	return nil
 }
