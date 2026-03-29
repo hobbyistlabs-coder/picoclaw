@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 # ============================================================
 # Stage 1: Build the jane-ai binary
 # ============================================================
@@ -8,12 +10,18 @@ RUN apk add --no-cache git make
 WORKDIR /src
 
 # Cache dependencies
-COPY go.mod ./
-RUN go mod download
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
 # Copy source and build
-COPY . .
-RUN go mod tidy && make build
+COPY Makefile ./
+COPY cmd ./cmd
+COPY pkg ./pkg
+COPY workspace ./workspace
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    make build
 
 # ============================================================
 # Stage 2: Minimal runtime image

@@ -1,17 +1,22 @@
+# syntax=docker/dockerfile:1.7
+
 FROM golang:1.26.0-alpine AS builder
 
 RUN apk add --no-cache git
 
 WORKDIR /src
 
-COPY go.mod ./
-RUN go mod download
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
-COPY . .
-RUN mkdir -p /src/web/backend/dist && \
-	printf '%s\n' '<!doctype html><title>API only</title>' > /src/web/backend/dist/index.html && \
-	go mod tidy && \
-	go build -o /src/build/jane-ai-launcher ./web/backend
+COPY pkg ./pkg
+COPY web/backend ./web/backend
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    mkdir -p /src/web/backend/dist && \
+    printf '%s\n' '<!doctype html><title>API only</title>' > /src/web/backend/dist/index.html && \
+    go build -o /src/build/jane-ai-launcher ./web/backend
 
 FROM alpine:3.23
 
