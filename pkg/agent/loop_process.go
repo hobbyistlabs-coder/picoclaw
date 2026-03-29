@@ -384,12 +384,13 @@ func (al *AgentLoop) processSystemMessage(
 	if sessionKey == "" {
 		sessionKey = routing.BuildAgentMainSessionKey(agent.ID)
 	}
+	history := agent.Sessions.GetHistory(sessionKey)
 
 	return al.runAgentLoop(ctx, agent, processOptions{
 		SessionKey:      sessionKey,
 		Channel:         originChannel,
 		ChatID:          originChatID,
-		UserMessage:     fmt.Sprintf("[System: %s] %s", msg.SenderID, content),
+		UserMessage:     buildAsyncResumePrompt(history, msg.SenderID, content),
 		DefaultResponse: "Background task completed.",
 		EnableSummary:   false,
 		SendResponse:    true,
