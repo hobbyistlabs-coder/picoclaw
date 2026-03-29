@@ -205,7 +205,13 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 				})
 
 				// Execute the approved tools
-				agentResults := al.executeToolBatch(ctx, pending.agent, pending.opts, pending.normalizedToolCalls, pending.iteration)
+				agentResults, _ := al.executeToolBatch(
+					ctx,
+					pending.agent,
+					pending.opts,
+					pending.normalizedToolCalls,
+					pending.iteration,
+				)
 
 				// Inject results into context, matching original logic from loop_llm.go
 				for _, r := range agentResults {
@@ -387,5 +393,6 @@ func (al *AgentLoop) processSystemMessage(
 		DefaultResponse: "Background task completed.",
 		EnableSummary:   false,
 		SendResponse:    true,
+		NoHistory:       true,
 	})
 }

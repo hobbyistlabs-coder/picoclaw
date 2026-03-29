@@ -25,6 +25,7 @@ var (
 	metricsIterationDuration = expvar.NewFloat("agentloop_iteration_duration_seconds")
 	metricsFailureCounts     = expvar.NewInt("agentloop_failure_counts")
 	errApprovalPending       = errors.New("agent approval pending")
+	errAsyncPending          = errors.New("agent async batch pending")
 )
 
 // runAgentLoop is the core message processing logic.
@@ -77,6 +78,14 @@ func (al *AgentLoop) runAgentLoop(
 	if err != nil {
 		if errors.Is(err, errApprovalPending) {
 			logger.InfoCF("agent", "Turn paused pending approval", map[string]any{
+				"agent_id":    agent.ID,
+				"session_key": opts.SessionKey,
+				"iterations":  iteration,
+			})
+			return "", nil
+		}
+		if errors.Is(err, errAsyncPending) {
+			logger.InfoCF("agent", "Turn paused pending async completion", map[string]any{
 				"agent_id":    agent.ID,
 				"session_key": opts.SessionKey,
 				"iterations":  iteration,
@@ -397,7 +406,10 @@ func (al *AgentLoop) runLLMIteration(
 		// --- End HITL ---
 
 		// Execute tool calls in parallel
-		agentResults := al.executeToolBatch(ctx, agent, opts, normalizedToolCalls, iteration)
+		agentResults, hasAsync := al.executeToolBatch(ctx, agent, opts, normalizedToolCalls, iteration)
+		if hasAsync {
+			return "", iteration, metrics, errAsyncPending
+		}
 
 		// Process results in original order (send to user, save to session)
 		for _, r := range agentResults {

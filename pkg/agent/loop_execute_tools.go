@@ -33,7 +33,7 @@ func (al *AgentLoop) executeToolBatch(
 	opts processOptions,
 	normalizedToolCalls []providers.ToolCall,
 	iteration int,
-) []indexedAgentResult {
+) ([]indexedAgentResult, bool) {
 	agentResults := make([]indexedAgentResult, len(normalizedToolCalls))
 	var wg sync.WaitGroup
 	asyncCount := 0
@@ -153,5 +153,5 @@ func (al *AgentLoop) executeToolBatch(
 	}
 	wg.Wait()
 
-	return agentResults
+	return agentResults, asyncCount > 0
 }
