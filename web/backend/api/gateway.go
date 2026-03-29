@@ -32,6 +32,8 @@ var gateway = struct {
 	events: NewEventBroadcaster(),
 }
 
+var gatewaySSEHeartbeatInterval = 10 * time.Second
+
 // registerGatewayRoutes binds gateway lifecycle endpoints to the ServeMux.
 func (h *Handler) registerGatewayRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/gateway/status", h.handleGatewayStatus)
@@ -531,21 +533,27 @@ func (h *Handler) handleGatewayEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Cache-Control", "no-cache, no-transform")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("X-Accel-Buffering", "no")
 
 	if !h.managesGatewayProcess() {
-		fmt.Fprintf(w, "data: %s\n\n", h.currentGatewayStatus())
+		writeSSEData(w, h.currentGatewayStatus())
 		flusher.Flush()
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
+		statusTicker := time.NewTicker(5 * time.Second)
+		heartbeat := time.NewTicker(gatewaySSEHeartbeatInterval)
+		defer statusTicker.Stop()
+		defer heartbeat.Stop()
 		for {
 			select {
 			case <-r.Context().Done():
 				return
-			case <-ticker.C:
-				fmt.Fprintf(w, "data: %s\n\n", h.currentGatewayStatus())
+			case <-statusTicker.C:
+				writeSSEData(w, h.currentGatewayStatus())
+				flusher.Flush()
+			case <-heartbeat.C:
+				writeSSEComment(w, "keepalive")
 				flusher.Flush()
 			}
 		}
@@ -557,21 +565,34 @@ func (h *Handler) handleGatewayEvents(w http.ResponseWriter, r *http.Request) {
 
 	// Send initial status so the client doesn't start blank
 	initial := h.currentGatewayStatus()
-	fmt.Fprintf(w, "data: %s\n\n", initial)
+	writeSSEData(w, initial)
 	flusher.Flush()
+	heartbeat := time.NewTicker(gatewaySSEHeartbeatInterval)
+	defer heartbeat.Stop()
 
 	for {
 		select {
 		case <-r.Context().Done():
 			return
+		case <-heartbeat.C:
+			writeSSEComment(w, "keepalive")
+			flusher.Flush()
 		case data, ok := <-ch:
 			if !ok {
 				return
 			}
-			fmt.Fprintf(w, "data: %s\n\n", data)
+			writeSSEData(w, data)
 			flusher.Flush()
 		}
 	}
+}
+
+func writeSSEData(w io.Writer, data string) {
+	fmt.Fprintf(w, "data: %s\n\n", data)
+}
+
+func writeSSEComment(w io.Writer, comment string) {
+	fmt.Fprintf(w, ": %s\n\n", comment)
 }
 
 // currentGatewayStatus returns the current gateway status as a JSON string.

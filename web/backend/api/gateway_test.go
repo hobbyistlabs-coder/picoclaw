@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"jane/pkg/auth"
 	"jane/pkg/config"
@@ -283,6 +285,34 @@ func TestGatewayStartReady_OAuthModelRequiresStoredCredential(t *testing.T) {
 	}
 	if !ready {
 		t.Fatalf("gatewayStartReady() ready = false, want true with stored credential (reason=%q)", reason)
+	}
+}
+
+func TestHandleGatewayEvents_SendsHeartbeatForManagedGateway(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	h := NewHandler(configPath)
+
+	oldInterval := gatewaySSEHeartbeatInterval
+	gatewaySSEHeartbeatInterval = 10 * time.Millisecond
+	defer func() { gatewaySSEHeartbeatInterval = oldInterval }()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/gateway/events", nil)
+	ctx, cancel := context.WithTimeout(req.Context(), 25*time.Millisecond)
+	defer cancel()
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	h.handleGatewayEvents(rec, req)
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "data: ") {
+		t.Fatalf("expected initial SSE data event, got %q", body)
+	}
+	if !strings.Contains(body, ": keepalive") {
+		t.Fatalf("expected SSE heartbeat comment, got %q", body)
+	}
+	if got := rec.Header().Get("X-Accel-Buffering"); got != "no" {
+		t.Fatalf("X-Accel-Buffering = %q, want no", got)
 	}
 }
 
