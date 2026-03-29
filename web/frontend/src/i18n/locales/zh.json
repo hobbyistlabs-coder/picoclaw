@@ -88,6 +88,27 @@
       }
     }
   },
+  "theme": {
+    "title": "主题工作室",
+    "description": "切换明暗模式，选择已保存配色，或手动打造自己的主题。",
+    "mode": "主题模式",
+    "modes": {
+      "dark": "深色",
+      "light": "浅色"
+    },
+    "presets": "配色方案",
+    "editor": "配色编辑器",
+    "namePlaceholder": "配色名称",
+    "apply": "应用配色",
+    "saveNew": "另存为新配色",
+    "fields": {
+      "flame": "火焰",
+      "ember": "余烬",
+      "cream": "奶油",
+      "smoke": "烟灰",
+      "midnight": "午夜"
+    }
+  },
   "common": {
     "cancel": "取消",
     "save": "保存",

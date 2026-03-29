@@ -11,6 +11,7 @@ import { Link } from "@tanstack/react-router"
 import * as React from "react"
 import { useTranslation } from "react-i18next"
 
+import { ThemeSettingsSheet } from "@/components/theme/theme-settings-sheet"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,7 +36,15 @@ import { useTheme } from "@/hooks/use-theme.ts"
 
 export function AppHeader() {
   const { i18n, t } = useTranslation()
-  const { theme, toggleTheme } = useTheme()
+  const {
+    theme,
+    palettes,
+    activePalette,
+    setTheme,
+    toggleTheme,
+    selectPalette,
+    savePalette,
+  } = useTheme()
   const {
     state: gwState,
     loading: gwLoading,
@@ -48,10 +57,10 @@ export function AppHeader() {
   const isStarting = gwState === "starting"
   const isStopped = gwState === "stopped" || gwState === "unknown"
   const gatewayTone = isRunning
-    ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
+    ? "border-primary/30 bg-primary/10 text-primary"
     : isStarting
-      ? "border-sky-400/20 bg-sky-400/10 text-sky-100"
-      : "border-amber-400/20 bg-amber-400/10 text-amber-100"
+      ? "border-accent/40 bg-accent/20 text-accent-foreground"
+      : "border-border bg-secondary/60 text-secondary-foreground"
   const gatewayLabel = isRunning
     ? t("header.gateway.label.running")
     : isStarting
@@ -141,7 +150,7 @@ export function AppHeader() {
             isRunning
               ? "bg-destructive/10 text-destructive hover:bg-destructive/20"
               : isStopped
-                ? "bg-green-500 text-white hover:bg-green-600"
+                ? "bg-primary text-primary-foreground hover:bg-primary/85"
                 : ""
           }`}
           onClick={handleGatewayToggle}
@@ -166,6 +175,15 @@ export function AppHeader() {
         <Separator
           className="mx-4 my-2 hidden md:block"
           orientation="vertical"
+        />
+
+        <ThemeSettingsSheet
+          theme={theme}
+          palettes={palettes}
+          activePalette={activePalette}
+          onThemeChange={setTheme}
+          onPaletteSelect={selectPalette}
+          onPaletteSave={savePalette}
         />
 
         {/* Language Switcher */}

@@ -95,6 +95,27 @@
       }
     }
   },
+  "theme": {
+    "title": "Theme Studio",
+    "description": "Switch light or dark mode, choose a saved palette, or craft your own colors.",
+    "mode": "Theme Mode",
+    "modes": {
+      "dark": "Dark",
+      "light": "Light"
+    },
+    "presets": "Palettes",
+    "editor": "Palette Editor",
+    "namePlaceholder": "Palette name",
+    "apply": "Apply Palette",
+    "saveNew": "Save as New",
+    "fields": {
+      "flame": "Flame",
+      "ember": "Ember",
+      "cream": "Cream",
+      "smoke": "Smoke",
+      "midnight": "Midnight"
+    }
+  },
   "common": {
     "cancel": "Cancel",
     "save": "Save",

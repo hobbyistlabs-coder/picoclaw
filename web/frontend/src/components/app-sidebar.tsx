@@ -190,7 +190,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 JANE-ai
               </p>
               <p className="text-sidebar-foreground/60 text-xs tracking-[0.28em] uppercase">
-                Endgame mesh
+                Ember console
               </p>
             </div>
           </div>

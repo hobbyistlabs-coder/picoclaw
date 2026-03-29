@@ -1,28 +1,54 @@
 import { useCallback, useEffect, useState } from "react"
 
-type Theme = "light" | "dark"
-
-function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "dark"
-  return (localStorage.getItem("theme") as Theme) || "dark"
-}
+import {
+  type ThemeMode,
+  type ThemePalette,
+  type ThemeSettings,
+  applyThemeSettings,
+  getActivePalette,
+  getAllPalettes,
+  getStoredThemeSettings,
+  saveThemeSettings,
+  upsertCustomPalette,
+} from "@/lib/theme"
 
 export function useTheme() {
-  const [theme, setThemeState] = useState<Theme>(getStoredTheme)
+  const [settings, setSettings] = useState<ThemeSettings>(
+    getStoredThemeSettings,
+  )
 
   useEffect(() => {
-    const root = document.documentElement
-    if (theme === "dark") {
-      root.classList.add("dark")
-    } else {
-      root.classList.remove("dark")
-    }
-    localStorage.setItem("theme", theme)
-  }, [theme])
+    applyThemeSettings(settings)
+    saveThemeSettings(settings)
+  }, [settings])
 
-  const toggleTheme = useCallback(() => {
-    setThemeState((prev) => (prev === "dark" ? "light" : "dark"))
+  const setTheme = useCallback((mode: ThemeMode) => {
+    setSettings((prev) => ({ ...prev, mode }))
   }, [])
 
-  return { theme, toggleTheme }
+  const toggleTheme = useCallback(() => {
+    setSettings((prev) => ({
+      ...prev,
+      mode: prev.mode === "dark" ? "light" : "dark",
+    }))
+  }, [])
+
+  const selectPalette = useCallback((paletteId: string) => {
+    setSettings((prev) => ({ ...prev, activePaletteId: paletteId }))
+  }, [])
+
+  const savePalette = useCallback((palette: ThemePalette) => {
+    setSettings((prev) => upsertCustomPalette(prev, palette))
+  }, [])
+
+  return {
+    theme: settings.mode,
+    settings,
+    palettes: getAllPalettes(settings),
+    activePalette: getActivePalette(settings),
+    setTheme,
+    toggleTheme,
+    selectPalette,
+    savePalette,
+  }
 }

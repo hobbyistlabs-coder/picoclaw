@@ -77,8 +77,8 @@ export function ChatPage() {
   }
 
   const statusTone = isConnected
-    ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
-    : "border-amber-400/20 bg-amber-400/10 text-amber-100"
+    ? "border-primary/30 bg-primary/10 text-primary"
+    : "border-border bg-secondary/60 text-secondary-foreground"
   const statusLabel = isConnected
     ? t("chat.status.connected")
     : t("chat.status.disconnected")
