@@ -58,3 +58,4 @@ dist/
 !web/backend/dist/
 web/backend/dist/*
 !web/backend/dist/.gitkeep
+!cmd/picoclaw/internal/onboard/workspace/AGENTS.md
