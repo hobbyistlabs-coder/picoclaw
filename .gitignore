@@ -62,3 +62,4 @@ web/backend/dist/*
 
 # Keep onboard workspace AGENTS.md
 !cmd/picoclaw/internal/onboard/workspace/AGENTS.md
+!workspace/AGENTS.md
