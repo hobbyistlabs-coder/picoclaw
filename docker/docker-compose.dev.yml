@@ -33,6 +33,7 @@ services:
       - picoclaw-gateway
     volumes:
       - ../config:/root/.picoclaw
+      - picoclaw-workspace:/root/.picoclaw/workspace
     ports:
       - "127.0.0.1:18801:18800"
 
