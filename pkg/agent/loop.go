@@ -27,6 +27,7 @@ type AgentLoop struct {
 	state            *state.Manager
 	running          atomic.Bool
 	summarizing      sync.Map
+	asyncBatches     sync.Map
 	pendingApprovals sync.Map // Tracks state for Human-in-the-Loop approvals
 	summaryJobs      chan summaryJob
 	wg               sync.WaitGroup

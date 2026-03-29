@@ -16,6 +16,7 @@ type SubagentTask struct {
 	AgentID       string
 	OriginChannel string
 	OriginChatID  string
+	OriginSession string
 	Status        string
 	Result        string
 	Created       int64
@@ -78,7 +79,7 @@ func (sm *SubagentManager) RegisterTool(tool Tool) {
 
 func (sm *SubagentManager) Spawn(
 	ctx context.Context,
-	task, label, agentID, originChannel, originChatID string,
+	task, label, agentID, originChannel, originChatID, originSession string,
 	callback AsyncCallback,
 ) (string, error) {
 	sm.mu.Lock()
@@ -94,6 +95,7 @@ func (sm *SubagentManager) Spawn(
 		AgentID:       agentID,
 		OriginChannel: originChannel,
 		OriginChatID:  originChatID,
+		OriginSession: originSession,
 		Status:        "running",
 		Created:       time.Now().UnixMilli(),
 	}

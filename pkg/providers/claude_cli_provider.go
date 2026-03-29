@@ -125,6 +125,7 @@ func (p *ClaudeCliProvider) parseClaudeCliResponse(output string) (*LLMResponse,
 		finishReason = "tool_calls"
 		content = p.stripToolCallsJSON(resp.Result)
 	}
+	content = sanitizeProviderText(content)
 
 	var usage *UsageInfo
 	if resp.Usage.InputTokens > 0 || resp.Usage.OutputTokens > 0 {

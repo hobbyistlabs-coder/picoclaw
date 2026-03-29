@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -35,6 +36,20 @@ func (al *AgentLoop) executeToolBatch(
 ) []indexedAgentResult {
 	agentResults := make([]indexedAgentResult, len(normalizedToolCalls))
 	var wg sync.WaitGroup
+	asyncCount := 0
+	for _, tc := range normalizedToolCalls {
+		tool, ok := agent.Tools.Get(tc.Name)
+		if ok {
+			if _, ok := tool.(tools.AsyncExecutor); ok {
+				asyncCount++
+			}
+		}
+	}
+	asyncBatchID := ""
+	if asyncCount > 0 {
+		asyncBatchID = fmt.Sprintf("%s:%d:%d", opts.SessionKey, iteration, time.Now().UnixNano())
+		al.startAsyncBatch(asyncBatchID, asyncCount)
+	}
 
 	for i, tc := range normalizedToolCalls {
 		agentResults[i].tc = tc
@@ -78,18 +93,6 @@ func (al *AgentLoop) executeToolBatch(
 				publishToolEvent(context.Background(), al, opts,
 					buildToolEvent(tc, "completed", result, time.Since(startToolTime).Milliseconds()))
 
-				// Send ForUser content directly to the user (immediate feedback),
-				// mirroring the synchronous tool execution path.
-				if !result.Silent && result.ForUser != "" {
-					outCtx, outCancel := context.WithTimeout(context.Background(), 5*time.Second)
-					defer outCancel()
-					_ = al.bus.PublishOutbound(outCtx, bus.OutboundMessage{
-						Channel: opts.Channel,
-						ChatID:  opts.ChatID,
-						Content: result.ForUser,
-					})
-				}
-
 				// Determine content for the agent loop (ForLLM or error).
 				content := result.ForLLM
 				if content == "" && result.Err != nil {
@@ -109,15 +112,23 @@ func (al *AgentLoop) executeToolBatch(
 				pubCtx, pubCancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer pubCancel()
 				_ = al.bus.PublishInbound(pubCtx, bus.InboundMessage{
-					Channel:  "system",
-					SenderID: fmt.Sprintf("async:%s", tc.Name),
-					ChatID:   fmt.Sprintf("%s:%s", opts.Channel, opts.ChatID),
-					Content:  content,
+					Channel:    "system",
+					SenderID:   fmt.Sprintf("async:%s", tc.Name),
+					ChatID:     fmt.Sprintf("%s:%s", opts.Channel, opts.ChatID),
+					Content:    content,
+					SessionKey: opts.SessionKey,
+					Metadata: map[string]string{
+						"async_batch_id":       asyncBatchID,
+						"async_batch_expected": strconv.Itoa(asyncCount),
+						"async_tool_name":      tc.Name,
+						"async_tool_call_id":   tc.ID,
+					},
 				})
 			}
 
+			toolCtx := tools.WithToolSessionKey(ctx, opts.SessionKey)
 			toolResult := agent.Tools.ExecuteWithContext(
-				ctx,
+				toolCtx,
 				tc.Name,
 				tc.Arguments,
 				opts.Channel,

@@ -225,6 +225,27 @@ func TestParseJSONLEvents_CommandExecution(t *testing.T) {
 	}
 }
 
+func TestParseJSONLEvents_StripsInternalExecutionMarkup(t *testing.T) {
+	p := &CodexCliProvider{}
+	events := `{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"Before.\n[TOOL_CALL] {tool => \"web_search\", args => { --query \"test\" }} [/TOOL_CALL]\n<tool_call> {\"name\":\"visit\",\"parameters\":{\"url\":\"https://example.com\"}} </tool_call>\n{\"tool\":\"visit\",\"parameters\":{\"url\":\"https://example.com\"}}\nAfter."}}
+{"type":"turn.completed"}`
+
+	resp, err := p.parseJSONLEvents(events)
+	if err != nil {
+		t.Fatalf("parseJSONLEvents() error: %v", err)
+	}
+	if strings.Contains(resp.Content, "TOOL_CALL") || strings.Contains(resp.Content, "<tool_call>") {
+		t.Fatalf("expected internal execution markup to be removed, got %q", resp.Content)
+	}
+	if strings.Contains(resp.Content, `"tool":"visit"`) {
+		t.Fatalf("expected raw tool JSON to be removed, got %q", resp.Content)
+	}
+	if resp.Content != "Before.\nAfter." {
+		t.Fatalf("unexpected sanitized content: %q", resp.Content)
+	}
+}
+
 func TestParseJSONLEvents_NoUsage(t *testing.T) {
 	p := &CodexCliProvider{}
 	events := `{"type":"turn.started"}

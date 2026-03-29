@@ -961,6 +961,21 @@ func TestStripToolCallsJSON_OnlyToolCalls(t *testing.T) {
 	}
 }
 
+func TestStripToolCallsJSON_StripsInternalExecutionMarkup(t *testing.T) {
+	p := NewClaudeCliProvider("/workspace")
+	text := "Before.\n[TOOL_CALL] {tool => \"web_search\"} [/TOOL_CALL]\n<minimax:tool_call><invoke name=\"fetch\"></invoke></minimax:tool_call>\n{\"tool\":\"visit\",\"parameters\":{\"url\":\"https://example.com\"}}\nAfter."
+	got := p.stripToolCallsJSON(text)
+	if strings.Contains(got, "TOOL_CALL") || strings.Contains(got, "minimax:tool_call") {
+		t.Fatalf("expected internal execution markup removed, got %q", got)
+	}
+	if strings.Contains(got, `"tool":"visit"`) {
+		t.Fatalf("expected raw tool JSON removed, got %q", got)
+	}
+	if got != "Before.\nAfter." {
+		t.Fatalf("unexpected sanitized content: %q", got)
+	}
+}
+
 // --- findMatchingBrace tests ---
 
 func TestFindMatchingBrace(t *testing.T) {

@@ -702,6 +702,70 @@ func TestToolResult_UserFacingToolDoesSendMessage(t *testing.T) {
 	}
 }
 
+func TestProcessSystemMessage_BatchesAsyncResults(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "agent-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	cfg := &config.Config{
+		Agents: config.AgentsConfig{
+			Defaults: config.AgentDefaults{
+				Workspace:         tmpDir,
+				Model:             "test-model",
+				MaxTokens:         4096,
+				MaxToolIterations: 10,
+			},
+		},
+	}
+
+	msgBus := bus.NewMessageBus()
+	provider := &countingMockProvider{response: "batched summary"}
+	al := NewAgentLoop(cfg, msgBus, provider)
+	helper := testHelper{al: al}
+	batch := map[string]string{
+		"async_batch_id":       "batch-1",
+		"async_batch_expected": "2",
+		"async_tool_name":      "spawn",
+	}
+
+	first := helper.executeAndGetResponse(t, context.Background(), bus.InboundMessage{
+		Channel:    "system",
+		SenderID:   "async:spawn",
+		ChatID:     "telegram:chat-1",
+		Content:    "first result",
+		SessionKey: "agent:test:session",
+		Metadata:   batch,
+	})
+	if first != "" {
+		t.Fatalf("expected first batch item to stay silent, got %q", first)
+	}
+	if provider.calls != 0 {
+		t.Fatalf("expected provider not to run until batch completes, got %d", provider.calls)
+	}
+
+	second := helper.executeAndGetResponse(t, context.Background(), bus.InboundMessage{
+		Channel:    "system",
+		SenderID:   "async:spawn",
+		ChatID:     "telegram:chat-1",
+		Content:    "second result",
+		SessionKey: "agent:test:session",
+		Metadata:   batch,
+	})
+	if second != "batched summary" {
+		t.Fatalf("expected final batched response, got %q", second)
+	}
+	if provider.calls != 1 {
+		t.Fatalf("expected provider to run once after batch completion, got %d", provider.calls)
+	}
+	defaultAgent := al.registry.GetDefaultAgent()
+	history := defaultAgent.Sessions.GetHistory("agent:test:session")
+	if len(history) == 0 {
+		t.Fatal("expected batched async results to be written to the originating session")
+	}
+}
+
 // failFirstMockProvider fails on the first N calls with a specific error
 type failFirstMockProvider struct {
 	failures    int

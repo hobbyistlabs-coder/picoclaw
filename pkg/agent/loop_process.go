@@ -9,6 +9,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"jane/pkg/bus"
@@ -341,6 +342,19 @@ func (al *AgentLoop) processSystemMessage(
 	if idx := strings.Index(content, "Result:\n"); idx >= 0 {
 		content = content[idx+8:] // Extract just the result part
 	}
+	if batchID := msg.Metadata["async_batch_id"]; batchID != "" {
+		expected, _ := strconv.Atoi(msg.Metadata["async_batch_expected"])
+		combined, ready := al.addAsyncBatchResult(batchID, expected, content)
+		if !ready {
+			logger.InfoCF("agent", "Async batch awaiting more results",
+				map[string]any{
+					"batch_id": batchID,
+					"tool":     msg.Metadata["async_tool_name"],
+				})
+			return "", nil
+		}
+		content = combined
+	}
 
 	// Skip internal channels - only log, don't send to user
 	if constants.IsInternalChannel(originChannel) {
@@ -359,14 +373,17 @@ func (al *AgentLoop) processSystemMessage(
 		return "", fmt.Errorf("no default agent for system message")
 	}
 
-	// Use the origin session for context
-	sessionKey := routing.BuildAgentMainSessionKey(agent.ID)
+	// Use the originating session when available.
+	sessionKey := msg.SessionKey
+	if sessionKey == "" {
+		sessionKey = routing.BuildAgentMainSessionKey(agent.ID)
+	}
 
 	return al.runAgentLoop(ctx, agent, processOptions{
 		SessionKey:      sessionKey,
 		Channel:         originChannel,
 		ChatID:          originChatID,
-		UserMessage:     fmt.Sprintf("[System: %s] %s", msg.SenderID, msg.Content),
+		UserMessage:     fmt.Sprintf("[System: %s] %s", msg.SenderID, content),
 		DefaultResponse: "Background task completed.",
 		EnableSummary:   false,
 		SendResponse:    true,
