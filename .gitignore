@@ -57,6 +57,4 @@ dist/
 # Keep embedded backend dist directory placeholder in VCS
 !web/backend/dist/
 web/backend/dist/*
-!cmd/picoclaw/internal/onboard/workspace/AGENTS.md
 !web/backend/dist/.gitkeep
-!cmd/picoclaw/internal/onboard/workspace/.gitkeep
