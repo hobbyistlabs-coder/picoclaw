@@ -15,7 +15,3 @@
 ## 2025-03-25 - Efficient HTTP Response Prefix Checking
 **Learning:** Using `strings.ToLower(string(body))` on large HTTP response payloads (which can be megabytes in size) to check for a small case-insensitive prefix (like `<html` or `<!doctype`) causes massive memory allocation, large garbage collection overhead, and $O(N)$ string iterations.
 **Action:** Use bounded byte slice checks combined with `bytes.EqualFold` (e.g., `bytes.EqualFold(body[:5], []byte("<html"))`) for large payloads. This makes the check $O(1)$ without any string allocations or full-body case conversions.
-
-## 2025-03-30 - Replace `strings.HasPrefix(strings.ToLower(...))` with `strings.EqualFold(...)`
-**Learning:** Using `strings.HasPrefix(strings.ToLower(str), prefix)` allocates a new string of the full size of `str` and performs a full-string lowercase conversion just to check a short prefix. This creates unnecessary garbage collection pressure.
-**Action:** Use a fast-path length bounds check combined with `strings.EqualFold`: `len(str) >= len(prefix) && strings.EqualFold(str[:len(prefix)], prefix)`. This avoids memory allocation and stops evaluating characters once the prefix size is checked, dropping the complexity from $O(N)$ memory and time to $O(K)$ time (where $N$ is total string length, $K$ is prefix length).
