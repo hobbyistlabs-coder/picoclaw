@@ -75,7 +75,7 @@ func LogSessionEvent(workspacePath string, event ReplayEvent) {
 	defer lock.Unlock()
 
 	logDir := filepath.Join(workspacePath, "logs", event.SessionID, "events")
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
 		WarnCF("logger", "Failed to create session replay log directory", map[string]any{
 			"error": err.Error(),
 			"dir":   logDir,
@@ -84,7 +84,7 @@ func LogSessionEvent(workspacePath string, event ReplayEvent) {
 	}
 
 	logFile := filepath.Join(logDir, "events.jsonl")
-	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		WarnCF("logger", "Failed to open session replay log file", map[string]any{
 			"error": err.Error(),

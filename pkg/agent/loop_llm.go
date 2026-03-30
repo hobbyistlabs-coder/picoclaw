@@ -493,10 +493,10 @@ func (al *AgentLoop) runLLMIteration(
 
 				// Log error event for Session Replay
 				logger.LogSessionEvent(agent.Workspace, logger.ReplayEvent{
-					SessionID: opts.SessionKey,
-					EventType: logger.EventTypeError,
+					SessionID:     opts.SessionKey,
+					EventType:     logger.EventTypeError,
 					ErrorCategory: logger.ErrorCategoryLogic,
-					ErrorMessage: contentForLLM,
+					ErrorMessage:  contentForLLM,
 					Details: logger.EventDetails{
 						ToolName: r.tc.Name,
 					},
