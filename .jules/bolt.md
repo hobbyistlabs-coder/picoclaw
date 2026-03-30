@@ -15,3 +15,7 @@
 ## 2025-03-25 - Efficient HTTP Response Prefix Checking
 **Learning:** Using `strings.ToLower(string(body))` on large HTTP response payloads (which can be megabytes in size) to check for a small case-insensitive prefix (like `<html` or `<!doctype`) causes massive memory allocation, large garbage collection overhead, and $O(N)$ string iterations.
 **Action:** Use bounded byte slice checks combined with `bytes.EqualFold` (e.g., `bytes.EqualFold(body[:5], []byte("<html"))`) for large payloads. This makes the check $O(1)$ without any string allocations or full-body case conversions.
+
+## 2024-05-24 - [Routing Optimization] Bounded slice checks for prefix matching
+**Learning:** `strings.HasPrefix(strings.ToLower(str), prefix)` is a common anti-pattern in Go routing hot paths, as it allocates a new lowercase copy of the entire string just to check the prefix.
+**Action:** Always replace this pattern with a bounded length check combined with `strings.EqualFold`, like: `len(str) >= len(prefix) && strings.EqualFold(str[:len(prefix)], prefix)`. This significantly avoids memory allocations and improves performance for string handling.
