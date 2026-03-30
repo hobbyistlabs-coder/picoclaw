@@ -24,6 +24,8 @@ import (
 	"jane/pkg/tools"
 	"jane/pkg/tools/web"
 	"jane/pkg/voice"
+	"net/http"
+	"reflect"
 )
 
 func NewAgentLoop(
@@ -116,13 +118,42 @@ func registerSharedTools(
 			}
 		}
 
+		var browserActionTool *tools.BrowserActionTool
 		if cfg.Tools.IsToolEnabled("browser_action") {
-			browserActionTool := tools.NewBrowserActionTool()
+			browserActionTool = tools.NewBrowserActionTool()
 			agent.Tools.Register(browserActionTool)
 		}
 
 		if cfg.Tools.IsToolEnabled("go_eval") {
 			goEvalTool := tools.NewGoEvalTool(agent.Workspace)
+
+			// Inject environment bindings for the sandboxed tool
+			bindings := make(map[string]reflect.Value)
+
+			// Provide Workspace context to the sandbox
+			bindings["Workspace"] = reflect.ValueOf(&agent.Workspace).Elem()
+
+			// Expose BrowserActionTool for multi-step scriptable web automation if enabled
+			if browserActionTool != nil {
+				bindings["BrowserActionTool"] = reflect.ValueOf(browserActionTool)
+			}
+
+			// Expose an HTTP Client for basic web requests
+			httpClient := &http.Client{Timeout: 10 * time.Second}
+			bindings["HTTPClient"] = reflect.ValueOf(httpClient)
+
+			// Expose a Send callback to let sandboxed scripts dispatch outbound messages dynamically
+			bindings["Send"] = reflect.ValueOf(func(channel, chatID, content string) error {
+				pubCtx, pubCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer pubCancel()
+				return msgBus.PublishOutbound(pubCtx, bus.OutboundMessage{
+					Channel: channel,
+					ChatID:  chatID,
+					Content: content,
+				})
+			})
+
+			goEvalTool.SetBindings(bindings)
 			agent.Tools.Register(goEvalTool)
 		}
 
