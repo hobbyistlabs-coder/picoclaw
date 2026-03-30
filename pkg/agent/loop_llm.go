@@ -283,6 +283,15 @@ func (al *AgentLoop) runLLMIteration(
 					ReasoningContent: response.ReasoningContent,
 				})
 			}
+
+			// Log CoT event for Session Replay
+			logger.LogSessionEvent(agent.Workspace, logger.ReplayEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeCoT,
+				Details: logger.EventDetails{
+					CoTText: response.ReasoningContent,
+				},
+			})
 		}
 
 		logger.DebugCF("agent", "LLM response",
@@ -320,6 +329,16 @@ func (al *AgentLoop) runLLMIteration(
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
+
+			// Log tool call event for Session Replay
+			logger.LogSessionEvent(agent.Workspace, logger.ReplayEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeToolCall,
+				Details: logger.EventDetails{
+					ToolName: tc.Name,
+					Inputs:   tc.Arguments,
+				},
+			})
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
@@ -401,6 +420,16 @@ func (al *AgentLoop) runLLMIteration(
 				Content: approvalMsg,
 			})
 
+			// Log state transition for Session Replay
+			logger.LogSessionEvent(agent.Workspace, logger.ReplayEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeStateTransition,
+				Details: logger.EventDetails{
+					FromState: "generating",
+					ToState:   "awaiting_approval",
+				},
+			})
+
 			return "", iteration, metrics, errApprovalPending
 		}
 		// --- End HITL ---
@@ -461,7 +490,33 @@ func (al *AgentLoop) runLLMIteration(
 						"error":          contentForLLM,
 						"error_category": "logic_failure",
 					})
+
+				// Log error event for Session Replay
+				logger.LogSessionEvent(agent.Workspace, logger.ReplayEvent{
+					SessionID: opts.SessionKey,
+					EventType: logger.EventTypeError,
+					ErrorCategory: logger.ErrorCategoryLogic,
+					ErrorMessage: contentForLLM,
+					Details: logger.EventDetails{
+						ToolName: r.tc.Name,
+					},
+				})
 			}
+
+			// Log tool result event for Session Replay
+			var outputs map[string]any
+			if !r.result.IsError {
+				outputs = map[string]any{"result": contentForLLM}
+			}
+
+			logger.LogSessionEvent(agent.Workspace, logger.ReplayEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeToolResult,
+				Details: logger.EventDetails{
+					ToolName: r.tc.Name,
+					Outputs:  outputs,
+				},
+			})
 
 			toolResultMsg := providers.Message{
 				Role:       "tool",

@@ -12,6 +12,7 @@ import (
 
 	"jane/pkg/bus"
 	"jane/pkg/commands"
+	"jane/pkg/logger"
 	"jane/pkg/providers"
 )
 
@@ -100,6 +101,10 @@ func (al *AgentLoop) buildCommandsRuntime(agent *AgentInstance, opts *processOpt
 			agent.Sessions.SetHistory(opts.SessionKey, make([]providers.Message, 0))
 			agent.Sessions.SetSummary(opts.SessionKey, "")
 			agent.Sessions.Save(opts.SessionKey)
+
+			// Clean up the session lock from logger memory since the session is logically cleared
+			logger.CleanupSessionLock(opts.SessionKey)
+
 			return nil
 		}
 	}
