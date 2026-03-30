@@ -56,10 +56,12 @@ func TestGoEvalTool(t *testing.T) {
 	})
 }
 
-var TestWorkspace = "mock_workspace"
-var DoMockTask = func() string {
-	return "mock task completed"
-}
+var (
+	TestWorkspace = "mock_workspace"
+	DoMockTask    = func() string {
+		return "mock task completed"
+	}
+)
 
 func TestGoEvalToolWithBindings(t *testing.T) {
 	tool := NewGoEvalTool("/tmp/test_workspace")

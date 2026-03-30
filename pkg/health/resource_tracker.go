@@ -8,6 +8,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
+
 	"jane/pkg/logger"
 )
 
@@ -61,7 +62,11 @@ func NewResourceTracker(interval time.Duration) *ResourceTracker {
 		metric.WithDescription("Total memory allocated (even if freed), in MB"),
 	)
 	if err != nil {
-		logger.ErrorCF("SystemHealth", "Failed to create total memory alloc gauge", map[string]any{"error": err.Error()})
+		logger.ErrorCF(
+			"SystemHealth",
+			"Failed to create total memory alloc gauge",
+			map[string]any{"error": err.Error()},
+		)
 	}
 
 	rt.sysMBGauge, err = meter.Float64ObservableGauge(

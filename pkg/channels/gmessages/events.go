@@ -8,14 +8,14 @@ import (
 	"os"
 	"strings"
 
+	"go.mau.fi/mautrix-gmessages/pkg/libgm"
+	"go.mau.fi/mautrix-gmessages/pkg/libgm/events"
+	"go.mau.fi/mautrix-gmessages/pkg/libgm/gmproto"
+
 	"jane/pkg/bus"
 	"jane/pkg/channels"
 	"jane/pkg/logger"
 	mediaPkg "jane/pkg/media"
-
-	"go.mau.fi/mautrix-gmessages/pkg/libgm"
-	"go.mau.fi/mautrix-gmessages/pkg/libgm/events"
-	"go.mau.fi/mautrix-gmessages/pkg/libgm/gmproto"
 )
 
 type EventHandler struct {
@@ -75,7 +75,11 @@ func (h *EventHandler) handleClientReady(evt *events.ClientReady) {
 				h.Store.UpsertContact(num.GetNumber(), name)
 			}
 		}
-		logger.InfoCF("channels.gmessages", "Finished syncing contacts", map[string]any{"count": len(resp.GetContacts())})
+		logger.InfoCF(
+			"channels.gmessages",
+			"Finished syncing contacts",
+			map[string]any{"count": len(resp.GetContacts())},
+		)
 	}()
 }
 
@@ -121,7 +125,11 @@ func (h *EventHandler) handleMessage(evt *libgm.WrappedMessage) {
 			defer tmpFile.Close()
 
 			if _, err := tmpFile.Write(data); err != nil {
-				logger.ErrorCF("channels.gmessages", "Failed to write media data to temp file", map[string]any{"err": err})
+				logger.ErrorCF(
+					"channels.gmessages",
+					"Failed to write media data to temp file",
+					map[string]any{"err": err},
+				)
 				return
 			}
 
@@ -165,7 +173,11 @@ func (h *EventHandler) handleMessage(evt *libgm.WrappedMessage) {
 	dbMsg.ReplyToID = ExtractReplyToID(msg)
 
 	if err := h.Store.UpsertMessage(dbMsg); err != nil {
-		logger.ErrorCF("channels.gmessages", "Failed to store message", map[string]any{"err": err, "msg_id": dbMsg.MessageID})
+		logger.ErrorCF(
+			"channels.gmessages",
+			"Failed to store message",
+			map[string]any{"err": err, "msg_id": dbMsg.MessageID},
+		)
 		return
 	}
 
@@ -265,7 +277,11 @@ func (h *EventHandler) handleConversation(conv *gmproto.Conversation) {
 	}
 
 	if err := h.Store.UpsertConversation(dbConv); err != nil {
-		logger.ErrorCF("channels.gmessages", "Failed to store conversation", map[string]any{"err": err, "conv_id": dbConv.ConversationID})
+		logger.ErrorCF(
+			"channels.gmessages",
+			"Failed to store conversation",
+			map[string]any{"err": err, "conv_id": dbConv.ConversationID},
+		)
 		return
 	}
 }

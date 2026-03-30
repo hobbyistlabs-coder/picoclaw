@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
+	"go.mau.fi/mautrix-gmessages/pkg/libgm/gmproto"
+
 	"jane/pkg/bus"
 	"jane/pkg/logger"
-
-	"go.mau.fi/mautrix-gmessages/pkg/libgm/gmproto"
 )
 
 // ContactNumberMysteriousInt is the default value for the MysteriousInt field
@@ -163,13 +163,21 @@ func (c *GMessagesChannel) SendMedia(ctx context.Context, msg bus.OutboundMediaM
 	for _, part := range msg.Parts {
 		localPath, err := mediaStore.Resolve(part.Ref)
 		if err != nil {
-			logger.ErrorCF("channels.gmessages", "Failed to resolve media ref", map[string]any{"ref": part.Ref, "err": err})
+			logger.ErrorCF(
+				"channels.gmessages",
+				"Failed to resolve media ref",
+				map[string]any{"ref": part.Ref, "err": err},
+			)
 			continue
 		}
 
 		fileData, err := os.ReadFile(localPath)
 		if err != nil {
-			logger.ErrorCF("channels.gmessages", "Failed to read media file", map[string]any{"path": localPath, "err": err})
+			logger.ErrorCF(
+				"channels.gmessages",
+				"Failed to read media file",
+				map[string]any{"path": localPath, "err": err},
+			)
 			continue
 		}
 
@@ -195,7 +203,11 @@ func (c *GMessagesChannel) SendMedia(ctx context.Context, msg bus.OutboundMediaM
 		}
 
 		if errUpload != nil {
-			logger.ErrorCF("channels.gmessages", "Failed to upload media after retries", map[string]any{"err": errUpload})
+			logger.ErrorCF(
+				"channels.gmessages",
+				"Failed to upload media after retries",
+				map[string]any{"err": errUpload},
+			)
 			continue
 		}
 
