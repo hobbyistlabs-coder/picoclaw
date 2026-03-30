@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/playwright-community/playwright-go"
+
 	"jane/pkg/logger"
 )
 
@@ -86,7 +87,9 @@ func (t *BrowserActionTool) ensureBrowser() error {
 	t.browser = browser
 
 	context, err := browser.NewContext(playwright.BrowserNewContextOptions{
-		UserAgent: playwright.String("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
+		UserAgent: playwright.String(
+			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+		),
 	})
 	if err != nil {
 		return fmt.Errorf("could not create context: %w", err)
@@ -218,7 +221,10 @@ func (t *BrowserActionTool) Execute(ctx context.Context, args map[string]any) *T
 		// Truncate if too long (similar to web_fetch)
 		maxChars := 10000
 		if len(extractedText) > maxChars {
-			extractedText = extractedText[:maxChars] + fmt.Sprintf("\n... (truncated, %d more chars)", len(extractedText)-maxChars)
+			extractedText = extractedText[:maxChars] + fmt.Sprintf(
+				"\n... (truncated, %d more chars)",
+				len(extractedText)-maxChars,
+			)
 		}
 
 		url := t.page.URL()
@@ -229,7 +235,9 @@ func (t *BrowserActionTool) Execute(ctx context.Context, args map[string]any) *T
 		}
 
 	case "screenshot":
-		return ErrorResult("Screenshot action is not fully implemented for this environment yet (requires media handling).")
+		return ErrorResult(
+			"Screenshot action is not fully implemented for this environment yet (requires media handling).",
+		)
 
 	default:
 		return ErrorResult(fmt.Sprintf("Unknown action: %s", action))

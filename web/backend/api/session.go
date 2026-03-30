@@ -295,7 +295,9 @@ func (h *Handler) handleListSessions(w http.ResponseWriter, r *http.Request) {
 	items := []sessionListItem{}
 	seen := make(map[string]struct{})
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") || strings.HasSuffix(entry.Name(), ".meta.json") || strings.HasSuffix(entry.Name(), ".migrated") {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") ||
+			strings.HasSuffix(entry.Name(), ".meta.json") ||
+			strings.HasSuffix(entry.Name(), ".migrated") {
 			continue
 		}
 		data, readErr := os.ReadFile(filepath.Join(dir, entry.Name()))

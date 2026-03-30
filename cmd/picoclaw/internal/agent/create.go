@@ -66,7 +66,11 @@ func createAgentCmd(name, workspace, sysPrompt, model string, interactive bool) 
 		}
 
 		if workspace == "" {
-			fmt.Printf("Workspace path (default: %s/workspace/%s): ", runtimepaths.HomeDir(), strings.ToLower(strings.ReplaceAll(name, " ", "_")))
+			fmt.Printf(
+				"Workspace path (default: %s/workspace/%s): ",
+				runtimepaths.HomeDir(),
+				strings.ToLower(strings.ReplaceAll(name, " ", "_")),
+			)
 			workspaceInput, _ := reader.ReadString('\n')
 			workspaceInput = strings.TrimSpace(workspaceInput)
 			if workspaceInput != "" {
@@ -96,7 +100,11 @@ func createAgentCmd(name, workspace, sysPrompt, model string, interactive bool) 
 	}
 
 	if workspace == "" {
-		workspace = filepath.Join(runtimepaths.HomeDir(), "workspace", strings.ToLower(strings.ReplaceAll(name, " ", "_")))
+		workspace = filepath.Join(
+			runtimepaths.HomeDir(),
+			"workspace",
+			strings.ToLower(strings.ReplaceAll(name, " ", "_")),
+		)
 	}
 
 	var modelCfg *config.AgentModelConfig

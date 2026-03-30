@@ -496,7 +496,10 @@ func (t *SubagentTool) Execute(ctx context.Context, args map[string]any) *ToolRe
 		return ErrorResult("Subagent manager not configured").WithError(fmt.Errorf("manager is nil"))
 	}
 	messages := []providers.Message{
-		{Role: "system", Content: "You are a subagent. Complete the given task independently and provide a clear, concise result."},
+		{
+			Role:    "system",
+			Content: "You are a subagent. Complete the given task independently and provide a clear, concise result.",
+		},
 		{Role: "user", Content: task},
 	}
 

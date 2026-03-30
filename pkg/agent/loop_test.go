@@ -49,6 +49,7 @@ func (t *approvalTool) Name() string { return "approval_tool" }
 func (t *approvalTool) Description() string {
 	return "Tool that always requires approval for testing"
 }
+
 func (t *approvalTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -57,6 +58,7 @@ func (t *approvalTool) Parameters() map[string]any {
 		},
 	}
 }
+
 func (t *approvalTool) Execute(ctx context.Context, args map[string]any) *tools.ToolResult {
 	return &tools.ToolResult{ForLLM: "approved"}
 }

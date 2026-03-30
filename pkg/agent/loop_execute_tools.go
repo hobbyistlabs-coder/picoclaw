@@ -16,9 +16,7 @@ import (
 	"jane/pkg/utils"
 )
 
-var (
-	metricsToolExecutionDuration = expvar.NewFloat("agentloop_tool_execution_duration_seconds")
-)
+var metricsToolExecutionDuration = expvar.NewFloat("agentloop_tool_execution_duration_seconds")
 
 type indexedAgentResult struct {
 	result *tools.ToolResult

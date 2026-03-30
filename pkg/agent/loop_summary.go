@@ -35,7 +35,11 @@ func (al *AgentLoop) maybeSummarize(agent *AgentInstance, sessionKey, channel, c
 				// job accepted
 			default:
 				// Worker queue is full, delete from map so it can be retried later
-				logger.WarnCF("agent", "Summarization worker queue is full, skipping summarization", map[string]any{"session_key": sessionKey})
+				logger.WarnCF(
+					"agent",
+					"Summarization worker queue is full, skipping summarization",
+					map[string]any{"session_key": sessionKey},
+				)
 				al.summarizing.Delete(summarizeKey)
 			}
 		}
@@ -52,19 +56,24 @@ func (al *AgentLoop) forceCompression(agent *AgentInstance, sessionKey string) {
 
 	// Create logging directory: /logs/{session_id}/summarizer/
 	logDir := filepath.Join("logs", sessionKey, "summarizer")
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
 		logger.WarnCF("agent", "Failed to create summarizer log directory", map[string]any{"error": err.Error()})
 	}
 
 	// Dump input context
 	if b, err := json.MarshalIndent(history, "", "  "); err == nil {
-		_ = os.WriteFile(filepath.Join(logDir, "input_context.json"), b, 0644)
+		_ = os.WriteFile(filepath.Join(logDir, "input_context.json"), b, 0o644)
 	}
 
-	traceFile, _ := os.OpenFile(filepath.Join(logDir, "trace.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	traceFile, _ := os.OpenFile(filepath.Join(logDir, "trace.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if traceFile != nil {
 		defer traceFile.Close()
-		fmt.Fprintf(traceFile, "[%s] Starting summarization for session: %s\n", time.Now().Format(time.RFC3339), sessionKey)
+		fmt.Fprintf(
+			traceFile,
+			"[%s] Starting summarization for session: %s\n",
+			time.Now().Format(time.RFC3339),
+			sessionKey,
+		)
 	}
 
 	// Keep system prompt (usually [0]) and the very last message (user's trigger)
@@ -127,19 +136,24 @@ func (al *AgentLoop) summarizeSession(agent *AgentInstance, sessionKey string) {
 
 	// Create logging directory: /logs/{session_id}/summarizer/
 	logDir := filepath.Join("logs", sessionKey, "summarizer")
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
 		logger.WarnCF("agent", "Failed to create summarizer log directory", map[string]any{"error": err.Error()})
 	}
 
 	// Dump input context
 	if b, err := json.MarshalIndent(history, "", "  "); err == nil {
-		_ = os.WriteFile(filepath.Join(logDir, "input_context.json"), b, 0644)
+		_ = os.WriteFile(filepath.Join(logDir, "input_context.json"), b, 0o644)
 	}
 
-	traceFile, _ := os.OpenFile(filepath.Join(logDir, "trace.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	traceFile, _ := os.OpenFile(filepath.Join(logDir, "trace.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if traceFile != nil {
 		defer traceFile.Close()
-		fmt.Fprintf(traceFile, "[%s] Starting summarization for session: %s\n", time.Now().Format(time.RFC3339), sessionKey)
+		fmt.Fprintf(
+			traceFile,
+			"[%s] Starting summarization for session: %s\n",
+			time.Now().Format(time.RFC3339),
+			sessionKey,
+		)
 	}
 
 	toSummarize := history[:len(history)-4]
@@ -157,7 +171,13 @@ func (al *AgentLoop) summarizeSession(agent *AgentInstance, sessionKey string) {
 		if msgTokens > maxMessageTokens {
 			omitted = true
 			if traceFile != nil {
-				fmt.Fprintf(traceFile, "[%s] Omitting oversized message from %s (length: %d)\n", time.Now().Format(time.RFC3339), m.Role, len(m.Content))
+				fmt.Fprintf(
+					traceFile,
+					"[%s] Omitting oversized message from %s (length: %d)\n",
+					time.Now().Format(time.RFC3339),
+					m.Role,
+					len(m.Content),
+				)
 			}
 			continue
 		}
@@ -225,7 +245,7 @@ func (al *AgentLoop) summarizeSession(agent *AgentInstance, sessionKey string) {
 		if traceFile != nil {
 			fmt.Fprintf(traceFile, "[%s] Summarization complete. Saving session.\n", time.Now().Format(time.RFC3339))
 		}
-		_ = os.WriteFile(filepath.Join(logDir, "result_summary.md"), []byte(finalSummary), 0644)
+		_ = os.WriteFile(filepath.Join(logDir, "result_summary.md"), []byte(finalSummary), 0o644)
 
 		agent.Sessions.SetSummary(sessionKey, finalSummary)
 		agent.Sessions.TruncateHistory(sessionKey, 4)

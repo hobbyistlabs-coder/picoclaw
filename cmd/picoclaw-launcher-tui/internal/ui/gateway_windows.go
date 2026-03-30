@@ -8,7 +8,11 @@ import "os/exec"
 var execCommand = exec.Command
 
 func isGatewayProcessRunning() bool {
-	cmd := execCommand("cmd", "/C", `tasklist /FI "IMAGENAME eq jane-ai.exe" | findstr /I /C:"jane-ai.exe" >NUL || tasklist /FI "IMAGENAME eq picoclaw.exe" | findstr /I /C:"picoclaw.exe" >NUL`)
+	cmd := execCommand(
+		"cmd",
+		"/C",
+		`tasklist /FI "IMAGENAME eq jane-ai.exe" | findstr /I /C:"jane-ai.exe" >NUL || tasklist /FI "IMAGENAME eq picoclaw.exe" | findstr /I /C:"picoclaw.exe" >NUL`,
+	)
 	return cmd.Run() == nil
 }
 

@@ -65,7 +65,10 @@ func (h *Handler) dispatchBoardPrompt(
 	sessionID := generateSecureToken()
 	dialURL := wsURL + "?session_id=" + url.QueryEscape(sessionID)
 	header := http.Header{"Authorization": []string{"Bearer " + cfg.Channels.Pico.Token}}
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, dialURL, header)
+	conn, resp, err := websocket.DefaultDialer.DialContext(ctx, dialURL, header)
+	if resp != nil && resp.Body != nil {
+		resp.Body.Close()
+	}
 	if err != nil {
 		return "", fmt.Errorf("connect to gateway pico websocket: %w", err)
 	}

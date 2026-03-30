@@ -24,7 +24,6 @@ func (al *AgentLoop) executeLLMWithRetry(
 	activeModel string,
 	iteration int,
 ) (*providers.LLMResponse, error) {
-
 	llmOpts := map[string]any{
 		"max_tokens":       agent.MaxTokens,
 		"temperature":      agent.Temperature,
