@@ -1,7 +1,6 @@
 package providers
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -88,7 +87,12 @@ func (p *AntigravityProvider) Chat(
 	// Build API URL — uses Cloud Code Assist v1internal streaming endpoint
 	apiURL := fmt.Sprintf("%s/v1internal:streamGenerateContent?alt=sse", antigravityBaseURL)
 
-	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(
+		ctx,
+		"POST",
+		apiURL,
+		strings.NewReader(string(bodyBytes)),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
