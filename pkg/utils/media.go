@@ -20,13 +20,17 @@ func IsAudioFile(filename, contentType string) bool {
 	audioTypes := []string{"audio/", "application/ogg", "application/x-ogg"}
 
 	for _, ext := range audioExtensions {
-		if strings.HasSuffix(strings.ToLower(filename), ext) {
+		// Optimization: Avoid allocating a new string with strings.ToLower(filename)
+		// Use bounded slice check and EqualFold for O(1) memory case-insensitive suffix match
+		if len(filename) >= len(ext) && strings.EqualFold(filename[len(filename)-len(ext):], ext) {
 			return true
 		}
 	}
 
 	for _, audioType := range audioTypes {
-		if strings.HasPrefix(strings.ToLower(contentType), audioType) {
+		// Optimization: Avoid allocating a new string with strings.ToLower(contentType)
+		// Use bounded slice check and EqualFold for O(1) memory case-insensitive prefix match
+		if len(contentType) >= len(audioType) && strings.EqualFold(contentType[:len(audioType)], audioType) {
 			return true
 		}
 	}
