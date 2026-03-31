@@ -81,20 +81,29 @@ func LogSessionEvent(
 
 	// Ensure directory exists
 	eventsDir := filepath.Join(workspacePath, "logs", safeSessionID, "events")
-	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
-		ErrorCF("logger", "Failed to create session replay directory", map[string]any{"error": err.Error(), "dir": eventsDir})
+	if mkdirErr := os.MkdirAll(eventsDir, 0o755); mkdirErr != nil {
+		ErrorCF("logger", "Failed to create session replay directory", map[string]any{
+			"error": mkdirErr.Error(),
+			"dir":   eventsDir,
+		})
 		return
 	}
 
 	eventsFile := filepath.Join(eventsDir, "events.jsonl")
-	f, err := os.OpenFile(eventsFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-	if err != nil {
-		ErrorCF("logger", "Failed to open session replay file", map[string]any{"error": err.Error(), "file": eventsFile})
+	f, openErr := os.OpenFile(eventsFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if openErr != nil {
+		ErrorCF("logger", "Failed to open session replay file", map[string]any{
+			"error": openErr.Error(),
+			"file":  eventsFile,
+		})
 		return
 	}
 	defer f.Close()
 
-	if _, err := f.Write(eventBytes); err != nil {
-		ErrorCF("logger", "Failed to write session replay event", map[string]any{"error": err.Error(), "file": eventsFile})
+	if _, writeErr := f.Write(eventBytes); writeErr != nil {
+		ErrorCF("logger", "Failed to write session replay event", map[string]any{
+			"error": writeErr.Error(),
+			"file":  eventsFile,
+		})
 	}
 }
