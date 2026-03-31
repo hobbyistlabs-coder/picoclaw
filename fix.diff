@@ -1,0 +1,15 @@
+<<<<<<< SEARCH
+func TestNewPicoclawCommand(t *testing.T) {
+	cmd := NewPicoclawCommand("vdev", "abcd123", "2024-01-01")
+
+	assert.Equal(t, "picoclaw", cmd.Use)
+	assert.Equal(t, "🦞 picoclaw - Personal AI Assistant vdev\n\n", cmd.Long)
+}
+=======
+func TestNewPicoclawCommand(t *testing.T) {
+	cmd := NewPicoclawCommand("vdev", "abcd123", "2024-01-01")
+
+	assert.Equal(t, "jane-ai", cmd.Use)
+	assert.Equal(t, "🦞 jane-ai - Personal AI Assistant vdev\n\n", cmd.Long)
+}
+>>>>>>> REPLACE
