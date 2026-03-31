@@ -258,7 +258,11 @@ func setupCronTool(
 		var err error
 		cronTool, err = tools.NewCronTool(cronService, agentLoop, msgBus, workspace, restrict, execTimeout, cfg)
 		if err != nil {
-			logger.FatalCF("gateway", "Critical error during CronTool initialization", map[string]any{"error": err.Error()})
+			logger.FatalCF(
+				"gateway",
+				"Critical error during CronTool initialization",
+				map[string]any{"error": err.Error()},
+			)
 		}
 
 		agentLoop.RegisterTool(cronTool)

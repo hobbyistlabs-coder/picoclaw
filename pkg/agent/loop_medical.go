@@ -103,7 +103,9 @@ func (al *AgentLoop) processMedicalRequest(
 		if phase == PhaseSafetyDisclaimers {
 			if strings.Contains(strings.ToLower(phaseResult), "life-threatening") ||
 				strings.Contains(strings.ToLower(phaseResult), "red flag") {
-				finalResponse.WriteString("\n⚠️ **RED FLAG DETECTED: This requires immediate emergency medical attention.**\n")
+				finalResponse.WriteString(
+					"\n⚠️ **RED FLAG DETECTED: This requires immediate emergency medical attention.**\n",
+				)
 			}
 		}
 	}
@@ -125,15 +127,30 @@ func buildPhasePrompt(phase string, context string) string {
 
 	switch phase {
 	case PhaseExtraction:
-		return fmt.Sprintf(basePrompt, context) + "Extract all clinical terminology, symptoms, and vital signs from the context."
+		return fmt.Sprintf(
+			basePrompt,
+			context,
+		) + "Extract all clinical terminology, symptoms, and vital signs from the context."
 	case PhaseTemporalCorrelation:
-		return fmt.Sprintf(basePrompt, context) + "Analyze the temporal correlation of symptoms. Scan for recurring patterns in the patient's history."
+		return fmt.Sprintf(
+			basePrompt,
+			context,
+		) + "Analyze the temporal correlation of symptoms. Scan for recurring patterns in the patient's history."
 	case PhaseTheoryGeneration:
-		return fmt.Sprintf(basePrompt, context) + "Generate a ranked list of potential causes (DDx) and pathophysiological theories based on the extracted symptoms and patterns."
+		return fmt.Sprintf(
+			basePrompt,
+			context,
+		) + "Generate a ranked list of potential causes (DDx) and pathophysiological theories based on the extracted symptoms and patterns."
 	case PhaseVerification:
-		return fmt.Sprintf(basePrompt, context) + "Verify the proposed theories and any implicit remedies against the patient's Allergies and Medications profile."
+		return fmt.Sprintf(
+			basePrompt,
+			context,
+		) + "Verify the proposed theories and any implicit remedies against the patient's Allergies and Medications profile."
 	case PhaseSafetyDisclaimers:
-		return fmt.Sprintf(basePrompt, context) + "Provide mandatory clinical disclaimers. Explicitly state whether any 'Life-Threatening' or 'Red Flag' symptoms were detected."
+		return fmt.Sprintf(
+			basePrompt,
+			context,
+		) + "Provide mandatory clinical disclaimers. Explicitly state whether any 'Life-Threatening' or 'Red Flag' symptoms were detected."
 	default:
 		return context
 	}
