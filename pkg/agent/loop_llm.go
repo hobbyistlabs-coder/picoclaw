@@ -266,7 +266,6 @@ func (al *AgentLoop) runLLMIteration(
 		)
 		if err != nil {
 			errCat := logger.ModelFailure
-			// Simplistic heuristic since providers.ErrContextLengthExceeded might not be defined
 			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 				errCat = logger.InfrastructureFailure
 			}
