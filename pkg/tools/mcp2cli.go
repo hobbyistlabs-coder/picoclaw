@@ -54,7 +54,7 @@ func (t *MCP2CliTool) Parameters() map[string]any {
 	}
 }
 
-// mcp2cliArgs parses the string sent by the agent.
+// Execute parses the string sent by the agent.
 // Instead of a full `kong` CLI struct, we'll implement a custom parser
 // to handle dynamic tool names and arguments after the global flags.
 func (t *MCP2CliTool) Execute(ctx context.Context, args map[string]any) *ToolResult {
