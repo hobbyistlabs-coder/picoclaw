@@ -265,12 +265,10 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
-			errCat := logger.InfrastructureFailure
+			errCat := logger.ModelFailure
 			// Simplistic heuristic since providers.ErrContextLengthExceeded might not be defined
-			if err != nil && (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)) {
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 				errCat = logger.InfrastructureFailure
-			} else if err != nil {
-				errCat = logger.ModelFailure
 			}
 			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "error", nil, errCat, err.Error())
 			return "", iteration, metrics, err
