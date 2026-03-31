@@ -265,6 +265,14 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			errCat := logger.InfrastructureFailure
+			// Simplistic heuristic since providers.ErrContextLengthExceeded might not be defined
+			if err != nil && (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)) {
+				errCat = logger.InfrastructureFailure
+			} else if err != nil {
+				errCat = logger.ModelFailure
+			}
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "error", nil, errCat, err.Error())
 			return "", iteration, metrics, err
 		}
 		metrics.addUsage(enrichUsageWithCost(agent.Config, activeModel, response.Usage))
@@ -276,6 +284,12 @@ func (al *AgentLoop) runLLMIteration(
 		)
 		if response.ReasoningContent != "" {
 			metrics.reasoningContent = response.ReasoningContent
+
+			// Log cot event
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "cot", map[string]any{
+				"cot_text": response.ReasoningContent,
+			}, logger.NoneFailure, "")
+
 			if opts.Channel == "pico" {
 				al.bus.PublishOutbound(ctx, bus.OutboundMessage{
 					Channel:          opts.Channel,
@@ -336,6 +350,12 @@ func (al *AgentLoop) runLLMIteration(
 			ReasoningContent: response.ReasoningContent,
 		}
 		for _, tc := range normalizedToolCalls {
+			// Log tool call event
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "tool_call", map[string]any{
+				"tool_name": tc.Name,
+				"inputs":    tc.Arguments,
+			}, logger.NoneFailure, "")
+
 			argumentsJSON, _ := json.Marshal(tc.Arguments)
 			// Copy ExtraContent to ensure thought_signature is persisted for Gemini 3
 			extraContent := tc.ExtraContent
@@ -394,6 +414,11 @@ func (al *AgentLoop) runLLMIteration(
 				activeCandidates:    activeCandidates,
 				activeModel:         activeModel,
 			})
+
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "state_transition", map[string]any{
+				"from_state": "running",
+				"to_state":   "pending_approval",
+			}, logger.NoneFailure, "")
 
 			al.bus.PublishOutbound(ctx, bus.OutboundMessage{
 				Channel: opts.Channel,
@@ -461,6 +486,18 @@ func (al *AgentLoop) runLLMIteration(
 						"error":          contentForLLM,
 						"error_category": "logic_failure",
 					})
+				logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "error", map[string]any{
+					"tool_name": r.tc.Name,
+				}, logger.LogicFailure, contentForLLM)
+			} else {
+				var outputs map[string]any
+				if err := json.Unmarshal([]byte(contentForLLM), &outputs); err != nil {
+					outputs = map[string]any{"result": contentForLLM}
+				}
+				logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "tool_result", map[string]any{
+					"tool_name": r.tc.Name,
+					"outputs":   outputs,
+				}, logger.NoneFailure, "")
 			}
 
 			toolResultMsg := providers.Message{
