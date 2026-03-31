@@ -29,6 +29,16 @@ inputs = ["parse_logs"]
   field = "gc_pause_ms"
   name = "etl_gc_pause_ms"
 
+  [[transforms.log_to_metric_transform.metrics]]
+  type = "counter"
+  field = "http_requests_total"
+  name = "etl_http_requests_total"
+
+  [[transforms.log_to_metric_transform.metrics]]
+  type = "histogram"
+  field = "http_request_duration_seconds"
+  name = "etl_http_request_duration_seconds"
+
 [sinks.prometheus_out]
 type = "prometheus_exporter"
 inputs = ["log_to_metric_transform"]
