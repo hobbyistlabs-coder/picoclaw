@@ -15,7 +15,11 @@ func FetchAntigravityModels(accessToken, projectID string) ([]AntigravityModelIn
 		"project": projectID,
 	})
 
-	req, err := http.NewRequest("POST", antigravityBaseURL+"/v1internal:fetchAvailableModels", bytes.NewReader(reqBody))
+	req, err := http.NewRequest(
+		"POST",
+		antigravityBaseURL+"/v1internal:fetchAvailableModels",
+		bytes.NewReader(reqBody),
+	)
 	if err != nil {
 		return nil, err
 	}

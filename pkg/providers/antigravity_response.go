@@ -64,7 +64,11 @@ func (p *AntigravityProvider) parseSSEResponse(body string) (*LLMResponse, error
 				if part.FunctionCall != nil {
 					argumentsJSON, _ := json.Marshal(part.FunctionCall.Args)
 					toolCalls = append(toolCalls, ToolCall{
-						ID:        fmt.Sprintf("call_%s_%d", part.FunctionCall.Name, time.Now().UnixNano()),
+						ID: fmt.Sprintf(
+							"call_%s_%d",
+							part.FunctionCall.Name,
+							time.Now().UnixNano(),
+						),
 						Name:      part.FunctionCall.Name,
 						Arguments: part.FunctionCall.Args,
 						Function: &FunctionCall{
