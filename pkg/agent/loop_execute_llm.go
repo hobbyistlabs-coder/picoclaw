@@ -166,9 +166,11 @@ func (al *AgentLoop) executeLLMWithRetry(
 
 	if err != nil {
 		errorCategory := "infrastructure_failure"
+		var replayErrCategory logger.ReplayErrorCategory = logger.ReplayErrorInfrastructure
 		if failErr := providers.ClassifyError(err, agent.ID, activeModel); failErr != nil {
 			if failErr.Reason == providers.FailoverFormat || failErr.Reason == providers.FailoverContextLength {
 				errorCategory = "model_failure"
+				replayErrCategory = logger.ReplayErrorModel
 			}
 		}
 
@@ -179,6 +181,7 @@ func (al *AgentLoop) executeLLMWithRetry(
 				"error":          err.Error(),
 				"error_category": errorCategory,
 			})
+		logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "error", nil, replayErrCategory, err.Error())
 		return nil, fmt.Errorf("LLM call failed after retries: %w", err)
 	}
 
