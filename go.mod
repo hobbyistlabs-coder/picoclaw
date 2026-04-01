@@ -111,4 +111,3 @@ require (
 	golang.org/x/sys v0.41.0 // indirect
 )
 
-replace go.mau.fi/mautrix-gmessages => github.com/MaxGhenis/gmessages v0.2602.1-0.20260302032635-a6d7f9898a99
