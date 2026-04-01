@@ -90,9 +90,18 @@ func (s *JSONLStore) metaPath(key string) string {
 // so composite IDs (e.g. Telegram forum "chatID/threadID", Slack "channel/thread_ts")
 // do not create subdirectories or break on Windows.
 func sanitizeKey(key string) string {
+	// Mirrors pkg/session.sanitizeFilename. We do not extract Base
+	// because some keys like "group:-100/... " need to be preserved entirely.
+	// Replacing / and \ with _ already destroys any path traversal.
 	s := strings.ReplaceAll(key, ":", "_")
 	s = strings.ReplaceAll(s, "/", "_")
 	s = strings.ReplaceAll(s, "\\", "_")
+
+	// Reject if the ENTIRE sanitized string becomes just "." or ".."
+	if s == "." || s == ".." {
+		return ""
+	}
+
 	return s
 }
 
