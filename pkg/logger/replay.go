@@ -40,7 +40,12 @@ func sanitizeSessionKey(key string) string {
 
 // LogSessionEvent appends a session event to the event stream JSONL file.
 // Errors are suppressed (best-effort) to avoid interrupting the agent loop.
-func LogSessionEvent(workspacePath, sessionID, eventType string, details map[string]any, errorCategory ReplayErrorCategory, errorMsg string) {
+func LogSessionEvent(
+	workspacePath, sessionID, eventType string,
+	details map[string]any,
+	errorCategory ReplayErrorCategory,
+	errorMsg string,
+) {
 	if workspacePath == "" || sessionID == "" {
 		return
 	}
@@ -59,8 +64,8 @@ func LogSessionEvent(workspacePath, sessionID, eventType string, details map[str
 		ErrorMessage:  errorMsg,
 	}
 
-	eventJSON, err := json.Marshal(event)
-	if err != nil {
+	eventJSON, jsonErr := json.Marshal(event)
+	if jsonErr != nil {
 		return
 	}
 	eventJSON = append(eventJSON, '\n')
@@ -73,33 +78,33 @@ func LogSessionEvent(workspacePath, sessionID, eventType string, details map[str
 	defer lock.Unlock()
 
 	// Safe directory traversal validation
-	absWorkspace, err := filepath.Abs(workspacePath)
-	if err != nil {
+	absWorkspace, absErr := filepath.Abs(workspacePath)
+	if absErr != nil {
 		return
 	}
 
 	eventsDir := filepath.Join(absWorkspace, "logs", sanitizedSessionID, "events")
-	eventsDirAbs, err := filepath.Abs(eventsDir)
-	if err != nil {
+	eventsDirAbs, absDirErr := filepath.Abs(eventsDir)
+	if absDirErr != nil {
 		return
 	}
 
 	// Verify that the target directory is still under the workspace directory
-	rel, err := filepath.Rel(absWorkspace, eventsDirAbs)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") || strings.HasPrefix(rel, "..\\") {
+	rel, relErr := filepath.Rel(absWorkspace, eventsDirAbs)
+	if relErr != nil || rel == ".." || strings.HasPrefix(rel, "../") || strings.HasPrefix(rel, "..\\") {
 		return // Path traversal attempt
 	}
 
 	// Create directory if it doesn't exist
-	if err := os.MkdirAll(eventsDirAbs, 0o755); err != nil {
+	if mkdirErr := os.MkdirAll(eventsDirAbs, 0o755); mkdirErr != nil {
 		return
 	}
 
 	eventsFile := filepath.Join(eventsDirAbs, "events.jsonl")
 
 	// Append JSONL to file
-	f, err := os.OpenFile(eventsFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
+	f, openErr := os.OpenFile(eventsFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if openErr != nil {
 		return
 	}
 	defer f.Close()
