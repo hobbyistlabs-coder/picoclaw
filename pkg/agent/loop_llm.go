@@ -265,6 +265,13 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			errCat := logger.ModelFailure
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+				errCat = logger.InfrastructureFailure
+			}
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "error", map[string]any{
+				"agent_id": agent.ID,
+			}, errCat, err.Error())
 			return "", iteration, metrics, err
 		}
 		metrics.addUsage(enrichUsageWithCost(agent.Config, activeModel, response.Usage))
@@ -275,6 +282,9 @@ func (al *AgentLoop) runLLMIteration(
 			al.targetReasoningChannelID(opts.Channel),
 		)
 		if response.ReasoningContent != "" {
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "cot", map[string]any{
+				"cot_text": response.ReasoningContent,
+			}, logger.None, "")
 			metrics.reasoningContent = response.ReasoningContent
 			if opts.Channel == "pico" {
 				al.bus.PublishOutbound(ctx, bus.OutboundMessage{
@@ -356,6 +366,10 @@ func (al *AgentLoop) runLLMIteration(
 				ExtraContent:     extraContent,
 				ThoughtSignature: thoughtSignature,
 			})
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "tool_call", map[string]any{
+				"tool_name": tc.Name,
+				"inputs":    tc.Arguments,
+			}, logger.None, "")
 		}
 		messages = append(messages, assistantMsg)
 
@@ -384,6 +398,11 @@ func (al *AgentLoop) runLLMIteration(
 				approvalMsg += fmt.Sprintf("\n- `%s`:\n```json\n%s\n```\n", tc.Name, string(argsJSON))
 			}
 			approvalMsg += "\nDo you approve? (Yes/No)"
+
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "state_transition", map[string]any{
+				"from_state": "generating",
+				"to_state":   "pending_approval",
+			}, logger.None, "")
 
 			al.pendingApprovals.Store(opts.SessionKey, pendingApprovalState{
 				agent:               agent,
@@ -455,6 +474,10 @@ func (al *AgentLoop) runLLMIteration(
 			}
 
 			if r.result.IsError {
+				logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "error", map[string]any{
+					"tool_name": r.tc.Name,
+				}, logger.LogicFailure, contentForLLM)
+
 				logger.ErrorCF("agent", "Tool execution failed",
 					map[string]any{
 						"tool":           r.tc.Name,
@@ -462,6 +485,10 @@ func (al *AgentLoop) runLLMIteration(
 						"error_category": "logic_failure",
 					})
 			}
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "tool_result", map[string]any{
+				"tool_name": r.tc.Name,
+				"outputs":   contentForLLM,
+			}, logger.None, "")
 
 			toolResultMsg := providers.Message{
 				Role:       "tool",
