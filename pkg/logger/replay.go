@@ -91,7 +91,8 @@ func LogSessionEvent(
 
 	// Verify that the target directory is still under the workspace directory
 	rel, relErr := filepath.Rel(absWorkspace, eventsDirAbs)
-	if relErr != nil || rel == ".." || strings.HasPrefix(rel, "../") || strings.HasPrefix(rel, "..\\") {
+	if relErr != nil || rel == ".." || strings.HasPrefix(rel, "../") ||
+		strings.HasPrefix(rel, "..\\") {
 		return // Path traversal attempt
 	}
 
