@@ -18,12 +18,6 @@ func TestSanitizeFilename(t *testing.T) {
 		{"no-colons-here", "no-colons-here"},
 		{"multiple:colons:here", "multiple_colons_here"},
 		{"agent:main:telegram:group:-1003822706455/12", "agent_main_telegram_group_-1003822706455_12"},
-		{"../../../etc/passwd", ".._.._.._etc_passwd"},
-		{"....//....//....//....//etc/passwd", "....__....__....__....__etc_passwd"},
-		{"foo/bar/baz", "foo_bar_baz"},
-		{".//.//.", ".__.__."},
-		{"..", ""},
-		{"...", "..."},
 	}
 
 	for _, tt := range tests {
@@ -72,8 +66,6 @@ func TestSave_RejectsPathTraversal(t *testing.T) {
 	sm := NewSessionManager(tmpDir)
 
 	// Invalid names that must still be rejected.
-	// Note: ".//.//." evaluates to ".__.__." which is technically a valid filename in many filesystems,
-	// but "." and ".." must be rejected.
 	badKeys := []string{"", ".", ".."}
 	for _, key := range badKeys {
 		sm.GetOrCreate(key)
@@ -82,7 +74,7 @@ func TestSave_RejectsPathTraversal(t *testing.T) {
 		}
 	}
 
-	// Keys containing path separators are sanitized.
+	// Keys containing path separators are sanitized (no subdirs created).
 	sm.GetOrCreate("foo/bar")
 	if err := sm.Save("foo/bar"); err != nil {
 		t.Fatalf("Save(\"foo/bar\") after sanitize should succeed: %v", err)

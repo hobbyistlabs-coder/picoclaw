@@ -151,19 +151,9 @@ func (sm *SessionManager) TruncateHistory(key string, keepLast int) {
 // subdirectories or break on Windows. The original key is preserved inside
 // the JSON file, so loadSessions still maps back to the right in-memory key.
 func sanitizeFilename(key string) string {
-	// We do NOT use filepath.Base here because we want to preserve
-	// prefix parts of composite IDs (like "group:-100/...").
-	// Replacing '/' and '\' with '_' already neutralizes path traversal,
-	// turning e.g. "../../../etc/passwd" into a flat ".._.._.._etc_passwd".
 	s := strings.ReplaceAll(key, ":", "_")
 	s = strings.ReplaceAll(s, "/", "_")
 	s = strings.ReplaceAll(s, "\\", "_")
-
-	// Reject if the ENTIRE sanitized string becomes just "." or ".."
-	if s == "." || s == ".." {
-		return ""
-	}
-
 	return s
 }
 

@@ -37,14 +37,11 @@ func IsAudioFile(filename, contentType string) bool {
 // SanitizeFilename removes potentially dangerous characters from a filename
 // and returns a safe version for local filesystem storage.
 func SanitizeFilename(filename string) string {
-	// Remove any directory traversal attempts by replacing separators
 	// Get the base filename without path
-	base := filepath.Base(filepath.Clean(filename))
+	base := filepath.Base(filename)
 
-	if base == "." || base == ".." || base == "/" || base == "\\" {
-		return ""
-	}
-
+	// Remove any directory traversal attempts
+	base = strings.ReplaceAll(base, "..", "")
 	base = strings.ReplaceAll(base, "/", "_")
 	base = strings.ReplaceAll(base, "\\", "_")
 
