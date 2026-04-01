@@ -83,7 +83,11 @@ func extractPicoSessionIDFromSanitizedKey(key string) (string, bool) {
 }
 
 func sanitizeSessionKey(key string) string {
-	return strings.ReplaceAll(key, ":", "_")
+	base := filepath.Base(filepath.Clean(strings.ReplaceAll(key, ":", "_")))
+	if base == "." || base == "/" || base == "\\" || base == ".." {
+		return ""
+	}
+	return base
 }
 
 func (h *Handler) readLegacySession(dir, sessionID string) (sessionFile, error) {

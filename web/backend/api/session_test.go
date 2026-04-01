@@ -14,6 +14,63 @@ import (
 	"jane/pkg/session"
 )
 
+func TestSanitizeSessionKey(t *testing.T) {
+	tests := []struct {
+		name string
+		key  string
+		want string
+	}{
+		{
+			name: "normal key",
+			key:  "agent:main:pico:direct:pico:1234",
+			want: "agent_main_pico_direct_pico_1234",
+		},
+		{
+			name: "path traversal - simple up",
+			key:  "../foo",
+			want: "foo",
+		},
+		{
+			name: "path traversal - nested",
+			key:  ".//.",
+			want: "",
+		},
+		{
+			name: "path traversal - absolute",
+			key:  "/etc/passwd",
+			want: "passwd",
+		},
+		{
+			name: "path traversal - multiple up",
+			key:  "../../../../../etc/passwd",
+			want: "passwd",
+		},
+		{
+			name: "empty",
+			key:  "",
+			want: "",
+		},
+		{
+			name: "dots",
+			key:  "..",
+			want: "",
+		},
+		{
+			name: "colon in path traversal",
+			key:  "../foo:bar",
+			want: "foo_bar",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := sanitizeSessionKey(tt.key); got != tt.want {
+				t.Errorf("sanitizeSessionKey() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func sessionsTestDir(t *testing.T, configPath string) string {
 	t.Helper()
 
