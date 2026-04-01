@@ -82,6 +82,13 @@ func (al *AgentLoop) runAgentLoop(
 				"session_key": opts.SessionKey,
 				"iterations":  iteration,
 			})
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.ReplayEventStateTransition,
+				Details: &logger.SessionEventDetails{
+					ToState: "pending_approval",
+				},
+			})
 			return "", nil
 		}
 		if errors.Is(err, errAsyncPending) {
@@ -90,8 +97,27 @@ func (al *AgentLoop) runAgentLoop(
 				"session_key": opts.SessionKey,
 				"iterations":  iteration,
 			})
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.ReplayEventStateTransition,
+				Details: &logger.SessionEventDetails{
+					ToState: "pending_async",
+				},
+			})
 			return "", nil
 		}
+
+		errCategory := logger.ReplayErrorInfrastructureFailure
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			errCategory = logger.ReplayErrorInfrastructureFailure
+		}
+		logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+			SessionID:     opts.SessionKey,
+			EventType:     logger.ReplayEventError,
+			ErrorCategory: errCategory,
+			ErrorMessage:  err.Error(),
+		})
+
 		metricsFailureCounts.Add(1)
 		return "", err
 	}
@@ -268,6 +294,16 @@ func (al *AgentLoop) runLLMIteration(
 			return "", iteration, metrics, err
 		}
 		metrics.addUsage(enrichUsageWithCost(agent.Config, activeModel, response.Usage))
+		if response.ReasoningContent != "" {
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.ReplayEventCoT,
+				Details: &logger.SessionEventDetails{
+					CoTText: response.ReasoningContent,
+				},
+			})
+		}
+
 		go al.handleReasoning(
 			ctx,
 			response.Reasoning,
@@ -320,6 +356,18 @@ func (al *AgentLoop) runLLMIteration(
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
+
+			// Extract arguments for structured logging
+			// tc.Arguments is already map[string]any
+
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.ReplayEventToolCall,
+				Details: &logger.SessionEventDetails{
+					ToolName: tc.Name,
+					Inputs:   tc.Arguments,
+				},
+			})
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
@@ -461,6 +509,26 @@ func (al *AgentLoop) runLLMIteration(
 						"error":          contentForLLM,
 						"error_category": "logic_failure",
 					})
+				logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+					SessionID: opts.SessionKey,
+					EventType: logger.ReplayEventError,
+					ErrorCategory: logger.ReplayErrorLogicFailure,
+					ErrorMessage: contentForLLM,
+					Details: &logger.SessionEventDetails{
+						ToolName: r.tc.Name,
+					},
+				})
+			} else {
+				// We don't have structured output here, just log the text content
+				outputs := map[string]any{"content": contentForLLM}
+				logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+					SessionID: opts.SessionKey,
+					EventType: logger.ReplayEventToolResult,
+					Details: &logger.SessionEventDetails{
+						ToolName: r.tc.Name,
+						Outputs:  outputs,
+					},
+				})
 			}
 
 			toolResultMsg := providers.Message{
