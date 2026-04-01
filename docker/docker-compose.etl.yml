@@ -1,0 +1,56 @@
+services:
+  vector:
+    image: timberio/vector:0.38.0-alpine
+    container_name: etl-vector
+    restart: always
+    volumes:
+      - ./etl/vector/vector.toml:/etc/vector/vector.toml:ro
+      - ../workspace/logs/etl:/workspace/logs/etl:ro
+    ports:
+      - "8686:8686"
+      - "9090:9090" # Prometheus metrics endpoint
+    command: -c /etc/vector/vector.toml
+
+  prometheus:
+    image: prom/prometheus:v2.51.1
+    container_name: etl-prometheus
+    restart: always
+    volumes:
+      - ./etl/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./etl/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9091:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: etl-loki
+    restart: always
+    volumes:
+      - ./etl/loki/local-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: etl-grafana
+    restart: always
+    volumes:
+      - ./etl/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./etl/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+
+volumes:
+  prometheus_data:
+  loki_data:
+  grafana_data:

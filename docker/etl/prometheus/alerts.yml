@@ -1,0 +1,11 @@
+groups:
+  - name: ETLAlerts
+    rules:
+      - alert: HighGoroutineGrowth
+        expr: deriv(etl_goroutines[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Goroutine leak detected"
+          description: "The number of goroutines is increasing steadily over the last 5 minutes."

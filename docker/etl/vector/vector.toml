@@ -1,0 +1,47 @@
+[sources.app_metrics]
+type = "file"
+include = ["/workspace/logs/etl/system_metrics.jsonl"]
+read_from = "beginning"
+
+[transforms.parse_json]
+type = "remap"
+inputs = ["app_metrics"]
+source = '''
+. = parse_json!(.message)
+'''
+
+[transforms.metric_generator]
+type = "log_to_metric"
+inputs = ["parse_json"]
+
+[[transforms.metric_generator.metrics]]
+type = "histogram"
+field = "http_request_duration_seconds"
+name = "etl_http_request_duration_seconds"
+tags = { endpoint = "{{endpoint}}", status = "{{status}}" }
+
+[[transforms.metric_generator.metrics]]
+type = "counter"
+field = "http_requests_total"
+name = "etl_http_requests_total"
+tags = { endpoint = "{{endpoint}}", status = "{{status}}" }
+
+[[transforms.metric_generator.metrics]]
+type = "gauge"
+field = "goroutines"
+name = "etl_goroutines"
+
+[sinks.prometheus_exporter]
+type = "prometheus_exporter"
+inputs = ["metric_generator"]
+address = "0.0.0.0:9090"
+
+[sinks.loki]
+type = "loki"
+inputs = ["parse_json"]
+endpoint = "http://etl-loki:3100"
+encoding.codec = "json"
+
+[sinks.loki.labels]
+source = "vector"
+job = "etl"
