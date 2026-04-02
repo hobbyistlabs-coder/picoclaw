@@ -12,6 +12,8 @@ import (
 	"jane/pkg/logger"
 )
 
+// --- Token source ---
+
 func createAntigravityTokenSource() func() (string, string, error) {
 	return func() (string, string, error) {
 		cred, err := auth.GetCredential("google-antigravity")
@@ -24,6 +26,7 @@ func createAntigravityTokenSource() func() (string, string, error) {
 			)
 		}
 
+		// Refresh if needed
 		if cred.NeedsRefresh() && cred.RefreshToken != "" {
 			oauthCfg := auth.GoogleAntigravityOAuthConfig()
 			refreshed, err := auth.RefreshAccessToken(cred, oauthCfg)
@@ -48,16 +51,13 @@ func createAntigravityTokenSource() func() (string, string, error) {
 
 		projectID := cred.ProjectID
 		if projectID == "" {
+			// Try to fetch project ID from API
 			fetchedID, err := FetchAntigravityProjectID(cred.AccessToken)
 			if err != nil {
-				logger.WarnCF(
-					"provider.antigravity",
-					"Could not fetch project ID, using fallback",
-					map[string]any{
-						"error": err.Error(),
-					},
-				)
-				projectID = "rising-fact-p41fc"
+				logger.WarnCF("provider.antigravity", "Could not fetch project ID, using fallback", map[string]any{
+					"error": err.Error(),
+				})
+				projectID = "rising-fact-p41fc" // Default fallback (same as OpenCode)
 			} else {
 				projectID = fetchedID
 				cred.ProjectID = projectID
@@ -69,6 +69,7 @@ func createAntigravityTokenSource() func() (string, string, error) {
 	}
 }
 
+// FetchAntigravityProjectID retrieves the Google Cloud project ID from the loadCodeAssist endpoint.
 func FetchAntigravityProjectID(accessToken string) (string, error) {
 	reqBody, _ := json.Marshal(map[string]any{
 		"metadata": map[string]any{
@@ -78,11 +79,7 @@ func FetchAntigravityProjectID(accessToken string) (string, error) {
 		},
 	})
 
-	req, err := http.NewRequest(
-		"POST",
-		antigravityBaseURL+"/v1internal:loadCodeAssist",
-		bytes.NewReader(reqBody),
-	)
+	req, err := http.NewRequest("POST", antigravityBaseURL+"/v1internal:loadCodeAssist", bytes.NewReader(reqBody))
 	if err != nil {
 		return "", err
 	}
@@ -118,90 +115,4 @@ func FetchAntigravityProjectID(accessToken string) (string, error) {
 	}
 
 	return result.CloudAICompanionProject, nil
-}
-
-func FetchAntigravityModels(accessToken, projectID string) ([]AntigravityModelInfo, error) {
-	reqBody, _ := json.Marshal(map[string]any{
-		"project": projectID,
-	})
-
-	req, err := http.NewRequest(
-		"POST",
-		antigravityBaseURL+"/v1internal:fetchAvailableModels",
-		bytes.NewReader(reqBody),
-	)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", antigravityUserAgent)
-	req.Header.Set("X-Goog-Api-Client", antigravityXGoogClient)
-
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading fetchAvailableModels response: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf(
-			"fetchAvailableModels failed (HTTP %d): %s",
-			resp.StatusCode,
-			truncateString(string(body), 200),
-		)
-	}
-
-	var result struct {
-		Models map[string]struct {
-			DisplayName string `json:"displayName"`
-			QuotaInfo   struct {
-				RemainingFraction any    `json:"remainingFraction"`
-				ResetTime         string `json:"resetTime"`
-				IsExhausted       bool   `json:"isExhausted"`
-			} `json:"quotaInfo"`
-		} `json:"models"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("parsing models response: %w", err)
-	}
-
-	var models []AntigravityModelInfo
-	for id, info := range result.Models {
-		models = append(models, AntigravityModelInfo{
-			ID:          id,
-			DisplayName: info.DisplayName,
-			IsExhausted: info.QuotaInfo.IsExhausted,
-		})
-	}
-
-	hasFlashPreview := false
-	hasFlash := false
-	for _, m := range models {
-		if m.ID == "gemini-3-flash-preview" {
-			hasFlashPreview = true
-		}
-		if m.ID == "gemini-3-flash" {
-			hasFlash = true
-		}
-	}
-	if !hasFlashPreview {
-		models = append(models, AntigravityModelInfo{
-			ID:          "gemini-3-flash-preview",
-			DisplayName: "Gemini 3 Flash (Preview)",
-		})
-	}
-	if !hasFlash {
-		models = append(models, AntigravityModelInfo{
-			ID:          "gemini-3-flash",
-			DisplayName: "Gemini 3 Flash",
-		})
-	}
-
-	return models, nil
 }

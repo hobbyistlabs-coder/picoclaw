@@ -1,68 +1,13 @@
 package providers
 
 import (
+	"encoding/json"
+	"fmt"
 	"math/rand"
+	"strings"
 )
 
-var geminiUnsupportedKeywords = map[string]bool{
-	"patternProperties":    true,
-	"additionalProperties": true,
-	"$schema":              true,
-	"$id":                  true,
-	"$ref":                 true,
-	"$defs":                true,
-	"definitions":          true,
-	"examples":             true,
-	"minLength":            true,
-	"maxLength":            true,
-	"minimum":              true,
-	"maximum":              true,
-	"multipleOf":           true,
-	"pattern":              true,
-	"format":               true,
-	"minItems":             true,
-	"maxItems":             true,
-	"uniqueItems":          true,
-	"minProperties":        true,
-	"maxProperties":        true,
-}
-
-func sanitizeSchemaForGemini(schema map[string]any) map[string]any {
-	if schema == nil {
-		return nil
-	}
-
-	result := make(map[string]any)
-	for k, v := range schema {
-		if geminiUnsupportedKeywords[k] {
-			continue
-		}
-		switch val := v.(type) {
-		case map[string]any:
-			result[k] = sanitizeSchemaForGemini(val)
-		case []any:
-			sanitized := make([]any, len(val))
-			for i, item := range val {
-				if m, ok := item.(map[string]any); ok {
-					sanitized[i] = sanitizeSchemaForGemini(m)
-				} else {
-					sanitized[i] = item
-				}
-			}
-			result[k] = sanitized
-		default:
-			result[k] = v
-		}
-	}
-
-	if _, hasProps := result["properties"]; hasProps {
-		if _, hasType := result["type"]; !hasType {
-			result["type"] = "object"
-		}
-	}
-
-	return result
-}
+// --- Helpers ---
 
 func truncateString(s string, maxLen int) string {
 	if len(s) <= maxLen {
@@ -78,4 +23,36 @@ func randomString(n int) string {
 		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)
+}
+
+func (p *AntigravityProvider) parseAntigravityError(statusCode int, body []byte) error {
+	var errResp struct {
+		Error struct {
+			Code    int              `json:"code"`
+			Message string           `json:"message"`
+			Status  string           `json:"status"`
+			Details []map[string]any `json:"details"`
+		} `json:"error"`
+	}
+
+	if err := json.Unmarshal(body, &errResp); err != nil {
+		return fmt.Errorf("antigravity API error (HTTP %d): %s", statusCode, truncateString(string(body), 500))
+	}
+
+	msg := errResp.Error.Message
+	if statusCode == 429 {
+		// Try to extract quota reset info
+		for _, detail := range errResp.Error.Details {
+			if typeVal, ok := detail["@type"].(string); ok && strings.HasSuffix(typeVal, "ErrorInfo") {
+				if metadata, ok := detail["metadata"].(map[string]any); ok {
+					if delay, ok := metadata["quotaResetDelay"].(string); ok {
+						return fmt.Errorf("antigravity rate limit exceeded: %s (reset in %s)", msg, delay)
+					}
+				}
+			}
+		}
+		return fmt.Errorf("antigravity rate limit exceeded: %s", msg)
+	}
+
+	return fmt.Errorf("antigravity API error (%s): %s", errResp.Error.Status, msg)
 }

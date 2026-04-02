@@ -8,6 +8,28 @@ import (
 	"time"
 )
 
+// --- Response parsing ---
+
+type antigravityJSONResponse struct {
+	Candidates []struct {
+		Content struct {
+			Parts []struct {
+				Text                  string                   `json:"text,omitempty"`
+				ThoughtSignature      string                   `json:"thoughtSignature,omitempty"`
+				ThoughtSignatureSnake string                   `json:"thought_signature,omitempty"`
+				FunctionCall          *antigravityFunctionCall `json:"functionCall,omitempty"`
+			} `json:"parts"`
+			Role string `json:"role"`
+		} `json:"content"`
+		FinishReason string `json:"finishReason"`
+	} `json:"candidates"`
+	UsageMetadata struct {
+		PromptTokenCount     int `json:"promptTokenCount"`
+		CandidatesTokenCount int `json:"candidatesTokenCount"`
+		TotalTokenCount      int `json:"totalTokenCount"`
+	} `json:"usageMetadata"`
+}
+
 func (p *AntigravityProvider) parseSSEResponse(body string) (*LLMResponse, error) {
 	var contentParts []string
 	var toolCalls []ToolCall
@@ -25,6 +47,7 @@ func (p *AntigravityProvider) parseSSEResponse(body string) (*LLMResponse, error
 			break
 		}
 
+		// v1internal SSE wraps the Gemini response in a "response" field
 		var sseChunk struct {
 			Response antigravityJSONResponse `json:"response"`
 		}
@@ -41,11 +64,7 @@ func (p *AntigravityProvider) parseSSEResponse(body string) (*LLMResponse, error
 				if part.FunctionCall != nil {
 					argumentsJSON, _ := json.Marshal(part.FunctionCall.Args)
 					toolCalls = append(toolCalls, ToolCall{
-						ID: fmt.Sprintf(
-							"call_%s_%d",
-							part.FunctionCall.Name,
-							time.Now().UnixNano(),
-						),
+						ID:        fmt.Sprintf("call_%s_%d", part.FunctionCall.Name, time.Now().UnixNano()),
 						Name:      part.FunctionCall.Name,
 						Arguments: part.FunctionCall.Args,
 						Function: &FunctionCall{
@@ -97,44 +116,4 @@ func extractPartThoughtSignature(thoughtSignature string, thoughtSignatureSnake 
 		return thoughtSignatureSnake
 	}
 	return ""
-}
-
-func (p *AntigravityProvider) parseAntigravityError(statusCode int, body []byte) error {
-	var errResp struct {
-		Error struct {
-			Code    int              `json:"code"`
-			Message string           `json:"message"`
-			Status  string           `json:"status"`
-			Details []map[string]any `json:"details"`
-		} `json:"error"`
-	}
-
-	if err := json.Unmarshal(body, &errResp); err != nil {
-		return fmt.Errorf(
-			"antigravity API error (HTTP %d): %s",
-			statusCode,
-			truncateString(string(body), 500),
-		)
-	}
-
-	msg := errResp.Error.Message
-	if statusCode == 429 {
-		for _, detail := range errResp.Error.Details {
-			if typeVal, ok := detail["@type"].(string); ok &&
-				strings.HasSuffix(typeVal, "ErrorInfo") {
-				if metadata, ok := detail["metadata"].(map[string]any); ok {
-					if delay, ok := metadata["quotaResetDelay"].(string); ok {
-						return fmt.Errorf(
-							"antigravity rate limit exceeded: %s (reset in %s)",
-							msg,
-							delay,
-						)
-					}
-				}
-			}
-		}
-		return fmt.Errorf("antigravity rate limit exceeded: %s", msg)
-	}
-
-	return fmt.Errorf("antigravity API error (%s): %s", errResp.Error.Status, msg)
 }

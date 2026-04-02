@@ -7,6 +7,57 @@ import (
 	"jane/pkg/logger"
 )
 
+// --- Request building ---
+
+type antigravityRequest struct {
+	Contents     []antigravityContent     `json:"contents"`
+	Tools        []antigravityTool        `json:"tools,omitempty"`
+	SystemPrompt *antigravitySystemPrompt `json:"systemInstruction,omitempty"`
+	Config       *antigravityGenConfig    `json:"generationConfig,omitempty"`
+}
+
+type antigravityContent struct {
+	Role  string            `json:"role"`
+	Parts []antigravityPart `json:"parts"`
+}
+
+type antigravityPart struct {
+	Text                  string                       `json:"text,omitempty"`
+	ThoughtSignature      string                       `json:"thoughtSignature,omitempty"`
+	ThoughtSignatureSnake string                       `json:"thought_signature,omitempty"`
+	FunctionCall          *antigravityFunctionCall     `json:"functionCall,omitempty"`
+	FunctionResponse      *antigravityFunctionResponse `json:"functionResponse,omitempty"`
+}
+
+type antigravityFunctionCall struct {
+	Name string         `json:"name"`
+	Args map[string]any `json:"args"`
+}
+
+type antigravityFunctionResponse struct {
+	Name     string         `json:"name"`
+	Response map[string]any `json:"response"`
+}
+
+type antigravityTool struct {
+	FunctionDeclarations []antigravityFuncDecl `json:"functionDeclarations"`
+}
+
+type antigravityFuncDecl struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Parameters  any    `json:"parameters,omitempty"`
+}
+
+type antigravitySystemPrompt struct {
+	Parts []antigravityPart `json:"parts"`
+}
+
+type antigravityGenConfig struct {
+	MaxOutputTokens int     `json:"maxOutputTokens,omitempty"`
+	Temperature     float64 `json:"temperature,omitempty"`
+}
+
 func (p *AntigravityProvider) buildRequest(
 	messages []Message,
 	tools []ToolDefinition,
@@ -16,6 +67,7 @@ func (p *AntigravityProvider) buildRequest(
 	req := antigravityRequest{}
 	toolCallNames := make(map[string]string)
 
+	// Build contents from messages
 	for _, msg := range messages {
 		switch msg.Role {
 		case "system":
@@ -25,6 +77,7 @@ func (p *AntigravityProvider) buildRequest(
 		case "user":
 			if msg.ToolCallID != "" {
 				toolName := resolveToolResponseName(msg.ToolCallID, toolCallNames)
+				// Tool result
 				req.Contents = append(req.Contents, antigravityContent{
 					Role: "user",
 					Parts: []antigravityPart{{
@@ -92,6 +145,7 @@ func (p *AntigravityProvider) buildRequest(
 		}
 	}
 
+	// Build tools (sanitize schemas for Gemini compatibility)
 	if len(tools) > 0 {
 		var funcDecls []antigravityFuncDecl
 		for _, t := range tools {
@@ -110,6 +164,7 @@ func (p *AntigravityProvider) buildRequest(
 		}
 	}
 
+	// Generation config
 	config := &antigravityGenConfig{}
 	if val, ok := options["max_tokens"]; ok {
 		if maxTokens, ok := val.(int); ok && maxTokens > 0 {
@@ -146,8 +201,7 @@ func normalizeStoredToolCall(tc ToolCall) (string, map[string]any, string) {
 
 	if len(args) == 0 && tc.Function != nil && tc.Function.Arguments != "" {
 		var parsed map[string]any
-		if err := json.Unmarshal([]byte(tc.Function.Arguments), &parsed); err == nil &&
-			parsed != nil {
+		if err := json.Unmarshal([]byte(tc.Function.Arguments), &parsed); err == nil && parsed != nil {
 			args = parsed
 		}
 	}
