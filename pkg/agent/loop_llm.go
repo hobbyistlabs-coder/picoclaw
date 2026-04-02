@@ -139,8 +139,8 @@ func (al *AgentLoop) runAgentLoop(
 			"final_length": len(finalContent),
 		})
 
-		// Cleanup session lock after the response is sent or completed
-		logger.CleanupSessionLocks(opts.SessionKey)
+	// Cleanup session lock after the response is sent or completed
+	logger.CleanupSessionLocks(opts.SessionKey)
 
 	return finalContent, nil
 }
