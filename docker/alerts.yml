@@ -1,0 +1,23 @@
+groups:
+  - name: ETLAlerts
+    rules:
+      - alert: GoroutineLeak
+        expr: deriv(etl_goroutines[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Potential Goroutine leak detected"
+          description: "The number of active goroutines has been consistently rising for 5 minutes."
+
+      - alert: HighGCPause
+        # This is a placeholder since we don't have etl_gc_pause_ms metric in the current system metrics.
+        # But this is required by the ETL framework design (sum(rate(metric_sum[1m])) / sum(rate(metric_count[1m])) > threshold)
+        # Using etl_num_gc as a proxy for the rule pattern for now
+        expr: sum(rate(etl_num_gc_sum[1m])) / sum(rate(etl_num_gc_count[1m])) > 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High GC Pause Time"
+          description: "Average GC pause time is > 20ms over the last 5 minutes."
