@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"jane/pkg/bus"
 	"jane/pkg/constants"
@@ -166,6 +167,17 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 					"agent_id":    agent.ID,
 					"session_key": sessionKey,
 				})
+
+				logger.LogSessionEvent(agent.Workspace, sessionKey, logger.ReplayEvent{
+					Timestamp: time.Now().UTC(),
+					SessionID: sessionKey,
+					EventType: logger.EventTypeStateTransition,
+					Details: logger.ReplayEventDetails{
+						FromState: "pending_approval",
+						ToState:   "generating",
+					},
+				})
+
 				for _, tc := range pending.normalizedToolCalls {
 					rejectMsg := providers.Message{
 						Role:       "tool",
@@ -202,6 +214,16 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 				logger.InfoCF("agent", "User approved tool execution", map[string]any{
 					"agent_id":    agent.ID,
 					"session_key": sessionKey,
+				})
+
+				logger.LogSessionEvent(agent.Workspace, sessionKey, logger.ReplayEvent{
+					Timestamp: time.Now().UTC(),
+					SessionID: sessionKey,
+					EventType: logger.EventTypeStateTransition,
+					Details: logger.ReplayEventDetails{
+						FromState: "pending_approval",
+						ToState:   "executing_tools",
+					},
 				})
 
 				// Execute the approved tools

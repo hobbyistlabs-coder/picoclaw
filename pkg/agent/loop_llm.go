@@ -265,6 +265,20 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			errCategory := logger.ReplayErrorCategoryInfrastructureFailure
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+				errCategory = logger.ReplayErrorCategoryInfrastructureFailure
+			} else {
+				// Use a heuristic: assume model failure for other LLM execution errors
+				errCategory = logger.ReplayErrorCategoryModelFailure
+			}
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.ReplayEvent{
+				Timestamp: time.Now().UTC(),
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeError,
+				ErrorCategory: errCategory,
+				ErrorMessage: err.Error(),
+			})
 			return "", iteration, metrics, err
 		}
 		metrics.addUsage(enrichUsageWithCost(agent.Config, activeModel, response.Usage))
@@ -316,10 +330,39 @@ func (al *AgentLoop) runLLMIteration(
 		}
 		metrics.toolCalls += len(normalizedToolCalls)
 
+		// Log CoT to session replay if present
+		if response.ReasoningContent != "" {
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.ReplayEvent{
+				Timestamp: time.Now().UTC(),
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeCoT,
+				Details: logger.ReplayEventDetails{
+					CoTText: response.ReasoningContent,
+				},
+			})
+		}
+
 		// Log tool calls
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
+
+			// Log each tool call to session replay
+			if tc.Function != nil {
+				var inputs map[string]any
+				if err := json.Unmarshal([]byte(tc.Function.Arguments), &inputs); err != nil {
+					inputs = map[string]any{"raw_args": tc.Function.Arguments}
+				}
+				logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.ReplayEvent{
+					Timestamp: time.Now().UTC(),
+					SessionID: opts.SessionKey,
+					EventType: logger.EventTypeToolCall,
+					Details: logger.ReplayEventDetails{
+						ToolName: tc.Name,
+						Inputs:   inputs,
+					},
+				})
+			}
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
@@ -395,6 +438,16 @@ func (al *AgentLoop) runLLMIteration(
 				activeModel:         activeModel,
 			})
 
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.ReplayEvent{
+				Timestamp: time.Now().UTC(),
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeStateTransition,
+				Details: logger.ReplayEventDetails{
+					FromState: "generating",
+					ToState:   "pending_approval",
+				},
+			})
+
 			al.bus.PublishOutbound(ctx, bus.OutboundMessage{
 				Channel: opts.Channel,
 				ChatID:  opts.ChatID,
@@ -413,6 +466,8 @@ func (al *AgentLoop) runLLMIteration(
 
 		// Process results in original order (send to user, save to session)
 		for _, r := range agentResults {
+			var errCategory logger.ReplayErrorCategory = logger.ReplayErrorCategoryNone
+			var errMsg string
 			// Send ForUser content to user immediately if not Silent
 			if !r.result.Silent && r.result.ForUser != "" && opts.SendResponse {
 				al.bus.PublishOutbound(ctx, bus.OutboundMessage{
@@ -455,6 +510,8 @@ func (al *AgentLoop) runLLMIteration(
 			}
 
 			if r.result.IsError {
+				errCategory = logger.ReplayErrorCategoryLogicFailure
+				errMsg = contentForLLM
 				logger.ErrorCF("agent", "Tool execution failed",
 					map[string]any{
 						"tool":           r.tc.Name,
@@ -462,6 +519,29 @@ func (al *AgentLoop) runLLMIteration(
 						"error_category": "logic_failure",
 					})
 			}
+
+			var outputs map[string]any
+			if err := json.Unmarshal([]byte(contentForLLM), &outputs); err != nil {
+				outputs = map[string]any{"raw_output": contentForLLM}
+			}
+
+			// Determine if the event is a tool result or an error
+			eventType := logger.EventTypeToolResult
+			if r.result.IsError {
+				eventType = logger.EventTypeError
+			}
+
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.ReplayEvent{
+				Timestamp: time.Now().UTC(),
+				SessionID: opts.SessionKey,
+				EventType: eventType,
+				Details: logger.ReplayEventDetails{
+					ToolName: r.tc.Name,
+					Outputs:  outputs,
+				},
+				ErrorCategory: errCategory,
+				ErrorMessage:  errMsg,
+			})
 
 			toolResultMsg := providers.Message{
 				Role:       "tool",
