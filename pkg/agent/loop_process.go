@@ -204,6 +204,14 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 					"session_key": sessionKey,
 				})
 
+				logger.LogSessionEvent(agent.Workspace, sessionKey, logger.SessionEvent{
+					EventType: logger.EventTypeStateTransition,
+					Details: &logger.EventDetails{
+						FromState: "pending_approval",
+						ToState:   "executing",
+					},
+				})
+
 				// Execute the approved tools
 				agentResults, _ := al.executeToolBatch(
 					ctx,

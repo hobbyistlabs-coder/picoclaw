@@ -12,6 +12,7 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"strings"
 	"time"
 
 	"jane/pkg/bus"
@@ -137,6 +138,9 @@ func (al *AgentLoop) runAgentLoop(
 			"iterations":   iteration,
 			"final_length": len(finalContent),
 		})
+
+		// Cleanup session lock after the response is sent or completed
+		logger.CleanupSessionLocks(opts.SessionKey)
 
 	return finalContent, nil
 }
@@ -265,6 +269,17 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			errorCat := logger.ReplayErrorCategoryInfrastructureFailure
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+				errorCat = logger.ReplayErrorCategoryInfrastructureFailure
+			} else if strings.Contains(err.Error(), "context length") { // best effort heuristic
+				errorCat = logger.ReplayErrorCategoryModelFailure
+			}
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
+				EventType:     logger.EventTypeError,
+				ErrorCategory: errorCat,
+				ErrorMessage:  err.Error(),
+			})
 			return "", iteration, metrics, err
 		}
 		metrics.addUsage(enrichUsageWithCost(agent.Config, activeModel, response.Usage))
@@ -276,6 +291,12 @@ func (al *AgentLoop) runLLMIteration(
 		)
 		if response.ReasoningContent != "" {
 			metrics.reasoningContent = response.ReasoningContent
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
+				EventType: logger.EventTypeCoT,
+				Details: &logger.EventDetails{
+					CoTText: response.ReasoningContent,
+				},
+			})
 			if opts.Channel == "pico" {
 				al.bus.PublishOutbound(ctx, bus.OutboundMessage{
 					Channel:          opts.Channel,
@@ -320,6 +341,14 @@ func (al *AgentLoop) runLLMIteration(
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
+
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
+				EventType: logger.EventTypeToolCall,
+				Details: &logger.EventDetails{
+					ToolName: tc.Name,
+					Inputs:   tc.Arguments,
+				},
+			})
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
@@ -401,6 +430,14 @@ func (al *AgentLoop) runLLMIteration(
 				Content: approvalMsg,
 			})
 
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
+				EventType: logger.EventTypeStateTransition,
+				Details: &logger.EventDetails{
+					FromState: "executing",
+					ToState:   "pending_approval",
+				},
+			})
+
 			return "", iteration, metrics, errApprovalPending
 		}
 		// --- End HITL ---
@@ -461,6 +498,22 @@ func (al *AgentLoop) runLLMIteration(
 						"error":          contentForLLM,
 						"error_category": "logic_failure",
 					})
+				logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
+					EventType:     logger.EventTypeError,
+					ErrorCategory: logger.ReplayErrorCategoryLogicFailure,
+					ErrorMessage:  contentForLLM,
+					Details: &logger.EventDetails{
+						ToolName: r.tc.Name,
+					},
+				})
+			} else {
+				logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
+					EventType: logger.EventTypeToolResult,
+					Details: &logger.EventDetails{
+						ToolName: r.tc.Name,
+						Outputs:  contentForLLM,
+					},
+				})
 			}
 
 			toolResultMsg := providers.Message{
