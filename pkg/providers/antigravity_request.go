@@ -201,7 +201,8 @@ func normalizeStoredToolCall(tc ToolCall) (string, map[string]any, string) {
 
 	if len(args) == 0 && tc.Function != nil && tc.Function.Arguments != "" {
 		var parsed map[string]any
-		if err := json.Unmarshal([]byte(tc.Function.Arguments), &parsed); err == nil && parsed != nil {
+		if err := json.Unmarshal([]byte(tc.Function.Arguments), &parsed); err == nil &&
+			parsed != nil {
 			args = parsed
 		}
 	}
