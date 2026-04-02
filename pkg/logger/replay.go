@@ -67,7 +67,7 @@ func LogSessionEvent(workspacePath, sessionID, eventType string, details map[str
 	lock.Lock()
 	defer lock.Unlock()
 
-	if err := os.MkdirAll(logDir, 0o755); err != nil {
+	if mkdirErr := os.MkdirAll(logDir, 0o755); mkdirErr != nil {
 		return // Best effort
 	}
 
@@ -76,8 +76,8 @@ func LogSessionEvent(workspacePath, sessionID, eventType string, details map[str
 	// since JSONL is better for a continuous stream.
 	logFile := filepath.Join(logDir, "events.jsonl")
 
-	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
+	f, openErr := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if openErr != nil {
 		return // Best effort
 	}
 	defer f.Close()

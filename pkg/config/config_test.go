@@ -488,7 +488,7 @@ func TestDefaultConfig_WorkspacePath_Default(t *testing.T) {
 	t.Setenv("HOME", "/tmp/home")
 
 	cfg := DefaultConfig()
-	want := filepath.Join("/tmp/home", ".picoclaw", "workspace")
+		want := filepath.Join("/tmp/home", ".jane-ai", "workspace")
 
 	if cfg.Agents.Defaults.Workspace != want {
 		t.Errorf("Default workspace path = %q, want %q", cfg.Agents.Defaults.Workspace, want)
