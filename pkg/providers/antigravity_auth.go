@@ -1,0 +1,118 @@
+package providers
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
+
+	"jane/pkg/auth"
+	"jane/pkg/logger"
+)
+
+// --- Token source ---
+
+func createAntigravityTokenSource() func() (string, string, error) {
+	return func() (string, string, error) {
+		cred, err := auth.GetCredential("google-antigravity")
+		if err != nil {
+			return "", "", fmt.Errorf("loading auth credentials: %w", err)
+		}
+		if cred == nil {
+			return "", "", fmt.Errorf(
+				"no credentials for google-antigravity. Run: picoclaw auth login --provider google-antigravity",
+			)
+		}
+
+		// Refresh if needed
+		if cred.NeedsRefresh() && cred.RefreshToken != "" {
+			oauthCfg := auth.GoogleAntigravityOAuthConfig()
+			refreshed, err := auth.RefreshAccessToken(cred, oauthCfg)
+			if err != nil {
+				return "", "", fmt.Errorf("refreshing token: %w", err)
+			}
+			refreshed.Email = cred.Email
+			if refreshed.ProjectID == "" {
+				refreshed.ProjectID = cred.ProjectID
+			}
+			if err := auth.SetCredential("google-antigravity", refreshed); err != nil {
+				return "", "", fmt.Errorf("saving refreshed token: %w", err)
+			}
+			cred = refreshed
+		}
+
+		if cred.IsExpired() {
+			return "", "", fmt.Errorf(
+				"antigravity credentials expired. Run: picoclaw auth login --provider google-antigravity",
+			)
+		}
+
+		projectID := cred.ProjectID
+		if projectID == "" {
+			// Try to fetch project ID from API
+			fetchedID, err := FetchAntigravityProjectID(cred.AccessToken)
+			if err != nil {
+				logger.WarnCF("provider.antigravity", "Could not fetch project ID, using fallback", map[string]any{
+					"error": err.Error(),
+				})
+				projectID = "rising-fact-p41fc" // Default fallback (same as OpenCode)
+			} else {
+				projectID = fetchedID
+				cred.ProjectID = projectID
+				_ = auth.SetCredential("google-antigravity", cred)
+			}
+		}
+
+		return cred.AccessToken, projectID, nil
+	}
+}
+
+// FetchAntigravityProjectID retrieves the Google Cloud project ID from the loadCodeAssist endpoint.
+func FetchAntigravityProjectID(accessToken string) (string, error) {
+	reqBody, _ := json.Marshal(map[string]any{
+		"metadata": map[string]any{
+			"ideType":    "IDE_UNSPECIFIED",
+			"platform":   "PLATFORM_UNSPECIFIED",
+			"pluginType": "GEMINI",
+		},
+	})
+
+	req, err := http.NewRequest("POST", antigravityBaseURL+"/v1internal:loadCodeAssist", bytes.NewReader(reqBody))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", antigravityUserAgent)
+	req.Header.Set("X-Goog-Api-Client", antigravityXGoogClient)
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("reading loadCodeAssist response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("loadCodeAssist failed: %s", string(body))
+	}
+
+	var result struct {
+		CloudAICompanionProject string `json:"cloudaicompanionProject"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", err
+	}
+
+	if result.CloudAICompanionProject == "" {
+		return "", fmt.Errorf("no project ID in loadCodeAssist response")
+	}
+
+	return result.CloudAICompanionProject, nil
+}
