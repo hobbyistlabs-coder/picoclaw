@@ -1,2 +1,2 @@
-{"http_requests_total": 1, "status": "200", "goroutines": 50, "http_request_duration_seconds": 0.05, "gc_pause_ms": 2.5}
-{"http_requests_total": 1, "status": "500", "goroutines": 55, "http_request_duration_seconds": 0.15, "gc_pause_ms": 150.0}
+{"message": "{\"http_requests_total\": 1, \"status\": \"200\", \"goroutines\": 50, \"http_request_duration_seconds\": 0.05, \"gc_pause_ms\": 2.5}"}
+{"message": "{\"http_requests_total\": 1, \"status\": \"500\", \"goroutines\": 55, \"http_request_duration_seconds\": 0.15, \"gc_pause_ms\": 150.0}"}
