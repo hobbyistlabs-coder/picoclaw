@@ -12,6 +12,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"jane/pkg/logger"
 	"jane/pkg/providers"
 )
 
@@ -300,6 +301,7 @@ func (s *SQLiteStore) DeleteSession(ctx context.Context, sessionKey string) (boo
 	if err != nil {
 		return false, fmt.Errorf("memory: delete affected rows: %w", err)
 	}
+	logger.CleanupSessionLocks(sessionKey)
 	return n > 0, nil
 }
 

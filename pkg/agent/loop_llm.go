@@ -295,6 +295,12 @@ func (al *AgentLoop) runLLMIteration(
 				"target_channel": al.targetReasoningChannelID(opts.Channel),
 				"channel":        opts.Channel,
 			})
+		if response.ReasoningContent != "" {
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "cot", map[string]any{
+				"cot_text": response.ReasoningContent,
+			}, logger.ReplayErrorCategoryNone, "")
+		}
+
 		// Check if no tool calls - then check reasoning content if any
 		if len(response.ToolCalls) == 0 {
 			finalContent = response.Content
@@ -312,7 +318,12 @@ func (al *AgentLoop) runLLMIteration(
 
 		normalizedToolCalls := make([]providers.ToolCall, 0, len(response.ToolCalls))
 		for _, tc := range response.ToolCalls {
-			normalizedToolCalls = append(normalizedToolCalls, providers.NormalizeToolCall(tc))
+			normalized := providers.NormalizeToolCall(tc)
+			normalizedToolCalls = append(normalizedToolCalls, normalized)
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "tool_call", map[string]any{
+				"tool_name": normalized.Name,
+				"inputs":    normalized.Arguments,
+			}, logger.ReplayErrorCategoryNone, "")
 		}
 		metrics.toolCalls += len(normalizedToolCalls)
 
@@ -376,6 +387,11 @@ func (al *AgentLoop) runLLMIteration(
 				"agent_id":    agent.ID,
 				"session_key": opts.SessionKey,
 			})
+
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "state_transition", map[string]any{
+				"from_state": "generating",
+				"to_state":   "pending_approval",
+			}, logger.ReplayErrorCategoryNone, "")
 
 			// Format approval message
 			approvalMsg := "The following tool execution requires your approval:\n"
@@ -461,6 +477,14 @@ func (al *AgentLoop) runLLMIteration(
 						"error":          contentForLLM,
 						"error_category": "logic_failure",
 					})
+				logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "error", map[string]any{
+					"tool_name": r.tc.Name,
+				}, logger.ReplayErrorCategoryLogicFailure, contentForLLM)
+			} else {
+				logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "tool_result", map[string]any{
+					"tool_name": r.tc.Name,
+					"outputs":   contentForLLM,
+				}, logger.ReplayErrorCategoryNone, "")
 			}
 
 			toolResultMsg := providers.Message{
