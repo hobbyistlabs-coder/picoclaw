@@ -47,7 +47,7 @@ func GoogleAntigravityOAuthConfig() OAuthProviderConfig {
 	clientID := decodeBase64(
 		"MTA3MTAwNjA2MDU5MS10bWhzc2luMmgyMWxjcmUyMzV2dG9sb2poNGc0MDNlcC5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbQ==",
 	)
-	clientSecret := decodeBase64("R09DU1BYLUs1OEZXUjQ4NkxkTEoxbUxCOHNYQzR6NnFEQWY=")
+	clientSecret := os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET")
 	return OAuthProviderConfig{
 		Issuer:       "https://accounts.google.com/o/oauth2/v2",
 		TokenURL:     "https://oauth2.googleapis.com/token",
