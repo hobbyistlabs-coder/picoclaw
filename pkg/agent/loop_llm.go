@@ -265,6 +265,12 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID:     opts.SessionKey,
+				EventType:     "error",
+				ErrorCategory: logger.ReplayInfrastructureFailure, // Or ModelFailure depending on err, fallback to infra
+				ErrorMessage:  err.Error(),
+			})
 			return "", iteration, metrics, err
 		}
 		metrics.addUsage(enrichUsageWithCost(agent.Config, activeModel, response.Usage))
@@ -276,6 +282,13 @@ func (al *AgentLoop) runLLMIteration(
 		)
 		if response.ReasoningContent != "" {
 			metrics.reasoningContent = response.ReasoningContent
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: "cot",
+				Details: logger.SessionEventDetails{
+					CotText: response.ReasoningContent,
+				},
+			})
 			if opts.Channel == "pico" {
 				al.bus.PublishOutbound(ctx, bus.OutboundMessage{
 					Channel:          opts.Channel,
@@ -320,6 +333,14 @@ func (al *AgentLoop) runLLMIteration(
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: "tool_call",
+				Details: logger.SessionEventDetails{
+					ToolName: tc.Name,
+					Inputs:   tc.Arguments,
+				},
+			})
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
@@ -376,6 +397,14 @@ func (al *AgentLoop) runLLMIteration(
 				"agent_id":    agent.ID,
 				"session_key": opts.SessionKey,
 			})
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: "state_transition",
+				Details: logger.SessionEventDetails{
+					FromState: "executing",
+					ToState:   "pending_approval",
+				},
+			})
 
 			// Format approval message
 			approvalMsg := "The following tool execution requires your approval:\n"
@@ -413,6 +442,15 @@ func (al *AgentLoop) runLLMIteration(
 
 		// Process results in original order (send to user, save to session)
 		for _, r := range agentResults {
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: "tool_result",
+				Details: logger.SessionEventDetails{
+					ToolName: r.tc.Name,
+					Outputs:  r.result.ForLLM,
+				},
+			})
+
 			// Send ForUser content to user immediately if not Silent
 			if !r.result.Silent && r.result.ForUser != "" && opts.SendResponse {
 				al.bus.PublishOutbound(ctx, bus.OutboundMessage{
@@ -461,6 +499,12 @@ func (al *AgentLoop) runLLMIteration(
 						"error":          contentForLLM,
 						"error_category": "logic_failure",
 					})
+				logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+					SessionID:     opts.SessionKey,
+					EventType:     "error",
+					ErrorCategory: logger.ReplayLogicFailure,
+					ErrorMessage:  contentForLLM,
+				})
 			}
 
 			toolResultMsg := providers.Message{
