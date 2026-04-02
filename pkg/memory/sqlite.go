@@ -83,7 +83,11 @@ func (s *SQLiteStore) AddMessage(ctx context.Context, sessionKey, role, content 
 	})
 }
 
-func (s *SQLiteStore) AddFullMessage(ctx context.Context, sessionKey string, msg providers.Message) error {
+func (s *SQLiteStore) AddFullMessage(
+	ctx context.Context,
+	sessionKey string,
+	msg providers.Message,
+) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("memory: begin tx: %w", err)
@@ -103,8 +107,15 @@ func (s *SQLiteStore) AddFullMessage(ctx context.Context, sessionKey string, msg
 	return tx.Commit()
 }
 
-func (s *SQLiteStore) GetHistory(ctx context.Context, sessionKey string) ([]providers.Message, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT payload FROM messages WHERE session_key = ? ORDER BY id`, sessionKey)
+func (s *SQLiteStore) GetHistory(
+	ctx context.Context,
+	sessionKey string,
+) ([]providers.Message, error) {
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT payload FROM messages WHERE session_key = ? ORDER BY id`,
+		sessionKey,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("memory: query history: %w", err)
 	}
@@ -130,7 +141,8 @@ func (s *SQLiteStore) GetHistory(ctx context.Context, sessionKey string) ([]prov
 
 func (s *SQLiteStore) GetSummary(ctx context.Context, sessionKey string) (string, error) {
 	var summary string
-	err := s.db.QueryRowContext(ctx, `SELECT summary FROM sessions WHERE session_key = ?`, sessionKey).Scan(&summary)
+	err := s.db.QueryRowContext(ctx, `SELECT summary FROM sessions WHERE session_key = ?`, sessionKey).
+		Scan(&summary)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
@@ -183,7 +195,11 @@ func (s *SQLiteStore) TruncateHistory(ctx context.Context, sessionKey string, ke
 	return tx.Commit()
 }
 
-func (s *SQLiteStore) SetHistory(ctx context.Context, sessionKey string, history []providers.Message) error {
+func (s *SQLiteStore) SetHistory(
+	ctx context.Context,
+	sessionKey string,
+	history []providers.Message,
+) error {
 	return s.ImportSession(ctx, StoredSession{
 		Key:      sessionKey,
 		Messages: history,
@@ -220,7 +236,11 @@ func (s *SQLiteStore) ImportSession(ctx context.Context, session StoredSession) 
 	return tx.Commit()
 }
 
-func (s *SQLiteStore) ListSessions(ctx context.Context, prefix string, limit, offset int) ([]StoredSession, error) {
+func (s *SQLiteStore) ListSessions(
+	ctx context.Context,
+	prefix string,
+	limit, offset int,
+) ([]StoredSession, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT session_key, summary, created_at, updated_at
 		FROM sessions
@@ -313,7 +333,12 @@ func (s *SQLiteStore) Close() error {
 	return s.db.Close()
 }
 
-func upsertSession(tx *sql.Tx, sessionKey, summary string, createdAt, updatedAt time.Time, preserveSummary bool) error {
+func upsertSession(
+	tx *sql.Tx,
+	sessionKey, summary string,
+	createdAt, updatedAt time.Time,
+	preserveSummary bool,
+) error {
 	query := `
 		INSERT INTO sessions (session_key, summary, created_at, updated_at)
 		VALUES (?, ?, ?, ?)
@@ -334,7 +359,12 @@ func upsertSession(tx *sql.Tx, sessionKey, summary string, createdAt, updatedAt 
 	return nil
 }
 
-func insertMessage(tx *sql.Tx, sessionKey string, msg providers.Message, createdAt time.Time) error {
+func insertMessage(
+	tx *sql.Tx,
+	sessionKey string,
+	msg providers.Message,
+	createdAt time.Time,
+) error {
 	payload, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("memory: encode message: %w", err)

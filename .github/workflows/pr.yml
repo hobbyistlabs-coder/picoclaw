@@ -16,9 +16,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Create dummy dist for backend
-        run: mkdir -p web/backend/dist && touch web/backend/dist/index.html
-
       - name: Run go generate
         run: go generate ./...
 
@@ -41,9 +38,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Create dummy dist for backend
-        run: mkdir -p web/backend/dist && touch web/backend/dist/index.html
-
       - name: Run Govulncheck
         uses: golang/govulncheck-action@v1
         with:
@@ -60,9 +54,6 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-
-      - name: Create dummy dist for backend
-        run: mkdir -p web/backend/dist && touch web/backend/dist/index.html
 
       - name: Run go generate
         run: go generate ./...

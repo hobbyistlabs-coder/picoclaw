@@ -42,7 +42,12 @@ func CleanupSessionLocks(sessionID string) {
 }
 
 // LogSessionEvent appends a structured JSON event to the session's event.jsonl file.
-func LogSessionEvent(workspacePath, sessionID, eventType string, details map[string]any, errorCategory ReplayErrorCategory, errorMsg string) {
+func LogSessionEvent(
+	workspacePath, sessionID, eventType string,
+	details map[string]any,
+	errorCategory ReplayErrorCategory,
+	errorMsg string,
+) {
 	if workspacePath == "" || sessionID == "" || eventType == "" {
 		return
 	}
