@@ -138,6 +138,8 @@ func (al *AgentLoop) runAgentLoop(
 			"final_length": len(finalContent),
 		})
 
+	logger.CleanupSessionLocks(opts.SessionKey)
+
 	return finalContent, nil
 }
 
@@ -265,7 +267,29 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			// Record model/infrastructure failure
+			category := logger.ReplayModelFailure
+			if failErr := providers.ClassifyError(err, agent.ID, activeModel); failErr != nil {
+				if failErr.Reason == providers.FailoverTimeout || failErr.Reason == providers.FailoverOverloaded || failErr.Reason == providers.FailoverUnknown {
+					category = logger.ReplayInfrastructureFailure
+				}
+			}
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "error", map[string]any{
+				"iteration": iteration,
+			}, category, err.Error())
 			return "", iteration, metrics, err
+		}
+
+		// Record chain of thought
+		if response.Content != "" || response.ReasoningContent != "" {
+			cotDetails := map[string]any{
+				"iteration": iteration,
+				"model":     activeModel,
+			}
+			if response.ReasoningContent != "" {
+				cotDetails["cot_text"] = response.ReasoningContent
+			}
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "cot", cotDetails, logger.ReplayNone, "")
 		}
 		metrics.addUsage(enrichUsageWithCost(agent.Config, activeModel, response.Usage))
 		go al.handleReasoning(
@@ -320,6 +344,11 @@ func (al *AgentLoop) runLLMIteration(
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "tool_call", map[string]any{
+				"tool_name": tc.Name,
+				"inputs":    tc.Arguments,
+				"iteration": iteration,
+			}, logger.ReplayNone, "")
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
@@ -401,6 +430,12 @@ func (al *AgentLoop) runLLMIteration(
 				Content: approvalMsg,
 			})
 
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "state_transition", map[string]any{
+				"from_state": "running",
+				"to_state":   "pending_approval",
+				"iteration":  iteration,
+			}, logger.ReplayNone, "")
+
 			return "", iteration, metrics, errApprovalPending
 		}
 		// --- End HITL ---
@@ -408,6 +443,11 @@ func (al *AgentLoop) runLLMIteration(
 		// Execute tool calls in parallel
 		agentResults, hasAsync := al.executeToolBatch(ctx, agent, opts, normalizedToolCalls, iteration)
 		if hasAsync {
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "state_transition", map[string]any{
+				"from_state": "running",
+				"to_state":   "pending_async",
+				"iteration":  iteration,
+			}, logger.ReplayNone, "")
 			return "", iteration, metrics, errAsyncPending
 		}
 

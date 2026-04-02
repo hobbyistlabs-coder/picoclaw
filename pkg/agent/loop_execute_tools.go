@@ -148,6 +148,17 @@ func (al *AgentLoop) executeToolBatch(
 			if !toolResult.Async {
 				publishToolEvent(ctx, al, opts,
 					buildToolEvent(tc, "completed", toolResult, time.Since(startToolTime).Milliseconds()))
+
+				// Replay event
+				category := logger.ReplayNone
+				if toolResult.Err != nil || toolResult.IsError {
+					category = logger.ReplayLogicFailure
+				}
+				logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "tool_result", map[string]any{
+					"tool_name": tc.Name,
+					"outputs":   toolResult.ForLLM,
+					"iteration": iteration,
+				}, category, "")
 			}
 		}(i, tc)
 	}
