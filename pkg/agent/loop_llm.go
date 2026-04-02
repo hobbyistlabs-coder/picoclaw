@@ -410,7 +410,11 @@ func (al *AgentLoop) runLLMIteration(
 			approvalMsg := "The following tool execution requires your approval:\n"
 			for _, tc := range normalizedToolCalls {
 				argsJSON, _ := json.MarshalIndent(tc.Arguments, "", "  ")
-				approvalMsg += fmt.Sprintf("\n- `%s`:\n```json\n%s\n```\n", tc.Name, string(argsJSON))
+				approvalMsg += fmt.Sprintf(
+					"\n- `%s`:\n```json\n%s\n```\n",
+					tc.Name,
+					string(argsJSON),
+				)
 			}
 			approvalMsg += "\nDo you approve? (Yes/No)"
 
@@ -435,7 +439,13 @@ func (al *AgentLoop) runLLMIteration(
 		// --- End HITL ---
 
 		// Execute tool calls in parallel
-		agentResults, hasAsync := al.executeToolBatch(ctx, agent, opts, normalizedToolCalls, iteration)
+		agentResults, hasAsync := al.executeToolBatch(
+			ctx,
+			agent,
+			opts,
+			normalizedToolCalls,
+			iteration,
+		)
 		if hasAsync {
 			return "", iteration, metrics, errAsyncPending
 		}

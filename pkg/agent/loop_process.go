@@ -188,7 +188,12 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 				agent.Tools.TickTTL()
 
 				// Continue loop with rejection feedback
-				finalContent, _, metrics, err := al.runLLMIteration(ctx, pending.agent, pending.messages, pending.opts)
+				finalContent, _, metrics, err := al.runLLMIteration(
+					ctx,
+					pending.agent,
+					pending.messages,
+					pending.opts,
+				)
 				if err != nil {
 					return "", err
 				}
@@ -276,7 +281,12 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 				agent.Tools.TickTTL()
 
 				// Continue loop with execution feedback
-				finalContent, _, metrics, err := al.runLLMIteration(ctx, pending.agent, pending.messages, pending.opts)
+				finalContent, _, metrics, err := al.runLLMIteration(
+					ctx,
+					pending.agent,
+					pending.messages,
+					pending.opts,
+				)
 				if err != nil {
 					return "", err
 				}
@@ -303,7 +313,9 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 	return al.runAgentLoop(ctx, agent, opts)
 }
 
-func (al *AgentLoop) resolveMessageRoute(msg bus.InboundMessage) (routing.ResolvedRoute, *AgentInstance, error) {
+func (al *AgentLoop) resolveMessageRoute(
+	msg bus.InboundMessage,
+) (routing.ResolvedRoute, *AgentInstance, error) {
 	route := al.registry.ResolveRoute(routing.RouteInput{
 		Channel:    msg.Channel,
 		AccountID:  inboundMetadata(msg, metadataKeyAccountID),
@@ -318,7 +330,10 @@ func (al *AgentLoop) resolveMessageRoute(msg bus.InboundMessage) (routing.Resolv
 		agent = al.registry.GetDefaultAgent()
 	}
 	if agent == nil {
-		return routing.ResolvedRoute{}, nil, fmt.Errorf("no agent available for route (agent_id=%s)", route.AgentID)
+		return routing.ResolvedRoute{}, nil, fmt.Errorf(
+			"no agent available for route (agent_id=%s)",
+			route.AgentID,
+		)
 	}
 
 	return route, agent, nil

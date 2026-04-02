@@ -18,12 +18,12 @@ const (
 )
 
 type SessionEventDetails struct {
-	CotText   string         `json:"cot_text,omitempty"`
-	ToolName  string         `json:"tool_name,omitempty"`
-	Inputs    any            `json:"inputs,omitempty"`
-	Outputs   any            `json:"outputs,omitempty"`
-	FromState string         `json:"from_state,omitempty"`
-	ToState   string         `json:"to_state,omitempty"`
+	CotText   string `json:"cot_text,omitempty"`
+	ToolName  string `json:"tool_name,omitempty"`
+	Inputs    any    `json:"inputs,omitempty"`
+	Outputs   any    `json:"outputs,omitempty"`
+	FromState string `json:"from_state,omitempty"`
+	ToState   string `json:"to_state,omitempty"`
 }
 
 type SessionEvent struct {
