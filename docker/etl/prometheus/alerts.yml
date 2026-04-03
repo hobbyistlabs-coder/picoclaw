@@ -1,0 +1,20 @@
+groups:
+  - name: resource_utilization_alerts
+    rules:
+      - alert: GoroutineLeak
+        expr: deriv(etl_goroutines[5m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Potential Goroutine leak detected"
+          description: "The number of goroutines has been consistently increasing over the last 5 minutes."
+
+      - alert: HighGCPause
+        expr: sum(rate(etl_gc_pause_ms_sum[1m])) / sum(rate(etl_gc_pause_ms_count[1m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High GC Pause Time detected"
+          description: "The average GC pause time has exceeded 5ms for the last 5 minutes."

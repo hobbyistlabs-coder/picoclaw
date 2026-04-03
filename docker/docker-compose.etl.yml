@@ -1,0 +1,53 @@
+services:
+  vector:
+    image: timberio/vector:0.34.0-alpine
+    container_name: etl-vector
+    restart: unless-stopped
+    volumes:
+      - ./etl/vector/vector.toml:/etc/vector/vector.toml:ro
+      - ../workspace/logs/etl:/workspace/logs/etl:ro
+    ports:
+      - "8686:8686"
+    depends_on:
+      - loki
+      - prometheus
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: etl-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./etl/prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - "9090:9090"
+
+  loki:
+    image: grafana/loki:latest
+    container_name: etl-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: etl-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./etl/grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - loki
+
+volumes:
+  prometheus_data:
+  grafana_data:
