@@ -306,9 +306,13 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			errCat := logger.ErrorCategoryModelFailure
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+				errCat = logger.ErrorCategoryInfrastructureFailure
+			}
 			logger.LogSessionEvent(opts.SessionKey, logger.SessionEvent{
 				EventType:     logger.EventTypeError,
-				ErrorCategory: string(logger.ErrorCategoryModelFailure),
+				ErrorCategory: string(errCat),
 				ErrorMessage:  err.Error(),
 				Details: logger.EventDetails{
 					FromState: "waiting_llm_response",
@@ -476,7 +480,7 @@ func (al *AgentLoop) runLLMIteration(
 
 		// Process results in original order (send to user, save to session)
 		for _, r := range agentResults {
-			logger.LogSessionEvent(opts.SessionKey, logger.SessionEvent{
+			event := logger.SessionEvent{
 				EventType: logger.EventTypeToolResult,
 				Details: logger.EventDetails{
 					ToolName:  r.tc.Name,
@@ -488,7 +492,17 @@ func (al *AgentLoop) runLLMIteration(
 						"is_error": r.result.IsError,
 					},
 				},
-			})
+			}
+
+			if r.result.IsError {
+				event.EventType = logger.EventTypeError
+				event.ErrorCategory = string(logger.ErrorCategoryLogicFailure)
+				event.ErrorMessage = r.result.ForLLM
+				if event.ErrorMessage == "" && r.result.Err != nil {
+					event.ErrorMessage = r.result.Err.Error()
+				}
+			}
+			logger.LogSessionEvent(opts.SessionKey, event)
 			// Send ForUser content to user immediately if not Silent
 			if !r.result.Silent && r.result.ForUser != "" && opts.SendResponse {
 				al.bus.PublishOutbound(ctx, bus.OutboundMessage{

@@ -67,7 +67,7 @@ func LogSessionEvent(sessionID string, event SessionEvent) {
 	}
 
 	logDir := filepath.Join(workspaceDir, "logs", sessionID, "events")
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
 		WarnCF("logger", "failed to create session log directory", map[string]any{"error": err.Error()})
 		return
 	}
@@ -81,7 +81,7 @@ func LogSessionEvent(sessionID string, event SessionEvent) {
 	defer state.mu.Unlock()
 
 	if state.file == nil {
-		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 		if err != nil {
 			WarnCF("logger", "failed to open session event log file", map[string]any{"error": err.Error()})
 			return
