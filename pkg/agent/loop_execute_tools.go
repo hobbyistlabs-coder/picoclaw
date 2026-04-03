@@ -82,6 +82,22 @@ func (al *AgentLoop) executeToolBatch(
 					"tool":      tc.Name,
 					"iteration": iteration,
 				})
+
+			// Log tool call for observability
+			var inputs any
+			json.Unmarshal(argsJSON, &inputs) // Unmarshal back to any for clean JSON logging
+			logger.LogSessionEvent(
+				agent.Workspace,
+				opts.SessionKey,
+				"tool_call",
+				logger.SessionEventDetails{
+					ToolName: tc.Name,
+					Inputs:   inputs,
+				},
+				logger.ErrorCategoryNoneReplay,
+				"",
+			)
+
 			publishToolEvent(ctx, al, opts, buildToolEvent(tc, "started", nil, 0))
 			startToolTime := time.Now()
 
@@ -145,6 +161,31 @@ func (al *AgentLoop) executeToolBatch(
 			)
 			metricsToolExecutionDuration.Add(time.Since(startToolTime).Seconds())
 			agentResults[idx].result = toolResult
+
+			// Log tool result for observability
+			errorCategory := logger.ErrorCategoryNoneReplay
+			errMsg := ""
+			if toolResult.IsError || toolResult.Err != nil {
+				errorCategory = logger.ErrorCategoryLogicFailureReplay
+				if toolResult.Err != nil {
+					errMsg = toolResult.Err.Error()
+				} else {
+					errMsg = toolResult.ForLLM
+				}
+			}
+
+			logger.LogSessionEvent(
+				agent.Workspace,
+				opts.SessionKey,
+				"tool_result",
+				logger.SessionEventDetails{
+					ToolName: tc.Name,
+					Outputs:  toolResult.ForLLM,
+				},
+				errorCategory,
+				errMsg,
+			)
+
 			if !toolResult.Async {
 				publishToolEvent(ctx, al, opts,
 					buildToolEvent(tc, "completed", toolResult, time.Since(startToolTime).Milliseconds()))

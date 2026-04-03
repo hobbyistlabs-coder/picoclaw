@@ -34,6 +34,8 @@ func (al *AgentLoop) runAgentLoop(
 	agent *AgentInstance,
 	opts processOptions,
 ) (string, error) {
+	defer logger.CleanupSessionLocks(opts.SessionKey)
+
 	// 0. Record last channel for heartbeat notifications (skip internal channels and cli)
 	if opts.Channel != "" && opts.ChatID != "" {
 		if !constants.IsInternalChannel(opts.Channel) {
@@ -283,6 +285,18 @@ func (al *AgentLoop) runLLMIteration(
 					ReasoningContent: response.ReasoningContent,
 				})
 			}
+
+			// Log CoT event for observability
+			logger.LogSessionEvent(
+				agent.Workspace,
+				opts.SessionKey,
+				"cot",
+				logger.SessionEventDetails{
+					CotText: response.ReasoningContent,
+				},
+				logger.ErrorCategoryNoneReplay,
+				"",
+			)
 		}
 
 		logger.DebugCF("agent", "LLM response",
@@ -400,6 +414,19 @@ func (al *AgentLoop) runLLMIteration(
 				ChatID:  opts.ChatID,
 				Content: approvalMsg,
 			})
+
+			// Log state transition
+			logger.LogSessionEvent(
+				agent.Workspace,
+				opts.SessionKey,
+				"state_transition",
+				logger.SessionEventDetails{
+					FromState: "processing",
+					ToState:   "pending_approval",
+				},
+				logger.ErrorCategoryNoneReplay,
+				"",
+			)
 
 			return "", iteration, metrics, errApprovalPending
 		}
