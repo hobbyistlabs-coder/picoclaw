@@ -160,6 +160,7 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 
 		if isYes || isNo {
 			al.pendingApprovals.Delete(sessionKey)
+			defer logger.CleanupSessionLocks(sessionKey)
 
 			if isNo {
 				logger.InfoCF("agent", "User rejected tool execution", map[string]any{

@@ -267,6 +267,23 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			errCat := logger.ErrorCategoryInfrastructureFailureReplay
+			// Using context cancellation/timeout as a heuristic for infrastructure failure,
+			// otherwise assume model failure as instructed by memory.
+			if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+				errCat = logger.ErrorCategoryModelFailureReplay
+			}
+
+			logger.LogSessionEvent(
+				agent.Workspace,
+				opts.SessionKey,
+				"error",
+				logger.SessionEventDetails{
+					Outputs: err.Error(),
+				},
+				errCat,
+				err.Error(),
+			)
 			return "", iteration, metrics, err
 		}
 		metrics.addUsage(enrichUsageWithCost(agent.Config, activeModel, response.Usage))

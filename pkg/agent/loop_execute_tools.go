@@ -104,6 +104,30 @@ func (al *AgentLoop) executeToolBatch(
 			// as an inbound system message so processSystemMessage routes it
 			// back to the user via the normal agent loop.
 			asyncCallback := func(_ context.Context, result *tools.ToolResult) {
+				// Log tool result for async completions observability
+				errorCategory := logger.ErrorCategoryNoneReplay
+				errMsg := ""
+				if result.IsError || result.Err != nil {
+					errorCategory = logger.ErrorCategoryLogicFailureReplay
+					if result.Err != nil {
+						errMsg = result.Err.Error()
+					} else {
+						errMsg = result.ForLLM
+					}
+				}
+
+				logger.LogSessionEvent(
+					agent.Workspace,
+					opts.SessionKey,
+					"tool_result",
+					logger.SessionEventDetails{
+						ToolName: tc.Name,
+						Outputs:  result.ForLLM,
+					},
+					errorCategory,
+					errMsg,
+				)
+
 				if tc.Name != "spawn" {
 					publishToolEvent(
 						context.Background(),
