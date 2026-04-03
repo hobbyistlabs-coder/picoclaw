@@ -50,7 +50,12 @@ type SessionEvent struct {
 }
 
 // LogSessionEvent logs a structured event to a session-specific JSONL file.
-func LogSessionEvent(workspacePath, sessionID, eventType string, details SessionEventDetails, errorCategory ReplayErrorCategory, errorMessage string) {
+func LogSessionEvent(
+	workspacePath, sessionID, eventType string,
+	details SessionEventDetails,
+	errorCategory ReplayErrorCategory,
+	errorMessage string,
+) {
 	if workspacePath == "" || sessionID == "" {
 		return
 	}
