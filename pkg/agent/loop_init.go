@@ -19,6 +19,9 @@ import (
 	"jane/pkg/logger"
 	"jane/pkg/media"
 	"jane/pkg/providers"
+	"net/http"
+	"reflect"
+
 	"jane/pkg/skills"
 	"jane/pkg/state"
 	"jane/pkg/tools"
@@ -116,13 +119,38 @@ func registerSharedTools(
 			}
 		}
 
+		var browserActionTool *tools.BrowserActionTool
 		if cfg.Tools.IsToolEnabled("browser_action") {
-			browserActionTool := tools.NewBrowserActionTool()
+			browserActionTool = tools.NewBrowserActionTool()
 			agent.Tools.Register(browserActionTool)
 		}
 
 		if cfg.Tools.IsToolEnabled("go_eval") {
 			goEvalTool := tools.NewGoEvalTool(agent.Workspace)
+
+			// Inject pre-configured bindings for internal APIs into the Yaegi interpreter context.
+			// This allows JANE to write a single script that performs a complete workflow.
+			bindings := make(map[string]reflect.Value)
+			bindings["Workspace"] = reflect.ValueOf(&agent.Workspace).Elem()
+			bindings["HTTPClient"] = reflect.ValueOf(http.DefaultClient)
+
+			if browserActionTool != nil {
+				bindings["Browser"] = reflect.ValueOf(browserActionTool)
+			}
+
+			// Inject Send function for outbound messages
+			sendFunc := func(channel, chatID, content string) error {
+				pubCtx, pubCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer pubCancel()
+				return msgBus.PublishOutbound(pubCtx, bus.OutboundMessage{
+					Channel: channel,
+					ChatID:  chatID,
+					Content: content,
+				})
+			}
+			bindings["Send"] = reflect.ValueOf(sendFunc)
+
+			goEvalTool.SetBindings(bindings)
 			agent.Tools.Register(goEvalTool)
 		}
 
