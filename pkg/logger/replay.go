@@ -67,8 +67,12 @@ func LogSessionEvent(sessionID string, event SessionEvent) {
 	}
 
 	logDir := filepath.Join(workspaceDir, "logs", sessionID, "events")
-	if err := os.MkdirAll(logDir, 0o755); err != nil {
-		WarnCF("logger", "failed to create session log directory", map[string]any{"error": err.Error()})
+	if mkdirErr := os.MkdirAll(logDir, 0o755); mkdirErr != nil {
+		WarnCF(
+			"logger",
+			"failed to create session log directory",
+			map[string]any{"error": mkdirErr.Error()},
+		)
 		return
 	}
 
@@ -81,9 +85,13 @@ func LogSessionEvent(sessionID string, event SessionEvent) {
 	defer state.mu.Unlock()
 
 	if state.file == nil {
-		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-		if err != nil {
-			WarnCF("logger", "failed to open session event log file", map[string]any{"error": err.Error()})
+		file, openErr := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		if openErr != nil {
+			WarnCF(
+				"logger",
+				"failed to open session event log file",
+				map[string]any{"error": openErr.Error()},
+			)
 			return
 		}
 		state.file = file
@@ -91,7 +99,11 @@ func LogSessionEvent(sessionID string, event SessionEvent) {
 
 	_, err = state.file.Write(append(data, '\n'))
 	if err != nil {
-		WarnCF("logger", "failed to write to session event log file", map[string]any{"error": err.Error()})
+		WarnCF(
+			"logger",
+			"failed to write to session event log file",
+			map[string]any{"error": err.Error()},
+		)
 	}
 }
 
