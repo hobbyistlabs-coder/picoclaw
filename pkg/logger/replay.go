@@ -97,12 +97,12 @@ func LogSessionEvent(sessionID string, event SessionEvent) {
 		state.file = file
 	}
 
-	_, err = state.file.Write(append(data, '\n'))
-	if err != nil {
+	_, writeErr := state.file.Write(append(data, '\n'))
+	if writeErr != nil {
 		WarnCF(
 			"logger",
 			"failed to write to session event log file",
-			map[string]any{"error": err.Error()},
+			map[string]any{"error": writeErr.Error()},
 		)
 	}
 }

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,7 +35,20 @@ func TestJulesCommands(t *testing.T) {
 
 	t.Run("session create", func(t *testing.T) {
 		cmd := NewJulesCommand()
-		cmd.SetArgs([]string{"session", "create", "--prompt", "test prompt", "--source", "sources/test", "--title", "test title", "--branch", "main"})
+		cmd.SetArgs(
+			[]string{
+				"session",
+				"create",
+				"--prompt",
+				"test prompt",
+				"--source",
+				"sources/test",
+				"--title",
+				"test title",
+				"--branch",
+				"main",
+			},
+		)
 
 		// Capture stdout
 		oldStdout := os.Stdout
