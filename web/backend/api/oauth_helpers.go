@@ -77,7 +77,10 @@ func oauthConfigForProvider(provider string) (auth.OAuthProviderConfig, error) {
 	case oauthProviderGoogleAntigravity:
 		return auth.GoogleAntigravityOAuthConfig(), nil
 	default:
-		return auth.OAuthProviderConfig{}, fmt.Errorf("provider %q does not support browser oauth", provider)
+		return auth.OAuthProviderConfig{}, fmt.Errorf(
+			"provider %q does not support browser oauth",
+			provider,
+		)
 	}
 }
 
@@ -126,7 +129,10 @@ func newOAuthFlowID() string {
 	return hex.EncodeToString(buf)
 }
 
-func (h *Handler) persistCredentialAndConfig(provider, authMethod string, cred *auth.AuthCredential) error {
+func (h *Handler) persistCredentialAndConfig(
+	provider, authMethod string,
+	cred *auth.AuthCredential,
+) error {
 	if cred == nil {
 		return fmt.Errorf("empty credential")
 	}
@@ -141,7 +147,11 @@ func (h *Handler) persistCredentialAndConfig(provider, authMethod string, cred *
 		if cp.Email == "" {
 			email, err := oauthFetchGoogleUserEmailFunc(cp.AccessToken)
 			if err != nil {
-				logger.WarnCF("oauth", "could not fetch google email", map[string]any{"error": err.Error()})
+				logger.WarnCF(
+					"oauth",
+					"could not fetch google email",
+					map[string]any{"error": err.Error()},
+				)
 			} else {
 				cp.Email = email
 			}
@@ -149,7 +159,11 @@ func (h *Handler) persistCredentialAndConfig(provider, authMethod string, cred *
 		if cp.ProjectID == "" {
 			projectID, err := oauthFetchAntigravityProject(cp.AccessToken)
 			if err != nil {
-				logger.WarnCF("oauth", "could not fetch antigravity project id", map[string]any{"error": err.Error()})
+				logger.WarnCF(
+					"oauth",
+					"could not fetch antigravity project id",
+					map[string]any{"error": err.Error()},
+				)
 			} else {
 				cp.ProjectID = projectID
 			}
@@ -240,7 +254,11 @@ func defaultModelConfigForProvider(provider, authMethod string) config.ModelConf
 }
 
 func fetchGoogleUserEmail(accessToken string) (string, error) {
-	req, err := http.NewRequest(http.MethodGet, "https://www.googleapis.com/oauth2/v2/userinfo", nil)
+	req, err := http.NewRequest(
+		http.MethodGet,
+		"https://www.googleapis.com/oauth2/v2/userinfo",
+		nil,
+	)
 	if err != nil {
 		return "", err
 	}

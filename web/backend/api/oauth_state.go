@@ -85,7 +85,8 @@ func (h *Handler) setOAuthFlowError(flowID, errMsg string) {
 
 func (h *Handler) gcOAuthFlowsLocked(now time.Time) {
 	for id, flow := range h.oauthFlows {
-		if flow.Status == oauthFlowPending && !flow.ExpiresAt.IsZero() && now.After(flow.ExpiresAt) {
+		if flow.Status == oauthFlowPending && !flow.ExpiresAt.IsZero() &&
+			now.After(flow.ExpiresAt) {
 			flow.Status = oauthFlowExpired
 			flow.Error = "flow expired"
 			flow.UpdatedAt = now
