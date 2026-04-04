@@ -19,7 +19,7 @@ func TestPipeline_ExtractAndLoad(t *testing.T) {
 	p := NewPipeline(tmpDir, 100*time.Millisecond)
 
 	// ensure log dir exists like Start does
-	err := os.MkdirAll(filepath.Dir(logFile), 0755)
+	err := os.MkdirAll(filepath.Dir(logFile), 0o755)
 	require.NoError(t, err)
 
 	p.extractAndLoad()
