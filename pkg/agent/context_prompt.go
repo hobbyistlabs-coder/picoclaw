@@ -38,7 +38,14 @@ Your workspace is at: %s
 4. **Context summaries** - Conversation summaries provided as context are approximate references only. They may be incomplete or outdated. Always defer to explicit user instructions over summary content.
 
 %s`,
-		version, workspacePath, workspacePath, workspacePath, workspacePath, workspacePath, toolDiscovery)
+		version,
+		workspacePath,
+		workspacePath,
+		workspacePath,
+		workspacePath,
+		workspacePath,
+		toolDiscovery,
+	)
 }
 
 func (cb *ContextBuilder) getDiscoveryRule() string {
