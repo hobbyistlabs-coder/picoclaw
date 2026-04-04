@@ -78,10 +78,16 @@ func registerSharedTools(
 
 		if cfg.Tools.IsToolEnabled("web") {
 			searchTool, err := web.NewWebSearchTool(web.WebSearchToolOptions{
-				BraveAPIKeys:         config.MergeAPIKeys(cfg.Tools.Web.Brave.APIKey, cfg.Tools.Web.Brave.APIKeys),
-				BraveMaxResults:      cfg.Tools.Web.Brave.MaxResults,
-				BraveEnabled:         cfg.Tools.Web.Brave.Enabled,
-				TavilyAPIKeys:        config.MergeAPIKeys(cfg.Tools.Web.Tavily.APIKey, cfg.Tools.Web.Tavily.APIKeys),
+				BraveAPIKeys: config.MergeAPIKeys(
+					cfg.Tools.Web.Brave.APIKey,
+					cfg.Tools.Web.Brave.APIKeys,
+				),
+				BraveMaxResults: cfg.Tools.Web.Brave.MaxResults,
+				BraveEnabled:    cfg.Tools.Web.Brave.Enabled,
+				TavilyAPIKeys: config.MergeAPIKeys(
+					cfg.Tools.Web.Tavily.APIKey,
+					cfg.Tools.Web.Tavily.APIKeys,
+				),
 				TavilyBaseURL:        cfg.Tools.Web.Tavily.BaseURL,
 				TavilyMaxResults:     cfg.Tools.Web.Tavily.MaxResults,
 				TavilyEnabled:        cfg.Tools.Web.Tavily.Enabled,
@@ -104,15 +110,27 @@ func registerSharedTools(
 				Proxy:                cfg.Tools.Web.Proxy,
 			})
 			if err != nil {
-				logger.ErrorCF("agent", "Failed to create web search tool", map[string]any{"error": err.Error()})
+				logger.ErrorCF(
+					"agent",
+					"Failed to create web search tool",
+					map[string]any{"error": err.Error()},
+				)
 			} else if searchTool != nil {
 				agent.Tools.Register(searchTool)
 			}
 		}
 		if cfg.Tools.IsToolEnabled("web_fetch") {
-			fetchTool, err := web.NewWebFetchToolWithProxy(50000, cfg.Tools.Web.Proxy, cfg.Tools.Web.FetchLimitBytes)
+			fetchTool, err := web.NewWebFetchToolWithProxy(
+				50000,
+				cfg.Tools.Web.Proxy,
+				cfg.Tools.Web.FetchLimitBytes,
+			)
 			if err != nil {
-				logger.ErrorCF("agent", "Failed to create web fetch tool", map[string]any{"error": err.Error()})
+				logger.ErrorCF(
+					"agent",
+					"Failed to create web fetch tool",
+					map[string]any{"error": err.Error()},
+				)
 			} else {
 				agent.Tools.Register(fetchTool)
 			}
@@ -156,7 +174,9 @@ func registerSharedTools(
 		if cfg.Tools.IsToolEnabled("mcp2cli") {
 			// We can initialize an empty MCP manager for mcp2cli if it's the only one,
 			// or share the existing MCP manager if one exists
-			mcp2CliTool := tools.NewMCP2CliTool(nil) // It will init its own manager or use a global one later if needed
+			mcp2CliTool := tools.NewMCP2CliTool(
+				nil,
+			) // It will init its own manager or use a global one later if needed
 			agent.Tools.Register(mcp2CliTool)
 		}
 
