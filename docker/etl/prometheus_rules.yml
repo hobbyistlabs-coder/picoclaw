@@ -1,0 +1,11 @@
+groups:
+  - name: resource_utilization
+    rules:
+      - alert: HighGoroutineGrowth
+        expr: deriv(jane_etl_goroutines[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Goroutine count is consistently growing"
+          description: "The number of goroutines has been growing over the last 5 minutes. This may indicate a goroutine leak or excessive resource utilization."

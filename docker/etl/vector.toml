@@ -1,0 +1,58 @@
+[sources.system_metrics_file]
+type = "file"
+include = ["/workspace/logs/etl/system_metrics.jsonl"]
+read_from = "beginning"
+
+[transforms.parse_json]
+type = "remap"
+inputs = ["system_metrics_file"]
+source = '''
+  . = parse_json!(.message)
+  .timestamp = to_timestamp!(.timestamp)
+'''
+
+[transforms.metrics_gen]
+type = "log_to_metric"
+inputs = ["parse_json"]
+
+  [[transforms.metrics_gen.metrics]]
+  type = "gauge"
+  field = "goroutines"
+  name = "etl_goroutines"
+  namespace = "jane"
+
+  [[transforms.metrics_gen.metrics]]
+  type = "gauge"
+  field = "memory_alloc_mb"
+  name = "etl_memory_alloc_mb"
+  namespace = "jane"
+
+  [[transforms.metrics_gen.metrics]]
+  type = "gauge"
+  field = "memory_total_mb"
+  name = "etl_memory_total_mb"
+  namespace = "jane"
+
+  [[transforms.metrics_gen.metrics]]
+  type = "gauge"
+  field = "memory_sys_mb"
+  name = "etl_memory_sys_mb"
+  namespace = "jane"
+
+  [[transforms.metrics_gen.metrics]]
+  type = "counter"
+  field = "num_gc"
+  name = "etl_num_gc"
+  namespace = "jane"
+
+[sinks.prometheus_exporter]
+type = "prometheus_exporter"
+inputs = ["metrics_gen"]
+address = "0.0.0.0:9090"
+
+[sinks.loki]
+type = "loki"
+inputs = ["parse_json"]
+endpoint = "http://loki:3100"
+encoding.codec = "json"
+labels = { source = "system_metrics" }

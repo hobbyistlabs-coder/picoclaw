@@ -1,0 +1,60 @@
+services:
+  vector:
+    image: timberio/vector:0.34.0-alpine
+    container_name: vector
+    volumes:
+      - ./etl/vector.toml:/etc/vector/vector.toml:ro
+      - ../workspace/logs/etl:/workspace/logs/etl:ro
+    ports:
+      - "9090:9090" # Prometheus metrics exporter
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    container_name: prometheus
+    volumes:
+      - ./etl/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./etl/prometheus_rules.yml:/etc/prometheus/prometheus_rules.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9091:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    depends_on:
+      - vector
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki_data:/loki
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: grafana
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    volumes:
+      - ./etl/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - loki
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  loki_data:
+  grafana_data:
