@@ -26,7 +26,8 @@ func IsAudioFile(filename, contentType string) bool {
 	}
 
 	for _, audioType := range audioTypes {
-		if len(contentType) >= len(audioType) && strings.EqualFold(contentType[:len(audioType)], audioType) {
+		if len(contentType) >= len(audioType) &&
+			strings.EqualFold(contentType[:len(audioType)], audioType) {
 			return true
 		}
 	}
