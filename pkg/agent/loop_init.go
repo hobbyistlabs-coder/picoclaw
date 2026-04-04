@@ -9,6 +9,8 @@ package agent
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"reflect"
 	"sync"
 	"time"
 
@@ -74,6 +76,18 @@ func registerSharedTools(
 			continue
 		}
 
+		sendCallback := func(channel, chatID, content string) error {
+			pubCtx, pubCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer pubCancel()
+			return msgBus.PublishOutbound(pubCtx, bus.OutboundMessage{
+				Channel: channel,
+				ChatID:  chatID,
+				Content: content,
+			})
+		}
+
+		var browserActionTool *tools.BrowserActionTool
+
 		if cfg.Tools.IsToolEnabled("web") {
 			searchTool, err := web.NewWebSearchTool(web.WebSearchToolOptions{
 				BraveAPIKeys:         config.MergeAPIKeys(cfg.Tools.Web.Brave.APIKey, cfg.Tools.Web.Brave.APIKeys),
@@ -117,12 +131,23 @@ func registerSharedTools(
 		}
 
 		if cfg.Tools.IsToolEnabled("browser_action") {
-			browserActionTool := tools.NewBrowserActionTool()
+			browserActionTool = tools.NewBrowserActionTool()
 			agent.Tools.Register(browserActionTool)
 		}
 
 		if cfg.Tools.IsToolEnabled("go_eval") {
 			goEvalTool := tools.NewGoEvalTool(agent.Workspace)
+
+			bindings := make(map[string]reflect.Value)
+			bindings["Workspace"] = reflect.ValueOf(&agent.Workspace).Elem()
+			bindings["Send"] = reflect.ValueOf(sendCallback)
+			bindings["HTTPClient"] = reflect.ValueOf(http.DefaultClient)
+
+			if browserActionTool != nil {
+				bindings["BrowserActionTool"] = reflect.ValueOf(browserActionTool)
+			}
+
+			goEvalTool.SetBindings(bindings)
 			agent.Tools.Register(goEvalTool)
 		}
 
@@ -144,15 +169,7 @@ func registerSharedTools(
 		// Message tool
 		if cfg.Tools.IsToolEnabled("message") {
 			messageTool := tools.NewMessageTool()
-			messageTool.SetSendCallback(func(channel, chatID, content string) error {
-				pubCtx, pubCancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer pubCancel()
-				return msgBus.PublishOutbound(pubCtx, bus.OutboundMessage{
-					Channel: channel,
-					ChatID:  chatID,
-					Content: content,
-				})
-			})
+			messageTool.SetSendCallback(sendCallback)
 			agent.Tools.Register(messageTool)
 		}
 
