@@ -89,7 +89,11 @@ func (cb *ContextBuilder) BuildMessages(
 	stringParts := []string{staticPrompt, dynamicCtx}
 
 	contentBlocks := []providers.ContentBlock{
-		{Type: "text", Text: staticPrompt, CacheControl: &providers.CacheControl{Type: "ephemeral"}},
+		{
+			Type:         "text",
+			Text:         staticPrompt,
+			CacheControl: &providers.CacheControl{Type: "ephemeral"},
+		},
 		{Type: "text", Text: dynamicCtx},
 	}
 
@@ -99,7 +103,10 @@ func (cb *ContextBuilder) BuildMessages(
 				"for reference only. It may be incomplete or outdated — always defer to explicit instructions.\n\n%s",
 			summary)
 		stringParts = append(stringParts, summaryText)
-		contentBlocks = append(contentBlocks, providers.ContentBlock{Type: "text", Text: summaryText})
+		contentBlocks = append(
+			contentBlocks,
+			providers.ContentBlock{Type: "text", Text: summaryText},
+		)
 	}
 
 	fullSystemPrompt := strings.Join(stringParts, "\n\n---\n\n")
@@ -198,7 +205,11 @@ func sanitizeHistoryForProvider(history []providers.Message) []providers.Message
 		case "assistant":
 			if len(msg.ToolCalls) > 0 {
 				if len(sanitized) == 0 {
-					logger.DebugCF("agent", "Dropping assistant tool-call turn at history start", map[string]any{})
+					logger.DebugCF(
+						"agent",
+						"Dropping assistant tool-call turn at history start",
+						map[string]any{},
+					)
 					continue
 				}
 				prev := sanitized[len(sanitized)-1]

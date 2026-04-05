@@ -17,7 +17,11 @@ func TestNewPicoclawCommand(t *testing.T) {
 
 	require.NotNil(t, cmd)
 
-	short := fmt.Sprintf("%s jane-ai - Personal AI Assistant v%s\n\n", internal.Logo, config.GetVersion())
+	short := fmt.Sprintf(
+		"%s jane-ai - Personal AI Assistant v%s\n\n",
+		internal.Logo,
+		config.GetVersion(),
+	)
 
 	assert.Equal(t, "jane-ai", cmd.Use)
 	assert.Equal(t, short, cmd.Short)
