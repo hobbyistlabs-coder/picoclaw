@@ -94,11 +94,49 @@ func TestGoEvalToolWithBindings(t *testing.T) {
 		}
 
 		if !strings.Contains(result.ForLLM, "workspace: mock_workspace") {
-			t.Errorf("Expected output to contain 'workspace: mock_workspace', got %q", result.ForLLM)
+			t.Errorf(
+				"Expected output to contain 'workspace: mock_workspace', got %q",
+				result.ForLLM,
+			)
 		}
 
 		if !strings.Contains(result.ForLLM, "task: mock task completed") {
-			t.Errorf("Expected output to contain 'task: mock task completed', got %q", result.ForLLM)
+			t.Errorf(
+				"Expected output to contain 'task: mock task completed', got %q",
+				result.ForLLM,
+			)
+		}
+	})
+
+	t.Run("execute with browser binding", func(t *testing.T) {
+		browserActionTool := NewBrowserActionTool()
+		tool.SetBindings(map[string]reflect.Value{
+			"Browser": reflect.ValueOf(browserActionTool),
+		})
+
+		args := map[string]any{
+			"code": `
+				import "jane/env"
+				import "fmt"
+
+				func init() {
+					fmt.Println("browser tool name:", env.Browser.Name())
+				}
+
+				func Run() {}
+			`,
+		}
+
+		result := tool.Execute(ctx, args)
+		if result.IsError {
+			t.Fatalf("Expected no error, got: %s", result.ForLLM)
+		}
+
+		if !strings.Contains(result.ForLLM, "browser tool name: browser_action") {
+			t.Errorf(
+				"Expected output to contain 'browser tool name: browser_action', got %q",
+				result.ForLLM,
+			)
 		}
 	})
 }
