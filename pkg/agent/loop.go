@@ -82,7 +82,10 @@ const (
 )
 
 // DispatchSubagent implements tools.AgentDispatcher.
-func (al *AgentLoop) DispatchSubagent(ctx context.Context, agentID, task, originChannel, originChatID, sessionKey string) (*tools.ToolResult, error) {
+func (al *AgentLoop) DispatchSubagent(
+	ctx context.Context,
+	agentID, task, originChannel, originChatID, sessionKey string,
+) (*tools.ToolResult, error) {
 	agent, ok := al.registry.GetAgent(agentID)
 	if !ok {
 		return nil, fmt.Errorf("agent '%s' not found", agentID)
