@@ -532,23 +532,19 @@ func (s *Store) nextColumnPosition(ctx context.Context, boardID string) (int, er
 	return pos, nil
 }
 
+// reindexColumn recalculates the position of all cards in a column using a single update.
+// ⚡ Bolt: Optimized N+1 query loops into a single batch CTE UPDATE.
 func (s *Store) reindexColumn(ctx context.Context, columnID string) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT id FROM board_cards WHERE column_id = ?
-		ORDER BY position ASC, created_at ASC
+	_, _ = s.db.ExecContext(ctx, `
+		UPDATE board_cards
+		SET position = indexed.new_position
+		FROM (
+			SELECT id, ROW_NUMBER() OVER (ORDER BY position ASC, created_at ASC) - 1 as new_position
+			FROM board_cards
+			WHERE column_id = ?
+		) as indexed
+		WHERE board_cards.id = indexed.id
 	`, columnID)
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-	i := 0
-	for rows.Next() {
-		var cardID string
-		if rows.Scan(&cardID) == nil {
-			s.db.ExecContext(ctx, `UPDATE board_cards SET position = ? WHERE id = ?`, i, cardID)
-			i++
-		}
-	}
 }
 
 func (s *Store) touchBoard(ctx context.Context, boardID string) error {
