@@ -7,6 +7,8 @@
 package agent
 
 import (
+	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -17,6 +19,7 @@ import (
 	"jane/pkg/media"
 	"jane/pkg/providers"
 	"jane/pkg/state"
+	"jane/pkg/tools"
 	"jane/pkg/voice"
 )
 
@@ -77,3 +80,35 @@ const (
 	metadataKeyParentPeerKind = "parent_peer_kind"
 	metadataKeyParentPeerID   = "parent_peer_id"
 )
+
+// DispatchSubagent implements tools.AgentDispatcher.
+func (al *AgentLoop) DispatchSubagent(ctx context.Context, agentID, task, originChannel, originChatID, sessionKey string) (*tools.ToolResult, error) {
+	agent, ok := al.registry.GetAgent(agentID)
+	if !ok {
+		return nil, fmt.Errorf("agent '%s' not found", agentID)
+	}
+
+	opts := processOptions{
+		SessionKey:      sessionKey,
+		Channel:         originChannel,
+		ChatID:          originChatID,
+		UserMessage:     task,
+		DefaultResponse: "Subagent task completed.",
+		EnableSummary:   false, // Keep subagent session isolated from auto-summary for now
+		SendResponse:    false, // Do not send intermediate bus messages to user for delegated tasks
+		Stream:          false,
+	}
+
+	content, err := al.runAgentLoop(ctx, agent, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tools.ToolResult{
+		ForLLM:  content,
+		ForUser: content,
+		Silent:  true,
+		IsError: false,
+		Async:   false,
+	}, nil
+}

@@ -33,9 +33,6 @@ func NewAgentLoop(
 ) *AgentLoop {
 	registry := NewAgentRegistry(cfg, provider)
 
-	// Register shared tools to all agents
-	registerSharedTools(cfg, msgBus, registry, provider)
-
 	// Set up shared fallback chain
 	cooldown := providers.NewCooldownTracker()
 	fallbackChain := providers.NewFallbackChain(cooldown)
@@ -58,6 +55,9 @@ func NewAgentLoop(
 		cmdRegistry: commands.NewRegistry(commands.BuiltinDefinitions()),
 	}
 
+	// Register shared tools to all agents
+	registerSharedTools(cfg, msgBus, registry, provider, al)
+
 	return al
 }
 
@@ -67,6 +67,7 @@ func registerSharedTools(
 	msgBus *bus.MessageBus,
 	registry *AgentRegistry,
 	provider providers.LLMProvider,
+	al *AgentLoop,
 ) {
 	for _, agentID := range registry.ListAgentIDs() {
 		agent, ok := registry.GetAgent(agentID)
@@ -195,6 +196,7 @@ func registerSharedTools(
 			if cfg.Tools.IsToolEnabled("subagent") {
 				subagentManager := tools.NewSubagentManager(provider, agent.Model, agent.Workspace)
 				subagentManager.SetLLMOptions(agent.MaxTokens, agent.Temperature)
+				subagentManager.SetDispatcher(al)
 				spawnTool := tools.NewSpawnTool(subagentManager)
 				currentAgentID := agentID
 				spawnTool.SetAllowlistChecker(func(targetAgentID string) bool {
