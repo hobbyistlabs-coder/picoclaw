@@ -337,7 +337,11 @@ func (s *Store) AddCard(
 	return card, nil
 }
 
-func (s *Store) UpdateCard(ctx context.Context, cardID string, input UpdateCardInput) (*BoardCard, error) {
+func (s *Store) UpdateCard(
+	ctx context.Context,
+	cardID string,
+	input UpdateCardInput,
+) (*BoardCard, error) {
 	card, err := s.getCard(ctx, cardID)
 	if err != nil {
 		return nil, err
