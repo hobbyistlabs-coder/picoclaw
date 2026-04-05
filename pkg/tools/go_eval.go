@@ -57,7 +57,7 @@ func (t *GoEvalTool) Name() string {
 }
 
 func (t *GoEvalTool) Description() string {
-	return "Executes Go code dynamically using Yaegi interpreter. Provide valid Go source code. The code will be interpreted and executed safely without requiring the Go toolchain. Useful for complex logic or tasks that require writing a Go script. The 'jane/env' package is available and contains a 'Browser' binding for scriptable web automation."
+	return "Executes Go code dynamically using Yaegi interpreter. Provide valid Go source code. The code will be interpreted and executed safely without requiring the Go toolchain. Useful for complex logic or tasks that require writing a Go script."
 }
 
 func (t *GoEvalTool) Parameters() map[string]any {

@@ -9,7 +9,6 @@ package agent
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"sync"
 	"time"
 
@@ -117,19 +116,13 @@ func registerSharedTools(
 			}
 		}
 
-		var browserActionTool *tools.BrowserActionTool
 		if cfg.Tools.IsToolEnabled("browser_action") {
-			browserActionTool = tools.NewBrowserActionTool()
+			browserActionTool := tools.NewBrowserActionTool()
 			agent.Tools.Register(browserActionTool)
 		}
 
 		if cfg.Tools.IsToolEnabled("go_eval") {
 			goEvalTool := tools.NewGoEvalTool(agent.Workspace)
-			bindings := make(map[string]reflect.Value)
-			if browserActionTool != nil {
-				bindings["Browser"] = reflect.ValueOf(browserActionTool)
-			}
-			goEvalTool.SetBindings(bindings)
 			agent.Tools.Register(goEvalTool)
 		}
 
