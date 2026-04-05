@@ -188,7 +188,6 @@ After completing the task, provide a clear summary of what was done.`
 	sm.mu.RUnlock()
 
 	if dispatcher != nil && task.AgentID != "" {
-		// Use AgentDispatcher to run task on specific agent instance
 		var err error
 		result, err = dispatcher.DispatchSubagent(
 			ctx,
@@ -213,12 +212,10 @@ After completing the task, provide a clear summary of what was done.`
 					"result":           utils.Truncate(result.ForLLM, 240),
 					"progress_percent": 100,
 				})
-			// wrap in subagent format
 			result.ForLLM = fmt.Sprintf("Subagent '%s' (Agent %s) completed:\n%s",
 				task.Codename, task.AgentID, result.ForLLM)
 		}
 	} else {
-		// Fallback to internal RunToolLoop (original behavior)
 		sm.mu.RLock()
 		tools := sm.tools
 		maxIter := sm.maxIterations
