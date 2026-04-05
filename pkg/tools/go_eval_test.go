@@ -114,6 +114,8 @@ func TestGoEvalToolWithBindings(t *testing.T) {
 					func init() {
 						fmt.Println("browser tool name:", env.Browser.Name())
 					}
+
+					func Run() {}
 				`,
 			}
 
