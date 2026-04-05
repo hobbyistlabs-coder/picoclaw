@@ -518,7 +518,9 @@ func (t *SubagentTool) Name() string {
 }
 
 func (t *SubagentTool) Description() string {
-	return "Execute a subagent task synchronously and return the result. Use this for delegating specific tasks to an independent agent instance. Returns execution summary to user and full details to LLM."
+	return "Execute a subagent task synchronously and return the result. " +
+		"Use this for delegating specific tasks to an independent agent instance. " +
+		"Returns execution summary to user and full details to LLM."
 }
 
 func (t *SubagentTool) Parameters() map[string]any {
@@ -551,8 +553,9 @@ func (t *SubagentTool) Execute(ctx context.Context, args map[string]any) *ToolRe
 	}
 	messages := []providers.Message{
 		{
-			Role:    "system",
-			Content: "You are a subagent. Complete the given task independently and provide a clear, concise result.",
+			Role: "system",
+			Content: "You are a subagent. Complete the given task independently " +
+				"and provide a clear, concise result.",
 		},
 		{Role: "user", Content: task},
 	}
