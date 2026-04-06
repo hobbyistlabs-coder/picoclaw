@@ -1,0 +1,42 @@
+services:
+  vector:
+    image: timberio/vector:0.34.0-alpine
+    container_name: etl-vector
+    volumes:
+      - ./vector.yaml:/etc/vector/vector.yaml:ro
+      - ../workspace:/workspace:ro
+    ports:
+      - "9090:9090"
+    command: -c /etc/vector/vector.yaml
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: etl-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts.yml:/etc/prometheus/alerts.yml:ro
+    ports:
+      - "9091:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:latest
+    container_name: etl-loki
+    ports:
+      - "3100:3100"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: etl-grafana
+    volumes:
+      - ./grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    restart: unless-stopped
