@@ -232,3 +232,22 @@ func (m *failFirstMockProvider) GetDefaultModel() string {
 }
 
 func (t *mockCustomTool) RequiresApproval() bool { return false }
+
+type mockProvider struct{}
+
+func (m *mockProvider) Chat(
+	ctx context.Context,
+	messages []providers.Message,
+	tools []providers.ToolDefinition,
+	model string,
+	opts map[string]any,
+) (*providers.LLMResponse, error) {
+	return &providers.LLMResponse{
+		Content:   "Mock response",
+		ToolCalls: []providers.ToolCall{},
+	}, nil
+}
+
+func (m *mockProvider) GetDefaultModel() string {
+	return "mock-model"
+}
