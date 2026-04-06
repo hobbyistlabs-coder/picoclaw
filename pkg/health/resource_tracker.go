@@ -8,6 +8,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
+
 	"jane/pkg/logger"
 )
 
@@ -45,7 +46,11 @@ func NewResourceTracker(interval time.Duration) *ResourceTracker {
 		metric.WithDescription("Number of active goroutines"),
 	)
 	if err != nil {
-		logger.ErrorCF("SystemHealth", "Failed to create goroutines gauge", map[string]any{"error": err.Error()})
+		logger.ErrorCF(
+			"SystemHealth",
+			"Failed to create goroutines gauge",
+			map[string]any{"error": err.Error()},
+		)
 	}
 
 	rt.allocMBGauge, err = meter.Float64ObservableGauge(
@@ -53,7 +58,11 @@ func NewResourceTracker(interval time.Duration) *ResourceTracker {
 		metric.WithDescription("Memory allocated and still in use, in MB"),
 	)
 	if err != nil {
-		logger.ErrorCF("SystemHealth", "Failed to create memory alloc gauge", map[string]any{"error": err.Error()})
+		logger.ErrorCF(
+			"SystemHealth",
+			"Failed to create memory alloc gauge",
+			map[string]any{"error": err.Error()},
+		)
 	}
 
 	rt.totalMBGauge, err = meter.Float64ObservableGauge(
@@ -61,7 +70,11 @@ func NewResourceTracker(interval time.Duration) *ResourceTracker {
 		metric.WithDescription("Total memory allocated (even if freed), in MB"),
 	)
 	if err != nil {
-		logger.ErrorCF("SystemHealth", "Failed to create total memory alloc gauge", map[string]any{"error": err.Error()})
+		logger.ErrorCF(
+			"SystemHealth",
+			"Failed to create total memory alloc gauge",
+			map[string]any{"error": err.Error()},
+		)
 	}
 
 	rt.sysMBGauge, err = meter.Float64ObservableGauge(
@@ -69,11 +82,19 @@ func NewResourceTracker(interval time.Duration) *ResourceTracker {
 		metric.WithDescription("Total memory obtained from the OS, in MB"),
 	)
 	if err != nil {
-		logger.ErrorCF("SystemHealth", "Failed to create memory sys gauge", map[string]any{"error": err.Error()})
+		logger.ErrorCF(
+			"SystemHealth",
+			"Failed to create memory sys gauge",
+			map[string]any{"error": err.Error()},
+		)
 	}
 
 	if _, err := meter.RegisterCallback(rt.observeMetrics, rt.goroutinesGauge, rt.allocMBGauge, rt.totalMBGauge, rt.sysMBGauge); err != nil {
-		logger.ErrorCF("SystemHealth", "Failed to register metrics callback", map[string]any{"error": err.Error()})
+		logger.ErrorCF(
+			"SystemHealth",
+			"Failed to register metrics callback",
+			map[string]any{"error": err.Error()},
+		)
 	}
 
 	return rt
