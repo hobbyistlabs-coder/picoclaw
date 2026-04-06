@@ -34,6 +34,8 @@ func (al *AgentLoop) runAgentLoop(
 	agent *AgentInstance,
 	opts processOptions,
 ) (string, error) {
+	defer logger.CleanupSessionLocks(opts.SessionKey)
+
 	// 0. Record last channel for heartbeat notifications (skip internal channels and cli)
 	if opts.Channel != "" && opts.ChatID != "" {
 		if !constants.IsInternalChannel(opts.Channel) {
@@ -258,6 +260,14 @@ func (al *AgentLoop) runLLMIteration(
 				"tools_json":    formatToolsForLog(providerToolDefs),
 			})
 
+		logger.LogSessionEvent(ctx, opts.SessionKey, logger.SessionEvent{
+			EventType: "state_transition",
+			Details: logger.SessionEventDetails{
+				FromState: "waiting",
+				ToState:   "generating",
+			},
+		})
+
 		// Call LLM with fallback chain and retry logic
 		response, err := al.executeLLMWithRetry(
 			ctx, agent, opts, &messages,
@@ -265,6 +275,11 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			logger.LogSessionEvent(ctx, opts.SessionKey, logger.SessionEvent{
+				EventType:     "error",
+				ErrorCategory: logger.ReplayErrorCategoryInfrastructureFailure, // Assuming LLM API issues initially
+				ErrorMessage:  err.Error(),
+			})
 			return "", iteration, metrics, err
 		}
 		metrics.addUsage(enrichUsageWithCost(agent.Config, activeModel, response.Usage))
@@ -283,6 +298,19 @@ func (al *AgentLoop) runLLMIteration(
 					ReasoningContent: response.ReasoningContent,
 				})
 			}
+		}
+
+		if response.ReasoningContent != "" || response.Reasoning != "" {
+			cotText := response.ReasoningContent
+			if cotText == "" {
+				cotText = response.Reasoning
+			}
+			logger.LogSessionEvent(ctx, opts.SessionKey, logger.SessionEvent{
+				EventType: "cot",
+				Details: logger.SessionEventDetails{
+					CoTText: cotText,
+				},
+			})
 		}
 
 		logger.DebugCF("agent", "LLM response",
@@ -320,6 +348,14 @@ func (al *AgentLoop) runLLMIteration(
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
+
+			logger.LogSessionEvent(ctx, opts.SessionKey, logger.SessionEvent{
+				EventType: "tool_call",
+				Details: logger.SessionEventDetails{
+					ToolName: tc.Name,
+					Inputs:   tc.Arguments,
+				},
+			})
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
@@ -461,7 +497,25 @@ func (al *AgentLoop) runLLMIteration(
 						"error":          contentForLLM,
 						"error_category": "logic_failure",
 					})
+				logger.LogSessionEvent(ctx, opts.SessionKey, logger.SessionEvent{
+					EventType:     "error",
+					ErrorCategory: logger.ReplayErrorCategoryLogicFailure,
+					ErrorMessage:  contentForLLM,
+					Details: logger.SessionEventDetails{
+						ToolName: r.tc.Name,
+					},
+				})
 			}
+
+			logger.LogSessionEvent(ctx, opts.SessionKey, logger.SessionEvent{
+				EventType: "tool_result",
+				Details: logger.SessionEventDetails{
+					ToolName: r.tc.Name,
+					Outputs: map[string]any{
+						"result": contentForLLM,
+					},
+				},
+			})
 
 			toolResultMsg := providers.Message{
 				Role:       "tool",

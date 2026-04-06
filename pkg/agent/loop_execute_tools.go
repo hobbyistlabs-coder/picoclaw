@@ -67,6 +67,14 @@ func (al *AgentLoop) executeToolBatch(
 						"tool":     tc.Name,
 						"panic":    r,
 					})
+					logger.LogSessionEvent(ctx, opts.SessionKey, logger.SessionEvent{
+						EventType:     "error",
+						ErrorCategory: logger.ReplayErrorCategoryLogicFailure,
+						ErrorMessage:  errStr,
+						Details: logger.SessionEventDetails{
+							ToolName: tc.Name,
+						},
+					})
 					agentResults[idx].result = &tools.ToolResult{
 						ForLLM: errStr,
 						Err:    fmt.Errorf("%s", errStr),
