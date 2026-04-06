@@ -4,7 +4,7 @@ services:
     container_name: etl-vector
     volumes:
       - ./vector.yaml:/etc/vector/vector.yaml:ro
-      - ../workspace:/workspace:ro
+      - ..:/workspace:ro
     ports:
       - "9090:9090"
     command: -c /etc/vector/vector.yaml

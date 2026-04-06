@@ -27,7 +27,7 @@ transforms:
       - type: "gauge"
         field: "memory_sys_mb"
         name: "etl_memory_sys_mb"
-      - type: "counter"
+      - type: "gauge"
         field: "num_gc"
         name: "etl_num_gc"
       - type: "histogram"
