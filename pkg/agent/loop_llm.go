@@ -34,8 +34,6 @@ func (al *AgentLoop) runAgentLoop(
 	agent *AgentInstance,
 	opts processOptions,
 ) (string, error) {
-	defer logger.CleanupSessionLocks(opts.SessionKey)
-
 	// 0. Record last channel for heartbeat notifications (skip internal channels and cli)
 	if opts.Channel != "" && opts.ChatID != "" {
 		if !constants.IsInternalChannel(opts.Channel) {
@@ -278,14 +276,6 @@ func (al *AgentLoop) runLLMIteration(
 		)
 		if response.ReasoningContent != "" {
 			metrics.reasoningContent = response.ReasoningContent
-
-			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
-				EventType: "cot",
-				Details: logger.SessionEventDetails{
-					CoTText: response.ReasoningContent,
-				},
-			})
-
 			if opts.Channel == "pico" {
 				al.bus.PublishOutbound(ctx, bus.OutboundMessage{
 					Channel:          opts.Channel,
@@ -330,19 +320,6 @@ func (al *AgentLoop) runLLMIteration(
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
-
-			var inputs map[string]any
-			if tc.Arguments != nil {
-				inputs = tc.Arguments
-			}
-
-			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
-				EventType: "tool_call",
-				Details: logger.SessionEventDetails{
-					ToolName: tc.Name,
-					Inputs:   inputs,
-				},
-			})
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
@@ -484,27 +461,6 @@ func (al *AgentLoop) runLLMIteration(
 						"error":          contentForLLM,
 						"error_category": "logic_failure",
 					})
-				logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
-					EventType:     "error",
-					ErrorCategory: logger.ReplayErrorCategoryLogicFailure,
-					ErrorMessage:  contentForLLM,
-					Details: logger.SessionEventDetails{
-						ToolName: r.tc.Name,
-					},
-				})
-			} else {
-				var outputs map[string]any
-				_ = json.Unmarshal([]byte(contentForLLM), &outputs)
-				if outputs == nil {
-					outputs = map[string]any{"result": contentForLLM}
-				}
-				logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.SessionEvent{
-					EventType: "tool_result",
-					Details: logger.SessionEventDetails{
-						ToolName: r.tc.Name,
-						Outputs:  outputs,
-					},
-				})
 			}
 
 			toolResultMsg := providers.Message{
