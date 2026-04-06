@@ -1,9 +1,6 @@
 package agent
 
-import (
-	"strings"
-	"sync"
-)
+import "sync"
 
 type asyncBatchState struct {
 	mu       sync.Mutex
@@ -36,9 +33,12 @@ func (al *AgentLoop) addAsyncBatchResult(
 		return "", false
 	}
 	al.asyncBatches.Delete(batchID)
-
-	// Bolt: using strings.Join instead of O(N^2) loop string concatenation for performance
-	combined := strings.Join(state.results, "\n\n")
-
+	combined := ""
+	for i, item := range state.results {
+		if i > 0 {
+			combined += "\n\n"
+		}
+		combined += item
+	}
 	return combined, true
 }

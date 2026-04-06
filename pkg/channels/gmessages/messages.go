@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"go.mau.fi/mautrix-gmessages/pkg/libgm/gmproto"
-
 	"jane/pkg/bus"
 	"jane/pkg/logger"
+
+	"go.mau.fi/mautrix-gmessages/pkg/libgm/gmproto"
 )
 
 // ContactNumberMysteriousInt is the default value for the MysteriousInt field
