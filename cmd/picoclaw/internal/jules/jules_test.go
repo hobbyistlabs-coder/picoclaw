@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -52,7 +53,7 @@ func TestJulesCommands(t *testing.T) {
 
 		assert.Equal(t, "POST", lastReq.Method)
 		assert.Equal(t, "/sessions", lastReq.URL.Path)
-		assert.Equal(t, "test-api-key", lastReq.Header.Get("X-Goog-Api-Key"))
+		assert.Equal(t, "test-api-key", lastReq.Header.Get("x-goog-api-key"))
 
 		expectedBody := `{"prompt":"test prompt","sourceContext":{"githubRepoContext":{"startingBranch":"main"},"source":"sources/test"},"title":"test title"}`
 		// unmarshal and marshal again to compare json ignoring key order
@@ -76,7 +77,7 @@ func TestJulesCommands(t *testing.T) {
 
 		assert.Equal(t, "GET", lastReq.Method)
 		assert.Equal(t, "/sessions", lastReq.URL.Path)
-		assert.Equal(t, "test-api-key", lastReq.Header.Get("X-Goog-Api-Key"))
+		assert.Equal(t, "test-api-key", lastReq.Header.Get("x-goog-api-key"))
 	})
 
 	t.Run("session get", func(t *testing.T) {
