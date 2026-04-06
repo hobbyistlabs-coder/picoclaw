@@ -214,7 +214,9 @@ func TestAgentLoop_ContextExhaustionRetry(t *testing.T) {
 	msgBus := bus.NewMessageBus()
 
 	// Create a provider that fails once with a context error
-	contextErr := fmt.Errorf("InvalidParameter: Total tokens of image and text exceed max message tokens")
+	contextErr := fmt.Errorf(
+		"InvalidParameter: Total tokens of image and text exceed max message tokens",
+	)
 	provider := &failFirstMockProvider{
 		failures:    1,
 		failError:   contextErr,
@@ -335,7 +337,10 @@ func TestRunAgentLoop_PausesWithoutFallbackOnApproval(t *testing.T) {
 	if history[1].Role != "assistant" {
 		t.Fatalf("history[1].Role = %q, want assistant tool-call message", history[1].Role)
 	}
-	if strings.Contains(history[1].Content, "I've completed processing but have no response to give") {
+	if strings.Contains(
+		history[1].Content,
+		"I've completed processing but have no response to give",
+	) {
 		t.Fatalf("unexpected fallback assistant content persisted: %q", history[1].Content)
 	}
 	if len(history[1].ToolCalls) != 1 {

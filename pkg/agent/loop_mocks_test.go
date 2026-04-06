@@ -189,7 +189,11 @@ type testHelper struct {
 	al *AgentLoop
 }
 
-func (h testHelper) executeAndGetResponse(tb testing.TB, ctx context.Context, msg bus.InboundMessage) string {
+func (h testHelper) executeAndGetResponse(
+	tb testing.TB,
+	ctx context.Context,
+	msg bus.InboundMessage,
+) string {
 	// Use a short timeout to avoid hanging
 	timeoutCtx, cancel := context.WithTimeout(ctx, responseTimeout)
 	defer cancel()

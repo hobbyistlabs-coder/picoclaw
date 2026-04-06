@@ -209,7 +209,9 @@ func TestHandleReasoning(t *testing.T) {
 			}
 		}
 		if foundReasoning {
-			t.Fatal("expected reasoning message to be dropped when bus is full, but it was published")
+			t.Fatal(
+				"expected reasoning message to be dropped when bus is full, but it was published",
+			)
 		}
 	})
 }

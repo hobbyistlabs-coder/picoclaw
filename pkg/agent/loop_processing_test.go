@@ -128,7 +128,10 @@ func TestProcessMessage_CommandOutcomes(t *testing.T) {
 		t.Fatalf("unexpected /foo reply: %q", fooResp)
 	}
 	if provider.calls != 1 {
-		t.Fatalf("LLM should be called exactly once after /foo passthrough, calls=%d", provider.calls)
+		t.Fatalf(
+			"LLM should be called exactly once after /foo passthrough, calls=%d",
+			provider.calls,
+		)
 	}
 
 	newResp := helper.executeAndGetResponse(t, context.Background(), bus.InboundMessage{
