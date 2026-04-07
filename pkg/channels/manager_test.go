@@ -235,7 +235,7 @@ func TestSendWithRetry_UnknownError(t *testing.T) {
 	}
 }
 
-func TestSendWithRetry_ContextCancelled(t *testing.T) {
+func TestSendWithRetry_ContextCanceled(t *testing.T) {
 	m := newTestManager()
 	var callCount int
 	ch := &mockChannel{
