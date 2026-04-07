@@ -9,6 +9,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -74,8 +75,10 @@ func registerSharedTools(
 			continue
 		}
 
+		var searchTool tools.Tool
 		if cfg.Tools.IsToolEnabled("web") {
-			searchTool, err := web.NewWebSearchTool(web.WebSearchToolOptions{
+			var err error
+			searchTool, err = web.NewWebSearchTool(web.WebSearchToolOptions{
 				BraveAPIKeys:         config.MergeAPIKeys(cfg.Tools.Web.Brave.APIKey, cfg.Tools.Web.Brave.APIKeys),
 				BraveMaxResults:      cfg.Tools.Web.Brave.MaxResults,
 				BraveEnabled:         cfg.Tools.Web.Brave.Enabled,
@@ -107,8 +110,11 @@ func registerSharedTools(
 				agent.Tools.Register(searchTool)
 			}
 		}
+
+		var fetchTool *web.WebFetchTool
 		if cfg.Tools.IsToolEnabled("web_fetch") {
-			fetchTool, err := web.NewWebFetchToolWithProxy(50000, cfg.Tools.Web.Proxy, cfg.Tools.Web.FetchLimitBytes)
+			var err error
+			fetchTool, err = web.NewWebFetchToolWithProxy(50000, cfg.Tools.Web.Proxy, cfg.Tools.Web.FetchLimitBytes)
 			if err != nil {
 				logger.ErrorCF("agent", "Failed to create web fetch tool", map[string]any{"error": err.Error()})
 			} else {
@@ -116,13 +122,30 @@ func registerSharedTools(
 			}
 		}
 
+		var browserActionTool *tools.BrowserActionTool
 		if cfg.Tools.IsToolEnabled("browser_action") {
-			browserActionTool := tools.NewBrowserActionTool()
+			browserActionTool = tools.NewBrowserActionTool()
 			agent.Tools.Register(browserActionTool)
 		}
 
 		if cfg.Tools.IsToolEnabled("go_eval") {
 			goEvalTool := tools.NewGoEvalTool(agent.Workspace)
+
+			bindings := make(map[string]reflect.Value)
+			if searchTool != nil {
+				bindings["WebSearch"] = reflect.ValueOf(searchTool)
+			}
+			if fetchTool != nil {
+				bindings["WebFetch"] = reflect.ValueOf(fetchTool)
+			}
+			if browserActionTool != nil {
+				bindings["Browser"] = reflect.ValueOf(browserActionTool)
+			}
+
+			if len(bindings) > 0 {
+				goEvalTool.SetBindings(bindings)
+			}
+
 			agent.Tools.Register(goEvalTool)
 		}
 
