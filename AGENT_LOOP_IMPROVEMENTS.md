@@ -28,7 +28,7 @@ This document outlines a series of tasks to improve the main loop of the agentic
 
 * [ ] **Human-in-the-Loop:** Introduce an approval prompt state for high-risk tools (e.g., SQL execution) that pauses the loop until a user explicitly replies "Yes/No".
 * [ ] **Background / Long-Running Tasks:** Implement tools that allow the LLM to run slow operations in the background, releasing the main loop and notifying the user asynchronously upon completion.
-* [x] **Multi-Agent Orchestration:** Create a Supervisor Loop where an agent can delegate tasks to other `AgentInstance`s and synthesize their results.
+* [ ] **Multi-Agent Orchestration:** Create a Supervisor Loop where an agent can delegate tasks to other `AgentInstance`s and synthesize their results.
 
 ## Phase 5: Observability & Logging Dashboard
 

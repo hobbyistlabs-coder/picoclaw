@@ -3,8 +3,10 @@ package api
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,8 +33,8 @@ func (h *Handler) handleRunCardAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer cleanup()
-	if err := validateBoardCard(r.Context(), store, r.PathValue("id"), r.PathValue("cardID")); err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+	if validateErr := validateBoardCard(r.Context(), store, r.PathValue("id"), r.PathValue("cardID")); validateErr != nil {
+		http.Error(w, validateErr.Error(), http.StatusNotFound)
 		return
 	}
 	if !cfg.Channels.Pico.Enabled || strings.TrimSpace(cfg.Channels.Pico.Token) == "" {
@@ -65,7 +67,10 @@ func (h *Handler) dispatchBoardPrompt(
 	sessionID := generateSecureToken()
 	dialURL := wsURL + "?session_id=" + url.QueryEscape(sessionID)
 	header := http.Header{"Authorization": []string{"Bearer " + cfg.Channels.Pico.Token}}
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, dialURL, header)
+	conn, resp, err := websocket.DefaultDialer.DialContext(ctx, dialURL, header)
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 	if err != nil {
 		return "", fmt.Errorf("connect to gateway pico websocket: %w", err)
 	}
@@ -102,7 +107,8 @@ func (h *Handler) gatewayPicoWSURL(cfg *config.Config) (string, error) {
 	}
 
 	host := gatewayProbeHost(h.effectiveGatewayBindHost(cfg))
-	return fmt.Sprintf("ws://%s:%d/pico/ws", host, cfg.Gateway.Port), nil
+	hostPort := net.JoinHostPort(host, strconv.Itoa(cfg.Gateway.Port))
+	return fmt.Sprintf("ws://%s/pico/ws", hostPort), nil
 }
 
 func drainPicoConn(conn *websocket.Conn, maxDuration time.Duration) {

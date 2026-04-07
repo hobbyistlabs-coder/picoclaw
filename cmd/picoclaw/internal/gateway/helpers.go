@@ -97,8 +97,8 @@ func gatewayCmd(debug bool) error {
 		execTimeout,
 		cfg,
 	)
-	if err := setupBoardsTool(agentLoop, cronService, cfg); err != nil {
-		return err
+	if setupErr := setupBoardsTool(agentLoop, cronService, cfg); setupErr != nil {
+		return setupErr
 	}
 
 	heartbeatService := heartbeat.NewHeartbeatService(

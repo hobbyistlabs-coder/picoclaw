@@ -549,6 +549,7 @@ func (s *Store) reindexColumn(ctx context.Context, columnID string) {
 			i++
 		}
 	}
+	_ = rows.Err()
 }
 
 func (s *Store) touchBoard(ctx context.Context, boardID string) error {
