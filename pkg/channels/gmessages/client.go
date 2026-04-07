@@ -14,7 +14,6 @@ import (
 	"go.mau.fi/mautrix-gmessages/pkg/libgm/events"
 	"go.mau.fi/mautrix-gmessages/pkg/libgm/gmproto"
 
-	"jane/pkg/fileutil"
 	"jane/pkg/logger"
 	"jane/pkg/runtimepaths"
 )
@@ -156,7 +155,7 @@ func saveSession(path string, data *SessionData) error {
 	if err != nil {
 		return err
 	}
-	return fileutil.WriteFileAtomic(path, b, 0o600)
+	return os.WriteFile(path, b, 0o600)
 }
 
 func (c *GMessagesChannel) handlePairing(ctx context.Context, client *GMClient) error {
@@ -193,11 +192,19 @@ func (c *GMessagesChannel) handlePairing(ctx context.Context, client *GMClient) 
 
 	var pairErr2 error
 	pairCB := func(data *gmproto.PairedData) {
-		logger.InfoCF("channels.gmessages", "Pairing successful", map[string]any{"phone_id": data.GetMobile().GetSourceID()})
+		logger.InfoCF(
+			"channels.gmessages",
+			"Pairing successful",
+			map[string]any{"phone_id": data.GetMobile().GetSourceID()},
+		)
 
 		sessionData, err := client.SessionData()
 		if err != nil {
-			logger.ErrorCF("channels.gmessages", "Failed to get session data", map[string]any{"error": err.Error()})
+			logger.ErrorCF(
+				"channels.gmessages",
+				"Failed to get session data",
+				map[string]any{"error": err.Error()},
+			)
 		} else {
 			if err := saveSession(client.SessionPath, sessionData); err != nil {
 				logger.ErrorCF("channels.gmessages", "Failed to save session", map[string]any{"error": err.Error()})
