@@ -69,6 +69,14 @@ func (al *AgentLoop) ProcessHeartbeat(
 }
 
 func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage) (string, error) {
+	sessionKey := msg.SessionKey
+	if sessionKey == "" {
+		sessionKey = fmt.Sprintf("session:%s:%s", msg.Channel, msg.ChatID)
+	}
+
+	// Always ensure cleanup of session files when finished
+	defer func() { logger.CleanupSessionLocks(sessionKey) }()
+
 	// Add message preview to log (show full content for error messages)
 	var logContent string
 	if strings.Contains(msg.Content, "Error:") || strings.Contains(msg.Content, "error") {
@@ -115,7 +123,7 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 
 	// Resolve session key from route, while preserving explicit agent-scoped keys.
 	scopeKey := resolveScopeKey(route, msg.SessionKey)
-	sessionKey := scopeKey
+	sessionKey = scopeKey
 
 	logger.InfoCF("agent", "Routed message",
 		map[string]any{

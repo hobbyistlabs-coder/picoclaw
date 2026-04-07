@@ -320,6 +320,16 @@ func (al *AgentLoop) runLLMIteration(
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
+
+			// Session Replay: Capture Tool Call
+			_ = logger.LogSessionEvent(agent.Workspace, logger.ReplayEvent{
+				SessionID: opts.SessionKey,
+				EventType: "tool_call",
+				Details: logger.ReplayEventDetails{
+					ToolName: tc.Name,
+					Inputs:   tc.Arguments,
+				},
+			})
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
@@ -328,6 +338,21 @@ func (al *AgentLoop) runLLMIteration(
 				"count":     len(normalizedToolCalls),
 				"iteration": iteration,
 			})
+
+		// Session Replay: Capture CoT text if present
+		if response.ReasoningContent != "" || response.Content != "" {
+			cotText := response.ReasoningContent
+			if cotText == "" {
+				cotText = response.Content
+			}
+			_ = logger.LogSessionEvent(agent.Workspace, logger.ReplayEvent{
+				SessionID: opts.SessionKey,
+				EventType: "cot",
+				Details: logger.ReplayEventDetails{
+					CoTText: cotText,
+				},
+			})
+		}
 
 		// Build assistant message with tool calls
 		assistantMsg := providers.Message{
@@ -413,6 +438,29 @@ func (al *AgentLoop) runLLMIteration(
 
 		// Process results in original order (send to user, save to session)
 		for _, r := range agentResults {
+			// Session Replay: Capture Tool Result
+			_ = logger.LogSessionEvent(agent.Workspace, logger.ReplayEvent{
+				SessionID: opts.SessionKey,
+				EventType: "tool_result",
+				Details: logger.ReplayEventDetails{
+					ToolName: r.tc.Name,
+					Outputs: map[string]any{
+						"for_llm": r.result.ForLLM,
+					},
+				},
+				ErrorCategory: logger.None,
+			})
+
+			// Session Replay: Capture State Transition
+			_ = logger.LogSessionEvent(agent.Workspace, logger.ReplayEvent{
+				SessionID: opts.SessionKey,
+				EventType: "state_transition",
+				Details: logger.ReplayEventDetails{
+					FromState: "executing_tool",
+					ToState:   "tool_completed",
+				},
+			})
+
 			// Send ForUser content to user immediately if not Silent
 			if !r.result.Silent && r.result.ForUser != "" && opts.SendResponse {
 				al.bus.PublishOutbound(ctx, bus.OutboundMessage{
