@@ -22,12 +22,12 @@ type Pipeline struct {
 
 // SystemMetrics represents the extracted system KPIs
 type SystemMetrics struct {
-	Timestamp     time.Time `json:"timestamp"`
-	Goroutines    int       `json:"goroutines"`
-	MemoryAllocMB float64   `json:"memory_alloc_mb"`
-	MemoryTotalMB float64   `json:"memory_total_mb"`
-	MemorySysMB   float64   `json:"memory_sys_mb"`
-	NumGC         uint32    `json:"num_gc"`
+	Timestamp       time.Time `json:"timestamp"`
+	Goroutines      int       `json:"goroutines"`
+	MemoryAllocMB   float64   `json:"memory_alloc_mb"`
+	MemoryTotalMB   float64   `json:"memory_total_mb"`
+	MemorySysMB     float64   `json:"memory_sys_mb"`
+	NumGC           uint32    `json:"num_gc"`
 }
 
 // NewPipeline creates a new ETL pipeline
@@ -48,7 +48,7 @@ func (p *Pipeline) Start(ctx context.Context) {
 
 	// Ensure log directory exists
 	logDir := filepath.Join(p.workspacePath, "logs", "etl")
-	if err := os.MkdirAll(logDir, 0o755); err != nil {
+	if err := os.MkdirAll(logDir, 0755); err != nil {
 		logger.ErrorCF("ETL", "Failed to create ETL log directory", map[string]any{"error": err.Error()})
 		return
 	}
@@ -98,7 +98,7 @@ func (p *Pipeline) extractAndLoad() {
 
 	// Load (Write to JSONL file)
 	logFile := filepath.Join(p.workspacePath, "logs", "etl", "system_metrics.jsonl")
-	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		logger.ErrorCF("ETL", "Failed to open metrics file", map[string]any{"error": err.Error()})
 		return
