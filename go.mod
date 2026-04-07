@@ -29,7 +29,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/tencent-connect/botgo v0.2.1
 	github.com/traefik/yaegi v0.16.1
-	go.mau.fi/mautrix-gmessages v0.0.0-00010101000000-000000000000
+	go.mau.fi/mautrix-gmessages v0.2602.1-0.20260302032635-a6d7f9898a99
 	go.mau.fi/whatsmeow v0.0.0-20260219150138-7ae702b1eed4
 	go.opentelemetry.io/otel v1.29.0
 	go.opentelemetry.io/otel/metric v1.29.0
