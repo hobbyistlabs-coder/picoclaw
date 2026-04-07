@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -259,7 +260,7 @@ func skillFilesChangedSince(skillRoots []string, filesAtCache map[string]time.Ti
 		if changed {
 			return true
 		}
-		if err != nil && !os.IsNotExist(err) && (err.Error() != "walk stop" && err != errWalkStop) {
+		if err != nil && !errors.Is(err, errWalkStop) && !os.IsNotExist(err) {
 			logger.DebugCF("agent", "skills walk error", map[string]any{"error": err.Error()})
 			return true
 		}
