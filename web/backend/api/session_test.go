@@ -387,14 +387,14 @@ func TestHandleDeleteSession_JSONLStorage(t *testing.T) {
 	}
 
 	sessionKey := picoSessionPrefix + "delete-jsonl"
-	if err := store.AddFullMessage(nil, sessionKey, providers.Message{
+	if addErr := store.AddFullMessage(nil, sessionKey, providers.Message{
 		Role:    "user",
 		Content: "delete me",
-	}); err != nil {
-		t.Fatalf("AddFullMessage() error = %v", err)
+	}); addErr != nil {
+		t.Fatalf("AddFullMessage() error = %v", addErr)
 	}
-	if err := store.SetSummary(nil, sessionKey, "delete summary"); err != nil {
-		t.Fatalf("SetSummary() error = %v", err)
+	if setErr := store.SetSummary(nil, sessionKey, "delete summary"); setErr != nil {
+		t.Fatalf("SetSummary() error = %v", setErr)
 	}
 
 	h := NewHandler(configPath)
