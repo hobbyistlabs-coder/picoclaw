@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -105,7 +106,10 @@ func (h *Handler) gatewayPicoWSURL(cfg *config.Config) (string, error) {
 	}
 
 	host := gatewayProbeHost(h.effectiveGatewayBindHost(cfg))
-	return fmt.Sprintf("ws://%s:%d/pico/ws", host, cfg.Gateway.Port), nil
+	return fmt.Sprintf(
+		"ws://%s/pico/ws",
+		net.JoinHostPort(host, fmt.Sprintf("%d", cfg.Gateway.Port)),
+	), nil
 }
 
 func drainPicoConn(conn *websocket.Conn, maxDuration time.Duration) {
