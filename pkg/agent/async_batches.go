@@ -36,6 +36,9 @@ func (al *AgentLoop) addAsyncBatchResult(
 		return "", false
 	}
 	al.asyncBatches.Delete(batchID)
+	// ⚡ Bolt: Replaced O(N^2) string concatenation loop with strings.Join.
+	// strings.Join calculates the exact buffer size needed and performs a single allocation,
+	// dropping the complexity to O(N) and significantly reducing GC pressure.
 	combined := strings.Join(state.results, "\n\n")
 	return combined, true
 }
