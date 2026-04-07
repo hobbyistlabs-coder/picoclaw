@@ -146,7 +146,7 @@ func (rt *ResourceTracker) logResources() {
 		"memory_total_mb":   totalAllocMB,
 		"memory_sys_mb":     sysMB,
 		"num_gc":            m.NumGC,
-		"gc_pause_ns":       m.PauseNs[(m.NumGC+255)%256], // Latest GC pause time
+		"gc_pause_ms":       float64(m.PauseNs[(m.NumGC+255)%256]) / 1e6, // Latest GC pause time in ms
 		"gc_pause_total_ns": m.PauseTotalNs,
 	})
 }
