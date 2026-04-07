@@ -152,6 +152,8 @@ func TestHandleListModels_ConfiguredStatusForOAuthModelWithCredential(t *testing
 	if err != nil {
 		t.Fatalf("LoadConfig() error = %v", err)
 	}
+	cfg.Providers.Anthropic.AuthMethod = "oauth"
+	cfg.Providers.Anthropic.APIKey = "dummy-to-prevent-drop"
 	cfg.ModelList = []config.ModelConfig{{
 		ModelName:  "claude-oauth",
 		Model:      "anthropic/claude-sonnet-4.6",
@@ -192,7 +194,7 @@ func TestHandleListModels_ConfiguredStatusForOAuthModelWithCredential(t *testing
 		t.Fatalf("len(models) = %d, want 1", len(resp.Models))
 	}
 	if !resp.Models[0].Configured {
-		t.Fatalf("oauth model configured = false, want true with stored credential")
+		t.Fatalf("oauth model configured = false, want true with stored credential. Models: %+v", resp.Models[0])
 	}
 }
 

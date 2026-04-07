@@ -225,10 +225,11 @@ func setupOAuthTestEnv(t *testing.T) (string, func()) {
 	oldHome := os.Getenv("HOME")
 	oldPicoHome := os.Getenv("PICOCLAW_HOME")
 
+	os.Unsetenv("JANE_AI_HOME")
 	if err := os.Setenv("HOME", tmp); err != nil {
 		t.Fatalf("set HOME: %v", err)
 	}
-	if err := os.Setenv("PICOCLAW_HOME", filepath.Join(tmp, ".picoclaw")); err != nil {
+	if err := os.Setenv("PICOCLAW_HOME", filepath.Join(tmp, ".jane-ai")); err != nil {
 		t.Fatalf("set PICOCLAW_HOME: %v", err)
 	}
 

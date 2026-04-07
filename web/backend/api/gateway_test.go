@@ -429,12 +429,12 @@ func TestFindPicoclawBinary_EnvOverride(t *testing.T) {
 }
 
 func TestFindPicoclawBinary_EnvOverride_InvalidPath(t *testing.T) {
-	// When PICOCLAW_BINARY points to a non-existent path, fall through to next strategy
+	// JANE_AI_BINARY/PICOCLAW_BINARY explicitly overrides the path and skips stat checks.
+	// We no longer fall back; we trust the environment variable.
 	t.Setenv("PICOCLAW_BINARY", "/nonexistent/picoclaw-binary")
 
 	got := utils.FindPicoclawBinary()
-	// Should not return the invalid path; falls back to "picoclaw" or another found path
-	if got == "/nonexistent/picoclaw-binary" {
-		t.Errorf("FindPicoclawBinary() returned invalid env path %q, expected fallback", got)
+	if got != "/nonexistent/picoclaw-binary" {
+		t.Errorf("FindPicoclawBinary() returned %q, expected exact env override", got)
 	}
 }

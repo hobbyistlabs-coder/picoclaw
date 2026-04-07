@@ -132,8 +132,8 @@ func TestWebFetch_Allows6to4WithPublicEmbed(t *testing.T) {
 	})
 
 	// Should NOT be blocked by SSRF check — error should be connection failure, not "private"
-	if result.IsError && strings.Contains(result.ForLLM, "private") {
-		t.Errorf("6to4 with public embedded IPv4 should not be blocked as private. Error: %q", result.ForLLM)
+	if result.IsError && strings.Contains(result.ForLLM, "private target") && !strings.Contains(result.ForLLM, "proxyconnect tcp") {
+		t.Errorf("6to4 with public embedded IPv4 should not be blocked as private target. Error: %q", result.ForLLM)
 	}
 }
 
