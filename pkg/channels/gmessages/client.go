@@ -10,6 +10,7 @@ import (
 
 	"github.com/mdp/qrterminal/v3"
 	"github.com/rs/zerolog"
+	"jane/pkg/fileutil"
 	"jane/pkg/logger"
 	"jane/pkg/runtimepaths"
 
@@ -155,7 +156,7 @@ func saveSession(path string, data *SessionData) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0600)
+	return fileutil.WriteFileAtomic(path, b, 0600)
 }
 
 func (c *GMessagesChannel) handlePairing(ctx context.Context, client *GMClient) error {
