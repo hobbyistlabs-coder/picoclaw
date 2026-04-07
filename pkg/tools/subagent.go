@@ -10,6 +10,13 @@ import (
 	"jane/pkg/utils"
 )
 
+type AgentDispatcher interface {
+	DispatchSubagent(
+		ctx context.Context,
+		agentID, task, originChannel, originChatID, sessionKey string,
+	) (string, error)
+}
+
 type SubagentTask struct {
 	ID                string
 	Task              string
@@ -42,6 +49,7 @@ type SubagentManager struct {
 	progressCallbacks map[string]SubagentProgressCallback
 	mu                sync.RWMutex
 	provider          providers.LLMProvider
+	dispatcher        AgentDispatcher
 	defaultModel      string
 	workspace         string
 	tools             *ToolRegistry
@@ -85,6 +93,12 @@ func (sm *SubagentManager) SetTools(tools *ToolRegistry) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	sm.tools = tools
+}
+
+func (sm *SubagentManager) SetDispatcher(dispatcher AgentDispatcher) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.dispatcher = dispatcher
 }
 
 // RegisterTool registers a tool for subagent execution.
@@ -166,6 +180,7 @@ After completing the task, provide a clear summary of what was done.`
 	}
 
 	sm.mu.RLock()
+	dispatcher := sm.dispatcher
 	tools := sm.tools
 	maxIter := sm.maxIterations
 	maxTokens := sm.maxTokens
@@ -174,27 +189,48 @@ After completing the task, provide a clear summary of what was done.`
 	hasTemperature := sm.hasTemperature
 	sm.mu.RUnlock()
 
-	var llmOptions map[string]any
-	if hasMaxTokens || hasTemperature {
-		llmOptions = map[string]any{}
-		if hasMaxTokens {
-			llmOptions["max_tokens"] = maxTokens
+	var finalContent string
+	var loopIterations int
+	var err error
+
+	if task.AgentID != "" && dispatcher != nil {
+		finalContent, err = dispatcher.DispatchSubagent(
+			ctx,
+			task.AgentID,
+			task.Task,
+			task.OriginChannel,
+			task.OriginChatID,
+			task.OriginSession,
+		)
+		loopIterations = 1
+	} else {
+		var llmOptions map[string]any
+		if hasMaxTokens || hasTemperature {
+			llmOptions = map[string]any{}
+			if hasMaxTokens {
+				llmOptions["max_tokens"] = maxTokens
+			}
+			if hasTemperature {
+				llmOptions["temperature"] = temperature
+			}
 		}
-		if hasTemperature {
-			llmOptions["temperature"] = temperature
+
+		var loopResult *ToolLoopResult
+		loopResult, err = RunToolLoop(ctx, ToolLoopConfig{
+			Provider:      sm.provider,
+			Model:         sm.defaultModel,
+			Tools:         tools,
+			MaxIterations: maxIter,
+			LLMOptions:    llmOptions,
+			OnToolCall: func(tc providers.ToolCall, status string, result *ToolResult) {
+				sm.recordToolEvent(taskID, tc, status, result)
+			},
+		}, messages, task.OriginChannel, task.OriginChatID)
+		if err == nil {
+			finalContent = loopResult.Content
+			loopIterations = loopResult.Iterations
 		}
 	}
-
-	loopResult, err := RunToolLoop(ctx, ToolLoopConfig{
-		Provider:      sm.provider,
-		Model:         sm.defaultModel,
-		Tools:         tools,
-		MaxIterations: maxIter,
-		LLMOptions:    llmOptions,
-		OnToolCall: func(tc providers.ToolCall, status string, result *ToolResult) {
-			sm.recordToolEvent(taskID, tc, status, result)
-		},
-	}, messages, task.OriginChannel, task.OriginChatID)
 
 	var result *ToolResult
 	if err != nil {
@@ -209,13 +245,13 @@ After completing the task, provide a clear summary of what was done.`
 	} else {
 		sm.emit(taskID, "task.completed", SubagentCompleted, "Delegated task completed",
 			map[string]any{
-				"result":           utils.Truncate(loopResult.Content, 240),
+				"result":           utils.Truncate(finalContent, 240),
 				"progress_percent": 100,
 			})
 		result = &ToolResult{
 			ForLLM: fmt.Sprintf("Subagent '%s' completed (iterations: %d): %s",
-				task.Codename, loopResult.Iterations, loopResult.Content),
-			ForUser: loopResult.Content,
+				task.Codename, loopIterations, finalContent),
+			ForUser: finalContent,
 			Silent:  false,
 			IsError: false,
 			Async:   false,

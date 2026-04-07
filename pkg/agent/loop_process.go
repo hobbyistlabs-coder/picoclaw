@@ -48,6 +48,30 @@ func (al *AgentLoop) ProcessDirectWithChannel(
 
 // ProcessHeartbeat processes a heartbeat request without session history.
 // Each heartbeat is independent and doesn't accumulate context.
+func (al *AgentLoop) DispatchSubagent(
+	ctx context.Context,
+	agentID, task, channel, chatID, sessionKey string,
+) (string, error) {
+	agent, ok := al.registry.GetAgent(agentID)
+	if !ok {
+		return "", fmt.Errorf("agent %q not found", agentID)
+	}
+
+	opts := processOptions{
+		SessionKey:      sessionKey,
+		Channel:         channel,
+		ChatID:          chatID,
+		UserMessage:     task,
+		DefaultResponse: defaultResponse,
+		EnableSummary:   false,
+		SendResponse:    false,
+		NoHistory:       true,
+		Stream:          false,
+	}
+
+	return al.runAgentLoop(ctx, agent, opts)
+}
+
 func (al *AgentLoop) ProcessHeartbeat(
 	ctx context.Context,
 	content, channel, chatID string,
