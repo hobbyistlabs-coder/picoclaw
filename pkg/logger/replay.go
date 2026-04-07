@@ -44,9 +44,7 @@ type sessionFileState struct {
 	file *os.File
 }
 
-var (
-	sessionFiles = sync.Map{} // map[string]*sessionFileState
-)
+var sessionFiles = sync.Map{} // map[string]*sessionFileState
 
 // LogSessionEvent safely appends a JSONL ReplayEvent to {workspacePath}/logs/{session_id}/events/events.jsonl
 func LogSessionEvent(workspacePath string, event ReplayEvent) error {
@@ -84,13 +82,13 @@ func LogSessionEvent(workspacePath string, event ReplayEvent) error {
 					return fmt.Errorf("invalid session ID")
 				}
 				logDir := filepath.Join(workspacePath, "logs", safeSessionID, "events")
-				if err := os.MkdirAll(logDir, 0755); err != nil {
+				if err := os.MkdirAll(logDir, 0o755); err != nil {
 					state.mu.Unlock()
 					sessionFiles.Delete(sessionID)
 					return fmt.Errorf("failed to create log dir %s: %w", logDir, err)
 				}
 				filePath := filepath.Join(logDir, "events.jsonl")
-				f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+				f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 				if err != nil {
 					state.mu.Unlock()
 					sessionFiles.Delete(sessionID)
@@ -119,9 +117,9 @@ func LogSessionEvent(workspacePath string, event ReplayEvent) error {
 
 		// Attempt to reopen the file if it was closed
 		logDir := filepath.Join(workspacePath, "logs", safeSessionID, "events")
-		if err := os.MkdirAll(logDir, 0755); err == nil {
+		if err := os.MkdirAll(logDir, 0o755); err == nil {
 			filePath := filepath.Join(logDir, "events.jsonl")
-			f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 			if err == nil {
 				state.file = f
 				// Re-store in the map if it was deleted
