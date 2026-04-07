@@ -41,7 +41,7 @@ func doRequest(method, url string, body []byte) error {
 		return fmt.Errorf("error creating request: %w", err)
 	}
 
-	req.Header.Set("X-Goog-Api-Key", apiKey)
+	req.Header.Set("x-goog-api-key", apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{
