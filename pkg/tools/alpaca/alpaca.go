@@ -6,6 +6,7 @@ import (
 
 	"github.com/alpacahq/alpaca-trade-api-go/v3/alpaca"
 	"github.com/alpacahq/alpaca-trade-api-go/v3/marketdata"
+
 	"jane/pkg/tools"
 )
 
@@ -124,6 +125,7 @@ func (t *AlpacaTool) getSMA(symbol string) *tools.ToolResult {
 	sma := sum / float64(len(bars))
 	return tools.UserResult(fmt.Sprintf("10-Day SMA for %s: $%.2f", symbol, sma))
 }
+
 func init() {
 	// tools.Register(&AlpacaTool{}) // We will register it manually where we have access to config.
 }
