@@ -97,7 +97,7 @@ func gatewayCmd(debug bool) error {
 		execTimeout,
 		cfg,
 	)
-	if err := setupBoardsTool(agentLoop, cronService, cfg); err != nil {
+	if err = setupBoardsTool(agentLoop, cronService, cfg); err != nil {
 		return err
 	}
 
@@ -147,7 +147,11 @@ func gatewayCmd(debug bool) error {
 	// Wire up voice transcription if a supported provider is configured.
 	if transcriber := voice.DetectTranscriber(cfg); transcriber != nil {
 		agentLoop.SetTranscriber(transcriber)
-		logger.InfoCF("voice", "Transcription enabled (agent-level)", map[string]any{"provider": transcriber.Name()})
+		logger.InfoCF(
+			"voice",
+			"Transcription enabled (agent-level)",
+			map[string]any{"provider": transcriber.Name()},
+		)
 	}
 
 	enabledChannels := channelManager.GetEnabledChannels()
@@ -205,7 +209,11 @@ func gatewayCmd(debug bool) error {
 		return err
 	}
 
-	fmt.Printf("✓ Health endpoints available at http://%s:%d/health and /ready\n", cfg.Gateway.Host, cfg.Gateway.Port)
+	fmt.Printf(
+		"✓ Health endpoints available at http://%s:%d/health and /ready\n",
+		cfg.Gateway.Host,
+		cfg.Gateway.Port,
+	)
 
 	go agentLoop.Run(ctx)
 
@@ -256,9 +264,21 @@ func setupCronTool(
 	var cronTool *tools.CronTool
 	if cfg.Tools.IsToolEnabled("cron") {
 		var err error
-		cronTool, err = tools.NewCronTool(cronService, agentLoop, msgBus, workspace, restrict, execTimeout, cfg)
+		cronTool, err = tools.NewCronTool(
+			cronService,
+			agentLoop,
+			msgBus,
+			workspace,
+			restrict,
+			execTimeout,
+			cfg,
+		)
 		if err != nil {
-			logger.FatalCF("gateway", "Critical error during CronTool initialization", map[string]any{"error": err.Error()})
+			logger.FatalCF(
+				"gateway",
+				"Critical error during CronTool initialization",
+				map[string]any{"error": err.Error()},
+			)
 		}
 
 		agentLoop.RegisterTool(cronTool)

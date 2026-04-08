@@ -13,7 +13,19 @@ func TestSplitQuoted(t *testing.T) {
 
 	cmdStr = `--mcp-stdio "npx alpaca-mcp-server" my-tool --param1 "value 1" --param2 value2`
 	parts = splitQuoted(cmdStr)
-	assert.Equal(t, []string{"--mcp-stdio", "npx alpaca-mcp-server", "my-tool", "--param1", "value 1", "--param2", "value2"}, parts)
+	assert.Equal(
+		t,
+		[]string{
+			"--mcp-stdio",
+			"npx alpaca-mcp-server",
+			"my-tool",
+			"--param1",
+			"value 1",
+			"--param2",
+			"value2",
+		},
+		parts,
+	)
 }
 
 func TestMCP2CliToolExecuteValidation(t *testing.T) {

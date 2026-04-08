@@ -311,14 +311,6 @@ func addIntField(form *tview.Form, label string, value int, onChange func(int)) 
 	})
 }
 
-func addInt64Field(form *tview.Form, label string, value int64, onChange func(int64)) {
-	form.AddInputField(label, fmt.Sprintf("%d", value), 16, nil, func(text string) {
-		var parsed int64
-		if _, err := fmt.Sscanf(strings.TrimSpace(text), "%d", &parsed); err == nil {
-			onChange(parsed)
-		}
-	})
-}
 
 func channelItem(label, description string, enabled bool, action MenuAction) MenuItem {
 	item := MenuItem{

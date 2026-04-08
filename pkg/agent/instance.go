@@ -76,7 +76,9 @@ func NewAgentInstance(
 
 	if cfg.Tools.IsToolEnabled("read_file") {
 		maxReadFileSize := cfg.Tools.ReadFile.MaxReadFileSize
-		toolsRegistry.Register(tools.NewReadFileTool(workspace, readRestrict, maxReadFileSize, allowReadPaths))
+		toolsRegistry.Register(
+			tools.NewReadFileTool(workspace, readRestrict, maxReadFileSize, allowReadPaths),
+		)
 	}
 	if cfg.Tools.IsToolEnabled("write_file") {
 		toolsRegistry.Register(tools.NewWriteFileTool(workspace, restrict, allowWritePaths))
@@ -87,7 +89,11 @@ func NewAgentInstance(
 	if cfg.Tools.IsToolEnabled("exec") {
 		execTool, err := tools.NewExecToolWithConfig(workspace, restrict, cfg)
 		if err != nil {
-			logger.FatalCF("agent", "Critical error: unable to initialize exec tool", map[string]any{"error": err.Error()})
+			logger.FatalCF(
+				"agent",
+				"Critical error: unable to initialize exec tool",
+				map[string]any{"error": err.Error()},
+			)
 		}
 		toolsRegistry.Register(execTool)
 	}
@@ -188,7 +194,8 @@ func NewAgentInstance(
 		}
 
 		if cfg != nil {
-			if mc, err := cfg.GetModelConfig(raw); err == nil && mc != nil && strings.TrimSpace(mc.Model) != "" {
+			if mc, err := cfg.GetModelConfig(raw); err == nil && mc != nil &&
+				strings.TrimSpace(mc.Model) != "" {
 				return ensureProtocol(mc.Model), true
 			}
 
@@ -210,7 +217,11 @@ func NewAgentInstance(
 		return "", false
 	}
 
-	candidates := providers.ResolveCandidatesWithLookup(modelCfg, defaults.Provider, resolveFromModelList)
+	candidates := providers.ResolveCandidatesWithLookup(
+		modelCfg,
+		defaults.Provider,
+		resolveFromModelList,
+	)
 
 	// Model routing setup: pre-resolve light model candidates at creation time
 	// to avoid repeated model_list lookups on every incoming message.
@@ -218,7 +229,11 @@ func NewAgentInstance(
 	var lightCandidates []providers.FallbackCandidate
 	if rc := defaults.Routing; rc != nil && rc.Enabled && rc.LightModel != "" {
 		lightModelCfg := providers.ModelConfig{Primary: rc.LightModel}
-		resolved := providers.ResolveCandidatesWithLookup(lightModelCfg, defaults.Provider, resolveFromModelList)
+		resolved := providers.ResolveCandidatesWithLookup(
+			lightModelCfg,
+			defaults.Provider,
+			resolveFromModelList,
+		)
 		if len(resolved) > 0 {
 			router = routing.New(routing.RouterConfig{
 				LightModel: rc.LightModel,
@@ -263,7 +278,8 @@ func resolveAgentWorkspace(agentCfg *config.AgentConfig, defaults *config.AgentD
 		return expandHome(strings.TrimSpace(agentCfg.Workspace))
 	}
 	// Use the configured default workspace (respects PICOCLAW_HOME)
-	if agentCfg == nil || agentCfg.Default || agentCfg.ID == "" || routing.NormalizeAgentID(agentCfg.ID) == "main" {
+	if agentCfg == nil || agentCfg.Default || agentCfg.ID == "" ||
+		routing.NormalizeAgentID(agentCfg.ID) == "main" {
 		return expandHome(defaults.Workspace)
 	}
 	// For named agents without explicit workspace, use default workspace with agent ID suffix
@@ -315,12 +331,20 @@ func (a *AgentInstance) Close() error {
 func initSessionStore(dir string) session.SessionStore {
 	store, err := memory.NewSQLiteStore(memory.SQLitePath(dir))
 	if err != nil {
-		logger.WarnCF("agent", "memory: init sqlite store failed; using json sessions", map[string]any{"error": err.Error()})
+		logger.WarnCF(
+			"agent",
+			"memory: init sqlite store failed; using json sessions",
+			map[string]any{"error": err.Error()},
+		)
 		return session.NewSessionManager(dir)
 	}
 
 	if n, merr := memory.MigrateFromJSON(context.Background(), dir, store); merr != nil {
-		logger.WarnCF("agent", "memory: json migration failed; falling back to json sessions", map[string]any{"error": merr.Error()})
+		logger.WarnCF(
+			"agent",
+			"memory: json migration failed; falling back to json sessions",
+			map[string]any{"error": merr.Error()},
+		)
 		store.Close()
 		return session.NewSessionManager(dir)
 	} else if n > 0 {
@@ -331,7 +355,11 @@ func initSessionStore(dir string) session.SessionStore {
 		// Migration failure means the store could not write data.
 		// Fall back to SessionManager to avoid a split state where
 		// some sessions are in SQLite and others remain in files.
-		logger.WarnCF("agent", "memory: jsonl migration failed; falling back to json sessions", map[string]any{"error": merr.Error()})
+		logger.WarnCF(
+			"agent",
+			"memory: jsonl migration failed; falling back to json sessions",
+			map[string]any{"error": merr.Error()},
+		)
 		store.Close()
 		return session.NewSessionManager(dir)
 	} else if n > 0 {

@@ -12,8 +12,3 @@
 **Vulnerability:** The Pico WebSocket authentication handler was using standard string equality (`==`) to compare the provided bearer token against the configured secret token.
 **Learning:** String equality operators in Go return early as soon as a character mismatch is found. This allows an attacker to measure the time it takes for the server to reject the connection and iteratively guess the token character by character (a timing attack).
 **Prevention:** Always use `subtle.ConstantTimeCompare` from the `crypto/subtle` package when comparing secrets, tokens, passwords, or cryptographic signatures to ensure the comparison time depends only on the length of the secret, not the contents.
-
-## 2025-04-08 - [Medium] Secure File Permissions and Avoid Partial Writes for Sensitive Session Data
-**Vulnerability:** Saving sensitive session data (`AuthDataJSON`, `PushKeysJSON`) using standard `os.WriteFile` with simple truncation can lead to race conditions, partial writes if the app crashes, and potential exposure if existing files have loose permissions.
-**Learning:** `os.WriteFile` truncates and writes to files in place without modifying existing file permissions. This leaves the file state vulnerable to disruption, and allows potential unauthorized access if an attacker pre-creates the file with permissive access.
-**Prevention:** Always use `fileutil.WriteFileAtomic` with secure permissions (e.g., `0o600`) when persisting sensitive authentication or session tokens. Atomic writes to a temporary file, followed by fsync and rename, ensure data integrity and enforce strict permissions.

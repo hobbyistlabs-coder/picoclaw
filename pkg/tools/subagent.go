@@ -159,8 +159,8 @@ After completing the task, provide a clear summary of what was done.`
 
 	select {
 	case <-ctx.Done():
-		sm.emit(taskID, "task.failed", SubagentCancelled, "Task cancelled before execution",
-			map[string]any{"error": "context cancelled"})
+		sm.emit(taskID, "task.failed", SubagentCanceled, "Task canceled before execution",
+			map[string]any{"error": "context canceled"})
 		return
 	default:
 	}
@@ -201,8 +201,8 @@ After completing the task, provide a clear summary of what was done.`
 		status := SubagentFailed
 		message := fmt.Sprintf("Delegated task failed: %v", err)
 		if ctx.Err() != nil {
-			status = SubagentCancelled
-			message = "Task cancelled during execution"
+			status = SubagentCanceled
+			message = "Task canceled during execution"
 		}
 		sm.emit(taskID, "task.failed", status, message, map[string]any{"error": err.Error()})
 		result = ErrorResult(message).WithError(err)
@@ -306,8 +306,8 @@ func (sm *SubagentManager) GetBatchStatus(batchID string) *SubagentBatchStatus {
 			status.Failed++
 		case SubagentCompleted:
 			status.Completed++
-		case SubagentCancelled:
-			status.Cancelled++
+		case SubagentCanceled:
+			status.Canceled++
 		}
 	}
 	if status.Total == 0 {
@@ -439,7 +439,7 @@ func toolResultSnippet(result *ToolResult) string {
 func isTerminalStatus(status string) bool {
 	return status == SubagentCompleted ||
 		status == SubagentFailed ||
-		status == SubagentCancelled
+		status == SubagentCanceled
 }
 
 func nextCodename(index int) string {
@@ -493,10 +493,15 @@ func (t *SubagentTool) Execute(ctx context.Context, args map[string]any) *ToolRe
 	}
 	label, _ := args["label"].(string)
 	if t.manager == nil {
-		return ErrorResult("Subagent manager not configured").WithError(fmt.Errorf("manager is nil"))
+		return ErrorResult(
+			"Subagent manager not configured",
+		).WithError(fmt.Errorf("manager is nil"))
 	}
 	messages := []providers.Message{
-		{Role: "system", Content: "You are a subagent. Complete the given task independently and provide a clear, concise result."},
+		{
+			Role:    "system",
+			Content: "You are a subagent. Complete the given task independently and provide a clear, concise result.",
+		},
 		{Role: "user", Content: task},
 	}
 

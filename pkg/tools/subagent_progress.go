@@ -9,7 +9,7 @@ const (
 	SubagentBlocked        = "blocked"
 	SubagentCompleted      = "completed"
 	SubagentFailed         = "failed"
-	SubagentCancelled      = "cancelled"
+	SubagentCanceled      = "canceled"
 )
 
 type SubagentProgressEvent struct {
@@ -32,7 +32,7 @@ type SubagentBatchStatus struct {
 	Blocked      int
 	Failed       int
 	Completed    int
-	Cancelled    int
+	Canceled    int
 	LatestUpdate int64
 	Summary      string
 }

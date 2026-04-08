@@ -161,7 +161,13 @@ func (h *Handler) handleCreateCard(w http.ResponseWriter, r *http.Request) {
 	}
 	defer cleanup()
 
-	card, err := store.AddCard(r.Context(), r.PathValue("id"), req.Title, req.Description, req.ColumnID)
+	card, err := store.AddCard(
+		r.Context(),
+		r.PathValue("id"),
+		req.Title,
+		req.Description,
+		req.ColumnID,
+	)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -227,9 +233,15 @@ func (h *Handler) handleSetBoardReview(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	review, err := boards.SyncReviewSchedule(context.Background(), store, cronService, r.PathValue("id"), boards.ReviewScheduleInput{
-		Enabled: req.Enabled, EveryMinutes: req.EveryMinutes, Channel: req.Channel, ChatID: req.ChatID,
-	})
+	review, err := boards.SyncReviewSchedule(
+		context.Background(),
+		store,
+		cronService,
+		r.PathValue("id"),
+		boards.ReviewScheduleInput{
+			Enabled: req.Enabled, EveryMinutes: req.EveryMinutes, Channel: req.Channel, ChatID: req.ChatID,
+		},
+	)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

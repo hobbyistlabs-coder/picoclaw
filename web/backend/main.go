@@ -30,18 +30,29 @@ import (
 
 func main() {
 	port := flag.String("port", "18800", "Port to listen on")
-	public := flag.Bool("public", false, "Listen on all interfaces (0.0.0.0) instead of localhost only")
+	public := flag.Bool(
+		"public",
+		false,
+		"Listen on all interfaces (0.0.0.0) instead of localhost only",
+	)
 	noBrowser := flag.Bool("no-browser", false, "Do not auto-open browser on startup")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Jane AI Launcher - A web-based configuration editor\n\n")
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] [config.json]\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Arguments:\n")
-		fmt.Fprintf(os.Stderr, "  config.json    Path to the configuration file (default: ~/.jane-ai/config.json)\n\n")
+		fmt.Fprintf(
+			os.Stderr,
+			"  config.json    Path to the configuration file (default: ~/.jane-ai/config.json)\n\n",
+		)
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  %s                          Use default config path\n", os.Args[0])
+		fmt.Fprintf(
+			os.Stderr,
+			"  %s                          Use default config path\n",
+			os.Args[0],
+		)
 		fmt.Fprintf(os.Stderr, "  %s ./config.json             Specify a config file\n", os.Args[0])
 		fmt.Fprintf(
 			os.Stderr,
@@ -59,11 +70,19 @@ func main() {
 
 	absPath, err := filepath.Abs(configPath)
 	if err != nil {
-		logger.FatalCF("main", "Failed to resolve config path", map[string]any{"error": err.Error()})
+		logger.FatalCF(
+			"main",
+			"Failed to resolve config path",
+			map[string]any{"error": err.Error()},
+		)
 	}
 	err = utils.EnsureOnboarded(absPath)
 	if err != nil {
-		logger.WarnCF("main", "Failed to initialize Jane AI config automatically", map[string]any{"error": err.Error()})
+		logger.WarnCF(
+			"main",
+			"Failed to initialize Jane AI config automatically",
+			map[string]any{"error": err.Error()},
+		)
 	}
 
 	var explicitPort bool
@@ -80,7 +99,11 @@ func main() {
 	launcherPath := launcherconfig.PathForAppConfig(absPath)
 	launcherCfg, err := launcherconfig.Load(launcherPath, launcherconfig.Default())
 	if err != nil {
-		logger.WarnCF("main", "Failed to load launcher config", map[string]any{"path": launcherPath, "error": err.Error()})
+		logger.WarnCF(
+			"main",
+			"Failed to load launcher config",
+			map[string]any{"path": launcherPath, "error": err.Error()},
+		)
 		launcherCfg = launcherconfig.Default()
 	}
 
@@ -98,7 +121,11 @@ func main() {
 		if err == nil {
 			err = errors.New("must be in range 1-65535")
 		}
-		logger.FatalCF("main", "Invalid port", map[string]any{"port": effectivePort, "error": err.Error()})
+		logger.FatalCF(
+			"main",
+			"Invalid port",
+			map[string]any{"port": effectivePort, "error": err.Error()},
+		)
 	}
 
 	// Determine listen address
@@ -124,7 +151,11 @@ func main() {
 
 	accessControlledMux, err := middleware.IPAllowlist(launcherCfg.AllowedCIDRs, mux)
 	if err != nil {
-		logger.FatalCF("main", "Invalid allowed CIDR configuration", map[string]any{"error": err.Error()})
+		logger.FatalCF(
+			"main",
+			"Invalid allowed CIDR configuration",
+			map[string]any{"error": err.Error()},
+		)
 	}
 
 	// Apply middleware stack
@@ -153,7 +184,11 @@ func main() {
 			time.Sleep(500 * time.Millisecond)
 			url := "http://localhost:" + effectivePort
 			if err := utils.OpenBrowser(url); err != nil {
-				logger.WarnCF("main", "Failed to auto-open browser", map[string]any{"error": err.Error()})
+				logger.WarnCF(
+					"main",
+					"Failed to auto-open browser",
+					map[string]any{"error": err.Error()},
+				)
 			}
 		}()
 	}

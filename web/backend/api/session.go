@@ -75,12 +75,6 @@ func extractPicoSessionID(key string) (string, bool) {
 	return "", false
 }
 
-func extractPicoSessionIDFromSanitizedKey(key string) (string, bool) {
-	if strings.HasPrefix(key, sanitizedPicoSessionPrefix) {
-		return strings.TrimPrefix(key, sanitizedPicoSessionPrefix), true
-	}
-	return "", false
-}
 
 func sanitizeSessionKey(key string) string {
 	return strings.ReplaceAll(key, ":", "_")
@@ -295,7 +289,9 @@ func (h *Handler) handleListSessions(w http.ResponseWriter, r *http.Request) {
 	items := []sessionListItem{}
 	seen := make(map[string]struct{})
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") || strings.HasSuffix(entry.Name(), ".meta.json") || strings.HasSuffix(entry.Name(), ".migrated") {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") ||
+			strings.HasSuffix(entry.Name(), ".meta.json") ||
+			strings.HasSuffix(entry.Name(), ".migrated") {
 			continue
 		}
 		data, readErr := os.ReadFile(filepath.Join(dir, entry.Name()))
@@ -303,7 +299,8 @@ func (h *Handler) handleListSessions(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		var sess sessionFile
-		if unmarshalErr := json.Unmarshal(data, &sess); unmarshalErr != nil || isEmptySession(sess) {
+		if unmarshalErr := json.Unmarshal(data, &sess); unmarshalErr != nil ||
+			isEmptySession(sess) {
 			continue
 		}
 		sessionID, ok := extractPicoSessionID(sess.Key)
