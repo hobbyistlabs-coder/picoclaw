@@ -195,6 +195,7 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 					Usage:   metrics.usage(),
 				})
 				agent.Sessions.Save(sessionKey)
+				logger.CleanupSessionLocks(sessionKey)
 				return finalContent, nil
 			}
 
@@ -275,6 +276,7 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 					Usage:   metrics.usage(),
 				})
 				agent.Sessions.Save(sessionKey)
+				logger.CleanupSessionLocks(sessionKey)
 				return finalContent, nil
 			}
 		} else {
@@ -284,6 +286,7 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 	}
 	// End HITL
 
+	defer logger.CleanupSessionLocks(sessionKey)
 	return al.runAgentLoop(ctx, agent, opts)
 }
 

@@ -16,9 +16,7 @@ import (
 	"jane/pkg/utils"
 )
 
-var (
-	metricsToolExecutionDuration = expvar.NewFloat("agentloop_tool_execution_duration_seconds")
-)
+var metricsToolExecutionDuration = expvar.NewFloat("agentloop_tool_execution_duration_seconds")
 
 type indexedAgentResult struct {
 	result *tools.ToolResult
@@ -91,8 +89,17 @@ func (al *AgentLoop) executeToolBatch(
 			// back to the user via the normal agent loop.
 			asyncCallback := func(_ context.Context, result *tools.ToolResult) {
 				if tc.Name != "spawn" {
-					publishToolEvent(context.Background(), al, opts,
-						buildToolEvent(tc, "completed", result, time.Since(startToolTime).Milliseconds()))
+					publishToolEvent(
+						context.Background(),
+						al,
+						opts,
+						buildToolEvent(
+							tc,
+							"completed",
+							result,
+							time.Since(startToolTime).Milliseconds(),
+						),
+					)
 				}
 
 				// Determine content for the agent loop (ForLLM or error).
@@ -100,6 +107,27 @@ func (al *AgentLoop) executeToolBatch(
 				if content == "" && result.Err != nil {
 					content = result.Err.Error()
 				}
+
+				// Log async tool result to session replay
+				outputs := map[string]any{
+					"for_llm": result.ForLLM,
+				}
+				if result.Err != nil {
+					outputs["error"] = result.Err.Error()
+					logger.LogSessionEvent(al.cfg.Agents.Defaults.Workspace, opts.SessionKey, logger.ReplayEvent{
+						EventType:     logger.ReplayEventTypeError,
+						ErrorCategory: logger.ReplayErrorLogicFailure,
+						ErrorMessage:  result.Err.Error(),
+					})
+				}
+				logger.LogSessionEvent(al.cfg.Agents.Defaults.Workspace, opts.SessionKey, logger.ReplayEvent{
+					EventType: logger.ReplayEventTypeToolResult,
+					Details: logger.ReplayEventDetails{
+						ToolName: tc.Name,
+						Outputs:  outputs,
+					},
+				})
+
 				if content == "" {
 					return
 				}
@@ -129,7 +157,12 @@ func (al *AgentLoop) executeToolBatch(
 			}
 
 			progressCallback := func(task *tools.SubagentTask, event *tools.SubagentProgressEvent) {
-				publishToolEvent(context.Background(), al, opts, buildSubagentEvent(tc, task, event))
+				publishToolEvent(
+					context.Background(),
+					al,
+					opts,
+					buildSubagentEvent(tc, task, event),
+				)
 			}
 			toolCtx := tools.WithToolSessionKey(ctx, opts.SessionKey)
 			toolCtx = tools.WithToolCallID(toolCtx, tc.ID)
@@ -146,8 +179,45 @@ func (al *AgentLoop) executeToolBatch(
 			metricsToolExecutionDuration.Add(time.Since(startToolTime).Seconds())
 			agentResults[idx].result = toolResult
 			if !toolResult.Async {
-				publishToolEvent(ctx, al, opts,
-					buildToolEvent(tc, "completed", toolResult, time.Since(startToolTime).Milliseconds()))
+				publishToolEvent(
+					ctx,
+					al,
+					opts,
+					buildToolEvent(
+						tc,
+						"completed",
+						toolResult,
+						time.Since(startToolTime).Milliseconds(),
+					),
+				)
+
+				// Log tool result to session replay
+				outputs := map[string]any{
+					"for_llm": toolResult.ForLLM,
+				}
+				if toolResult.Err != nil {
+					outputs["error"] = toolResult.Err.Error()
+					logger.LogSessionEvent(
+						al.cfg.Agents.Defaults.Workspace,
+						opts.SessionKey,
+						logger.ReplayEvent{
+							EventType:     logger.ReplayEventTypeError,
+							ErrorCategory: logger.ReplayErrorLogicFailure,
+							ErrorMessage:  toolResult.Err.Error(),
+						},
+					)
+				}
+				logger.LogSessionEvent(
+					al.cfg.Agents.Defaults.Workspace,
+					opts.SessionKey,
+					logger.ReplayEvent{
+						EventType: logger.ReplayEventTypeToolResult,
+						Details: logger.ReplayEventDetails{
+							ToolName: tc.Name,
+							Outputs:  outputs,
+						},
+					},
+				)
 			}
 		}(i, tc)
 	}
