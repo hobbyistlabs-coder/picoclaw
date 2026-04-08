@@ -99,4 +99,38 @@ func TestGoEvalToolWithBindings(t *testing.T) {
 			t.Errorf("Expected output to contain 'task: mock task completed', got %q", result.ForLLM)
 		}
 	})
+
+	t.Run("execute with browser bindings", func(t *testing.T) {
+		// Replace the tool bindings to inject a browser action tool mock
+		browserTool := NewBrowserActionTool()
+		// No need to actually open a browser, just check if it's available
+		newBindings := map[string]reflect.Value{
+			"Browser": reflect.ValueOf(browserTool),
+		}
+		tool.SetBindings(newBindings)
+
+		args := map[string]any{
+			"code": `
+				import "jane/env"
+				import "fmt"
+
+				func init() {
+					if env.Browser != nil {
+						fmt.Println("browser available")
+					} else {
+						fmt.Println("browser nil")
+					}
+				}
+			`,
+		}
+
+		result := tool.Execute(ctx, args)
+		if result.IsError {
+			t.Fatalf("Expected no error, got: %s", result.ForLLM)
+		}
+
+		if !strings.Contains(result.ForLLM, "browser available") {
+			t.Errorf("Expected output to contain 'browser available', got %q", result.ForLLM)
+		}
+	})
 }
