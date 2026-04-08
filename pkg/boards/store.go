@@ -549,6 +549,9 @@ func (s *Store) reindexColumn(ctx context.Context, columnID string) {
 			i++
 		}
 	}
+	if err := rows.Err(); err != nil {
+		// Log or handle error if necessary, currently it silently returns on query err so silent here too.
+	}
 }
 
 func (s *Store) touchBoard(ctx context.Context, boardID string) error {

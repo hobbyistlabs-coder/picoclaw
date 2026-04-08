@@ -58,7 +58,9 @@ func (al *AgentLoop) processMedicalRequest(
 	clonedAgent.Workspace = patientWorkspace
 
 	var finalResponse strings.Builder
-	finalResponse.WriteString(fmt.Sprintf("Clinician Agent initialized for patient: %s\n\n", targetPatient))
+	finalResponse.WriteString(
+		fmt.Sprintf("Clinician Agent initialized for patient: %s\n\n", targetPatient),
+	)
 
 	// CoT State Machine variables
 	var currentContext string = opts.UserMessage
@@ -97,13 +99,19 @@ func (al *AgentLoop) processMedicalRequest(
 		finalResponse.WriteString(fmt.Sprintf("### [%s]\n%s\n\n", phase, phaseResult))
 
 		// Pass result as context to next phase
-		currentContext = currentContext + "\n\n" + fmt.Sprintf("Result of %s:\n%s", phase, phaseResult)
+		currentContext = currentContext + "\n\n" + fmt.Sprintf(
+			"Result of %s:\n%s",
+			phase,
+			phaseResult,
+		)
 
 		// Mandatory safety check abort
 		if phase == PhaseSafetyDisclaimers {
 			if strings.Contains(strings.ToLower(phaseResult), "life-threatening") ||
 				strings.Contains(strings.ToLower(phaseResult), "red flag") {
-				finalResponse.WriteString("\n⚠️ **RED FLAG DETECTED: This requires immediate emergency medical attention.**\n")
+				finalResponse.WriteString(
+					"\n⚠️ **RED FLAG DETECTED: This requires immediate emergency medical attention.**\n",
+				)
 			}
 		}
 	}
@@ -125,15 +133,30 @@ func buildPhasePrompt(phase string, context string) string {
 
 	switch phase {
 	case PhaseExtraction:
-		return fmt.Sprintf(basePrompt, context) + "Extract all clinical terminology, symptoms, and vital signs from the context."
+		return fmt.Sprintf(
+			basePrompt,
+			context,
+		) + "Extract all clinical terminology, symptoms, and vital signs from the context."
 	case PhaseTemporalCorrelation:
-		return fmt.Sprintf(basePrompt, context) + "Analyze the temporal correlation of symptoms. Scan for recurring patterns in the patient's history."
+		return fmt.Sprintf(
+			basePrompt,
+			context,
+		) + "Analyze the temporal correlation of symptoms. Scan for recurring patterns in the patient's history."
 	case PhaseTheoryGeneration:
-		return fmt.Sprintf(basePrompt, context) + "Generate a ranked list of potential causes (DDx) and pathophysiological theories based on the extracted symptoms and patterns."
+		return fmt.Sprintf(
+			basePrompt,
+			context,
+		) + "Generate a ranked list of potential causes (DDx) and pathophysiological theories based on the extracted symptoms and patterns."
 	case PhaseVerification:
-		return fmt.Sprintf(basePrompt, context) + "Verify the proposed theories and any implicit remedies against the patient's Allergies and Medications profile."
+		return fmt.Sprintf(
+			basePrompt,
+			context,
+		) + "Verify the proposed theories and any implicit remedies against the patient's Allergies and Medications profile."
 	case PhaseSafetyDisclaimers:
-		return fmt.Sprintf(basePrompt, context) + "Provide mandatory clinical disclaimers. Explicitly state whether any 'Life-Threatening' or 'Red Flag' symptoms were detected."
+		return fmt.Sprintf(
+			basePrompt,
+			context,
+		) + "Provide mandatory clinical disclaimers. Explicitly state whether any 'Life-Threatening' or 'Red Flag' symptoms were detected."
 	default:
 		return context
 	}

@@ -305,12 +305,6 @@ func (c *DiscordChannel) sendChunk(ctx context.Context, channelID, content, repl
 }
 
 // appendContent safely appends content to existing text
-func appendContent(content, suffix string) string {
-	if content == "" {
-		return suffix
-	}
-	return content + "\n" + suffix
-}
 
 func (c *DiscordChannel) handleMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m == nil || m.Author == nil {

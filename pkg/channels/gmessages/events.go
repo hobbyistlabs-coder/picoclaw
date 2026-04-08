@@ -8,14 +8,14 @@ import (
 	"os"
 	"strings"
 
+	"go.mau.fi/mautrix-gmessages/pkg/libgm"
+	"go.mau.fi/mautrix-gmessages/pkg/libgm/events"
+	"go.mau.fi/mautrix-gmessages/pkg/libgm/gmproto"
+
 	"jane/pkg/bus"
 	"jane/pkg/channels"
 	"jane/pkg/logger"
 	mediaPkg "jane/pkg/media"
-
-	"go.mau.fi/mautrix-gmessages/pkg/libgm"
-	"go.mau.fi/mautrix-gmessages/pkg/libgm/events"
-	"go.mau.fi/mautrix-gmessages/pkg/libgm/gmproto"
 )
 
 type EventHandler struct {
@@ -65,7 +65,11 @@ func (h *EventHandler) handleClientReady(evt *events.ClientReady) {
 	go func() {
 		resp, err := h.Client.GM.ListContacts()
 		if err != nil {
-			logger.WarnCF("channels.gmessages", "Failed to list contacts", map[string]any{"err": err})
+			logger.WarnCF(
+				"channels.gmessages",
+				"Failed to list contacts",
+				map[string]any{"err": err},
+			)
 			return
 		}
 
@@ -75,7 +79,11 @@ func (h *EventHandler) handleClientReady(evt *events.ClientReady) {
 				h.Store.UpsertContact(num.GetNumber(), name)
 			}
 		}
-		logger.InfoCF("channels.gmessages", "Finished syncing contacts", map[string]any{"count": len(resp.GetContacts())})
+		logger.InfoCF(
+			"channels.gmessages",
+			"Finished syncing contacts",
+			map[string]any{"count": len(resp.GetContacts())},
+		)
 	}()
 }
 
@@ -113,19 +121,31 @@ func (h *EventHandler) handleMessage(evt *libgm.WrappedMessage) {
 			}
 
 			// Save to a temporary file
-			tmpFile, err := os.CreateTemp("", "gmessages-media-*")
-			if err != nil {
-				logger.ErrorCF("channels.gmessages", "Failed to create temp file for media", map[string]any{"err": err})
+			tmpFile, tmpErr := os.CreateTemp("", "gmessages-media-*")
+			if tmpErr != nil {
+				logger.ErrorCF(
+					"channels.gmessages",
+					"Failed to create temp file for media",
+					map[string]any{"err": tmpErr},
+				)
 				return
 			}
 			defer tmpFile.Close()
 
-			if _, err := tmpFile.Write(data); err != nil {
-				logger.ErrorCF("channels.gmessages", "Failed to write media data to temp file", map[string]any{"err": err})
+			if _, writeErr := tmpFile.Write(data); writeErr != nil {
+				logger.ErrorCF(
+					"channels.gmessages",
+					"Failed to write media data to temp file",
+					map[string]any{"err": writeErr},
+				)
 				return
 			}
 
-			scope := channels.BuildMediaScope(h.Channel.Name(), msg.GetConversationID(), msg.GetMessageID())
+			scope := channels.BuildMediaScope(
+				h.Channel.Name(),
+				msg.GetConversationID(),
+				msg.GetMessageID(),
+			)
 			meta := mediaPkg.MediaMeta{ContentType: mimeType, Source: "gmessages"}
 
 			ref, err := h.Channel.GetMediaStore().Store(tmpFile.Name(), meta, scope)
@@ -152,7 +172,7 @@ func (h *EventHandler) handleMessage(evt *libgm.WrappedMessage) {
 		if b, err := json.Marshal(reactions); err == nil {
 			dbMsg.Reactions = string(b)
 			// Append reactions to body for bot visibility if body isn't empty
-			var reactionStrs []string
+			reactionStrs := make([]string, 0, len(reactions))
 			for _, r := range reactions {
 				reactionStrs = append(reactionStrs, r.Emoji)
 			}
@@ -165,7 +185,11 @@ func (h *EventHandler) handleMessage(evt *libgm.WrappedMessage) {
 	dbMsg.ReplyToID = ExtractReplyToID(msg)
 
 	if err := h.Store.UpsertMessage(dbMsg); err != nil {
-		logger.ErrorCF("channels.gmessages", "Failed to store message", map[string]any{"err": err, "msg_id": dbMsg.MessageID})
+		logger.ErrorCF(
+			"channels.gmessages",
+			"Failed to store message",
+			map[string]any{"err": err, "msg_id": dbMsg.MessageID},
+		)
 		return
 	}
 
@@ -231,7 +255,7 @@ func (h *EventHandler) handleConversation(conv *gmproto.Conversation) {
 			Number string `json:"number"`
 			IsMe   bool   `json:"is_me,omitempty"`
 		}
-		var infos []pInfo
+		infos := make([]pInfo, 0, len(ps))
 		for _, p := range ps {
 			info := pInfo{
 				Name: p.GetFullName(),
@@ -265,7 +289,11 @@ func (h *EventHandler) handleConversation(conv *gmproto.Conversation) {
 	}
 
 	if err := h.Store.UpsertConversation(dbConv); err != nil {
-		logger.ErrorCF("channels.gmessages", "Failed to store conversation", map[string]any{"err": err, "conv_id": dbConv.ConversationID})
+		logger.ErrorCF(
+			"channels.gmessages",
+			"Failed to store conversation",
+			map[string]any{"err": err, "conv_id": dbConv.ConversationID},
+		)
 		return
 	}
 }
@@ -276,11 +304,19 @@ func (h *EventHandler) handleAuthRefresh() {
 	}
 	sessionData, err := h.Client.SessionData()
 	if err != nil {
-		logger.ErrorCF("channels.gmessages", "Failed to get session data for save", map[string]any{"err": err})
+		logger.ErrorCF(
+			"channels.gmessages",
+			"Failed to get session data for save",
+			map[string]any{"err": err},
+		)
 		return
 	}
 	if err := saveSession(h.SessionPath, sessionData); err != nil {
-		logger.ErrorCF("channels.gmessages", "Failed to save refreshed session", map[string]any{"err": err})
+		logger.ErrorCF(
+			"channels.gmessages",
+			"Failed to save refreshed session",
+			map[string]any{"err": err},
+		)
 		return
 	}
 	logger.DebugCF("channels.gmessages", "Saved refreshed auth token", nil)
@@ -392,5 +428,5 @@ func ExtractSenderInfo(msg *gmproto.Message) (name, number string) {
 			number = p.GetFormattedNumber()
 		}
 	}
-	return
+	return name, number
 }

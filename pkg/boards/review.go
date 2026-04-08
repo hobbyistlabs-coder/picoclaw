@@ -16,7 +16,11 @@ type ReviewScheduleInput struct {
 }
 
 func SyncReviewSchedule(
-	ctx context.Context, store *Store, cronService *cron.CronService, boardID string, input ReviewScheduleInput,
+	ctx context.Context,
+	store *Store,
+	cronService *cron.CronService,
+	boardID string,
+	input ReviewScheduleInput,
 ) (*ReviewSchedule, error) {
 	if input.Enabled && input.EveryMinutes < 5 {
 		return nil, fmt.Errorf("boards: review schedule must be at least 5 minutes")
@@ -64,7 +68,9 @@ func BuildReviewPrompt(boardID string) string {
 	b.WriteString("Board ID: ")
 	b.WriteString(boardID)
 	b.WriteString("\n")
-	b.WriteString("Summarize overdue or blocked work, then move or annotate cards if the current context justifies it.")
+	b.WriteString(
+		"Summarize overdue or blocked work, then move or annotate cards if the current context justifies it.",
+	)
 	return b.String()
 }
 
@@ -78,7 +84,9 @@ func BuildCardActionPrompt(boardID, cardID string) string {
 	b.WriteString("Card ID: ")
 	b.WriteString(cardID)
 	b.WriteString("\n")
-	b.WriteString("Update progress, move the card if appropriate, and refine the card details with blockers or next steps when justified by the current context.")
+	b.WriteString(
+		"Update progress, move the card if appropriate, and refine the card details with blockers or next steps when justified by the current context.",
+	)
 	return b.String()
 }
 

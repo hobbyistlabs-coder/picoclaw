@@ -27,7 +27,11 @@ func NewWebFetchTool(maxChars int, fetchLimitBytes int64) (*WebFetchTool, error)
 	return NewWebFetchToolWithProxy(maxChars, "", fetchLimitBytes)
 }
 
-func NewWebFetchToolWithProxy(maxChars int, proxy string, fetchLimitBytes int64) (*WebFetchTool, error) {
+func NewWebFetchToolWithProxy(
+	maxChars int,
+	proxy string,
+	fetchLimitBytes int64,
+) (*WebFetchTool, error) {
 	if maxChars <= 0 {
 		maxChars = defaultMaxChars
 	}
@@ -140,7 +144,12 @@ func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) *tools.
 	if err != nil {
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) {
-			return tools.ErrorResult(fmt.Sprintf("failed to read response: size exceeded %d bytes limit", t.fetchLimitBytes))
+			return tools.ErrorResult(
+				fmt.Sprintf(
+					"failed to read response: size exceeded %d bytes limit",
+					t.fetchLimitBytes,
+				),
+			)
 		}
 		return tools.ErrorResult(fmt.Sprintf("failed to read response: %v", err))
 	}

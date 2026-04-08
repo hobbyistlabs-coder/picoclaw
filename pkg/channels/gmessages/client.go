@@ -10,12 +10,13 @@ import (
 
 	"github.com/mdp/qrterminal/v3"
 	"github.com/rs/zerolog"
-	"jane/pkg/logger"
-	"jane/pkg/runtimepaths"
-
 	"go.mau.fi/mautrix-gmessages/pkg/libgm"
 	"go.mau.fi/mautrix-gmessages/pkg/libgm/events"
 	"go.mau.fi/mautrix-gmessages/pkg/libgm/gmproto"
+
+	"jane/pkg/fileutil"
+	"jane/pkg/logger"
+	"jane/pkg/runtimepaths"
 )
 
 type SessionData struct {
@@ -34,7 +35,7 @@ func (c *GMessagesChannel) initClient(ctx context.Context) error {
 		dataDir = filepath.Join(runtimepaths.HomeDir(), "gmessages")
 	}
 
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create gmessages data dir: %w", err)
 	}
 
@@ -60,14 +61,14 @@ func (c *GMessagesChannel) initClient(ctx context.Context) error {
 	if err == nil {
 		logger.InfoCF("channels.gmessages", "Loaded existing session", nil)
 		authData := libgm.NewAuthData()
-		if err := json.Unmarshal(sessionData.AuthDataJSON, authData); err != nil {
+		if err = json.Unmarshal(sessionData.AuthDataJSON, authData); err != nil {
 			return fmt.Errorf("unmarshal auth data: %w", err)
 		}
 
 		var pushKeys *libgm.PushKeys
 		if len(sessionData.PushKeysJSON) > 0 {
 			pushKeys = &libgm.PushKeys{}
-			if err := json.Unmarshal(sessionData.PushKeysJSON, pushKeys); err != nil {
+			if err = json.Unmarshal(sessionData.PushKeysJSON, pushKeys); err != nil {
 				return fmt.Errorf("unmarshal push keys: %w", err)
 			}
 		}
@@ -155,7 +156,7 @@ func saveSession(path string, data *SessionData) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0600)
+	return fileutil.WriteFileAtomic(path, b, 0o600)
 }
 
 func (c *GMessagesChannel) handlePairing(ctx context.Context, client *GMClient) error {
@@ -190,13 +191,21 @@ func (c *GMessagesChannel) handlePairing(ctx context.Context, client *GMClient) 
 
 	logger.InfoCF("channels.gmessages", "Starting pairing process...", nil)
 
-	var pairErr2 error
+
 	pairCB := func(data *gmproto.PairedData) {
-		logger.InfoCF("channels.gmessages", "Pairing successful", map[string]any{"phone_id": data.GetMobile().GetSourceID()})
+		logger.InfoCF(
+			"channels.gmessages",
+			"Pairing successful",
+			map[string]any{"phone_id": data.GetMobile().GetSourceID()},
+		)
 
 		sessionData, err := client.SessionData()
 		if err != nil {
-			logger.ErrorCF("channels.gmessages", "Failed to get session data", map[string]any{"error": err.Error()})
+			logger.ErrorCF(
+				"channels.gmessages",
+				"Failed to get session data",
+				map[string]any{"error": err.Error()},
+			)
 		} else {
 			if err := saveSession(client.SessionPath, sessionData); err != nil {
 				logger.ErrorCF("channels.gmessages", "Failed to save session", map[string]any{"error": err.Error()})
@@ -222,9 +231,6 @@ func (c *GMessagesChannel) handlePairing(ctx context.Context, client *GMClient) 
 	case <-pairingCh:
 		if pairErr != nil {
 			return fmt.Errorf("pairing failed: %w", pairErr)
-		}
-		if pairErr2 != nil {
-			return fmt.Errorf("pairing failed: %w", pairErr2)
 		}
 		// pairing successful, we disconnect so the main initClient can set the real event handler and reconnect
 		client.GM.Disconnect()
