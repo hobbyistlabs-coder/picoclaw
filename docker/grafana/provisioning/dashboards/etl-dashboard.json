@@ -1,0 +1,30 @@
+{
+  "title": "ETL Ultimate Visibility",
+  "uid": "etl-dashboard-1",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Goroutines",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [{"expr": "etl_goroutines", "datasource": {"uid": "Prometheus"}}]
+    },
+    {
+      "type": "timeseries",
+      "title": "GC Pause (ms)",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [{"expr": "sum(rate(etl_gc_pause_ms_sum[1m])) / sum(rate(etl_gc_pause_ms_count[1m]))", "datasource": {"uid": "Prometheus"}}]
+    },
+    {
+      "type": "timeseries",
+      "title": "Traffic (Logs/sec)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [{"expr": "rate(etl_request_count_total[1m])", "datasource": {"uid": "Prometheus"}}]
+    },
+    {
+      "type": "timeseries",
+      "title": "Errors (Logs/sec)",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [{"expr": "rate(etl_request_count_total{status=\"error\"}[1m])", "datasource": {"uid": "Prometheus"}}]
+    }
+  ]
+}

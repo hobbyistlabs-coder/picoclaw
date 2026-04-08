@@ -1,0 +1,81 @@
+[sources.system_metrics_logs]
+type = "file"
+include = ["/workspace/logs/etl/system_metrics.jsonl", "/workspace/workspace/logs/etl/system_metrics.jsonl"]
+read_from = "beginning"
+
+[sources.app_logs]
+type = "file"
+include = ["/workspace/docker/data/logs/gateway.log", "/workspace/docker/data/logs/launcher.log", "/workspace/config/logs/launcher.log"]
+read_from = "beginning"
+
+[transforms.parse_system_metrics]
+type = "remap"
+inputs = ["system_metrics_logs"]
+source = '''
+. = parse_json!(.message)
+'''
+
+[transforms.parse_app_logs]
+type = "remap"
+inputs = ["app_logs"]
+source = '''
+. = parse_json!(.message)
+'''
+
+[transforms.metrics_from_system]
+type = "log_to_metric"
+inputs = ["parse_system_metrics"]
+
+  [[transforms.metrics_from_system.metrics]]
+  type = "gauge"
+  field = "goroutines"
+  name = "etl_goroutines"
+
+  [[transforms.metrics_from_system.metrics]]
+  type = "gauge"
+  field = "memory_alloc_mb"
+  name = "etl_memory_alloc_mb"
+
+  [[transforms.metrics_from_system.metrics]]
+  type = "gauge"
+  field = "memory_total_mb"
+  name = "etl_memory_total_mb"
+
+  [[transforms.metrics_from_system.metrics]]
+  type = "gauge"
+  field = "memory_sys_mb"
+  name = "etl_memory_sys_mb"
+
+  [[transforms.metrics_from_system.metrics]]
+  type = "gauge"
+  field = "num_gc"
+  name = "etl_num_gc"
+
+  [[transforms.metrics_from_system.metrics]]
+  type = "histogram"
+  field = "gc_pause_ms"
+  name = "etl_gc_pause_ms"
+
+[transforms.metrics_from_app_logs]
+type = "log_to_metric"
+inputs = ["parse_app_logs"]
+
+  [[transforms.metrics_from_app_logs.metrics]]
+  type = "counter"
+  field = "level"
+  name = "etl_request_count"
+  increment_by_value = false
+  tags.status = "{{level}}"
+  tags.component = "{{component}}"
+
+[sinks.prometheus_exporter]
+type = "prometheus_exporter"
+inputs = ["metrics_from_system", "metrics_from_app_logs"]
+address = "0.0.0.0:8686"
+
+[sinks.loki]
+type = "loki"
+inputs = ["parse_app_logs", "parse_system_metrics"]
+endpoint = "http://loki:3100"
+encoding.codec = "json"
+labels.job = "vector"
