@@ -10,6 +10,7 @@ import (
 
 	"github.com/mdp/qrterminal/v3"
 	"github.com/rs/zerolog"
+	"jane/pkg/fileutil"
 	"jane/pkg/logger"
 	"jane/pkg/runtimepaths"
 
@@ -34,7 +35,7 @@ func (c *GMessagesChannel) initClient(ctx context.Context) error {
 		dataDir = filepath.Join(runtimepaths.HomeDir(), "gmessages")
 	}
 
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create gmessages data dir: %w", err)
 	}
 
@@ -155,7 +156,7 @@ func saveSession(path string, data *SessionData) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0600)
+	return fileutil.WriteFileAtomic(path, b, 0o600)
 }
 
 func (c *GMessagesChannel) handlePairing(ctx context.Context, client *GMClient) error {
