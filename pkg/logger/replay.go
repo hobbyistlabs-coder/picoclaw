@@ -91,22 +91,14 @@ func LogSessionEvent(workspacePath, sessionID string, event ReplayEvent) {
 		// Ensure the directory exists
 		eventsDir := filepath.Join(workspacePath, "logs", safeSessionID, "events")
 		if err := os.MkdirAll(eventsDir, 0o700); err != nil {
-			WarnCF(
-				"replay",
-				"Failed to create events directory",
-				map[string]any{"error": err.Error(), "dir": eventsDir},
-			)
+			WarnCF("replay", "Failed to create events directory", map[string]any{"error": err.Error(), "dir": eventsDir})
 			return
 		}
 
 		filePath := filepath.Join(eventsDir, "events.jsonl")
 		f, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 		if err != nil {
-			WarnCF(
-				"replay",
-				"Failed to open events file",
-				map[string]any{"error": err.Error(), "file": filePath},
-			)
+			WarnCF("replay", "Failed to open events file", map[string]any{"error": err.Error(), "file": filePath})
 			return
 		}
 
@@ -124,6 +116,18 @@ func LogSessionEvent(workspacePath, sessionID string, event ReplayEvent) {
 	state.mu.Lock()
 	defer state.mu.Unlock()
 
+	// Reopen file if it was closed
+	if state.file == nil {
+		eventsDir := filepath.Join(workspacePath, "logs", safeSessionID, "events")
+		filePath := filepath.Join(eventsDir, "events.jsonl")
+		f, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+		if err != nil {
+			WarnCF("replay", "Failed to reopen events file", map[string]any{"error": err.Error(), "file": filePath})
+			return
+		}
+		state.file = f
+	}
+
 	if _, err := state.file.Write(data); err != nil {
 		WarnCF("replay", "Failed to write replay event", map[string]any{"error": err.Error()})
 	}
@@ -135,11 +139,16 @@ func CleanupSessionLocks(sessionID string) {
 		return
 	}
 	safeSessionID := getSafeSessionID(sessionID)
-	if val, ok := sessionLocks.LoadAndDelete(safeSessionID); ok {
+	// We do NOT delete the session lock from the map, because async callbacks
+	// might still need to log events for this session later.
+	// Instead, we just close the file descriptor and set it to nil.
+	// When the next event comes in, LogSessionEvent will re-open the file.
+	if val, ok := sessionLocks.Load(safeSessionID); ok {
 		state := val.(*sessionFileState)
 		state.mu.Lock()
 		if state.file != nil {
 			state.file.Close()
+			state.file = nil
 		}
 		state.mu.Unlock()
 	}
