@@ -56,10 +56,12 @@ func TestGoEvalTool(t *testing.T) {
 	})
 }
 
-var TestWorkspace = "mock_workspace"
-var DoMockTask = func() string {
-	return "mock task completed"
-}
+var (
+	TestWorkspace = "mock_workspace"
+	DoMockTask    = func() string {
+		return "mock task completed"
+	}
+)
 
 func TestGoEvalToolWithBindings(t *testing.T) {
 	tool := NewGoEvalTool("/tmp/test_workspace")
@@ -92,11 +94,51 @@ func TestGoEvalToolWithBindings(t *testing.T) {
 		}
 
 		if !strings.Contains(result.ForLLM, "workspace: mock_workspace") {
-			t.Errorf("Expected output to contain 'workspace: mock_workspace', got %q", result.ForLLM)
+			t.Errorf(
+				"Expected output to contain 'workspace: mock_workspace', got %q",
+				result.ForLLM,
+			)
 		}
 
 		if !strings.Contains(result.ForLLM, "task: mock task completed") {
-			t.Errorf("Expected output to contain 'task: mock task completed', got %q", result.ForLLM)
+			t.Errorf(
+				"Expected output to contain 'task: mock task completed', got %q",
+				result.ForLLM,
+			)
+		}
+	})
+
+	t.Run("execute with browser bindings", func(t *testing.T) {
+		// Replace the tool bindings to inject a browser action tool mock
+		browserTool := NewBrowserActionTool()
+		// No need to actually open a browser, just check if it's available
+		newBindings := map[string]reflect.Value{
+			"Browser": reflect.ValueOf(browserTool),
+		}
+		tool.SetBindings(newBindings)
+
+		args := map[string]any{
+			"code": `
+				import "jane/env"
+				import "fmt"
+
+				func init() {
+					if env.Browser != nil {
+						fmt.Println("browser available")
+					} else {
+						fmt.Println("browser nil")
+					}
+				}
+			`,
+		}
+
+		result := tool.Execute(ctx, args)
+		if result.IsError {
+			t.Fatalf("Expected no error, got: %s", result.ForLLM)
+		}
+
+		if !strings.Contains(result.ForLLM, "browser available") {
+			t.Errorf("Expected output to contain 'browser available', got %q", result.ForLLM)
 		}
 	})
 }
