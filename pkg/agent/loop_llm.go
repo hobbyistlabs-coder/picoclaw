@@ -265,18 +265,6 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
-			errCategory := logger.ModelFailure
-			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-				errCategory = logger.InfrastructureFailure
-			}
-			logger.LogSessionEvent(
-				agent.Workspace,
-				opts.SessionKey,
-				"error",
-				logger.SessionEventDetails{},
-				errCategory,
-				err.Error(),
-			)
 			return "", iteration, metrics, err
 		}
 		metrics.addUsage(enrichUsageWithCost(agent.Config, activeModel, response.Usage))
@@ -295,14 +283,6 @@ func (al *AgentLoop) runLLMIteration(
 					ReasoningContent: response.ReasoningContent,
 				})
 			}
-			logger.LogSessionEvent(
-				agent.Workspace,
-				opts.SessionKey,
-				"cot",
-				logger.SessionEventDetails{CotText: response.ReasoningContent},
-				logger.None,
-				"",
-			)
 		}
 
 		logger.DebugCF("agent", "LLM response",
@@ -425,17 +405,6 @@ func (al *AgentLoop) runLLMIteration(
 		}
 		// --- End HITL ---
 
-		for _, tc := range normalizedToolCalls {
-			logger.LogSessionEvent(
-				agent.Workspace,
-				opts.SessionKey,
-				"tool_call",
-				logger.SessionEventDetails{ToolName: tc.Name, Inputs: tc.Arguments},
-				logger.None,
-				"",
-			)
-		}
-
 		// Execute tool calls in parallel
 		agentResults, hasAsync := al.executeToolBatch(ctx, agent, opts, normalizedToolCalls, iteration)
 		if hasAsync {
@@ -485,11 +454,7 @@ func (al *AgentLoop) runLLMIteration(
 				contentForLLM = r.result.Err.Error()
 			}
 
-			errCategory := logger.None
-			errMsg := ""
 			if r.result.IsError {
-				errCategory = logger.LogicFailure
-				errMsg = contentForLLM
 				logger.ErrorCF("agent", "Tool execution failed",
 					map[string]any{
 						"tool":           r.tc.Name,
@@ -497,23 +462,6 @@ func (al *AgentLoop) runLLMIteration(
 						"error_category": "logic_failure",
 					})
 			}
-
-			outputsMap := map[string]any{"output": contentForLLM}
-			if r.result.ForUser != "" {
-				outputsMap["for_user"] = r.result.ForUser
-			}
-
-			logger.LogSessionEvent(
-				agent.Workspace,
-				opts.SessionKey,
-				"tool_result",
-				logger.SessionEventDetails{
-					ToolName: r.tc.Name,
-					Outputs:  outputsMap,
-				},
-				errCategory,
-				errMsg,
-			)
 
 			toolResultMsg := providers.Message{
 				Role:       "tool",
