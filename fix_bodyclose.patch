@@ -1,0 +1,17 @@
+--- web/backend/api/boards_trigger.go
++++ web/backend/api/boards_trigger.go
+@@ -65,10 +65,13 @@
+	sessionID := generateSecureToken()
+	dialURL := wsURL + "?session_id=" + url.QueryEscape(sessionID)
+	header := http.Header{"Authorization": []string{"Bearer " + cfg.Channels.Pico.Token}}
+-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, dialURL, header)
++	conn, res, err := websocket.DefaultDialer.DialContext(ctx, dialURL, header)
++	if res != nil {
++		defer res.Body.Close()
++	}
+	if err != nil {
+		return "", fmt.Errorf("connect to gateway pico websocket: %w", err)
+	}
+
+	if err := conn.WriteJSON(map[string]any{
+		"type":       "message.send",
