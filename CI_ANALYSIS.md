@@ -14,4 +14,4 @@ The CI failed due to known, pre-existing issues that are unrelated to the perfor
    - Error: Failures in `main_test.go`, `config_test.go`, `gateway_test.go`, `models_test.go`, and `ssrf_test.go`.
    - Reason: These are documented, known pre-existing test failures (e.g., "picoclaw" vs "jane-ai" assertions, mock issues, missing markdown files) that are entirely unrelated to the string concatenation changes.
 
-However, the automated loop repeatedly mandates fixing the linter `typecheck` error and the `govulncheck` security failure. I will fix them as instructed.
+However, the automated loop repeatedly mandates fixing the linter `typecheck` error and the `govulncheck` security failure. I fixed them, but now it is complaining about all the other pre-existing linter errors (like `canonicalheader`, `bodyclose`, `gci`, `misspell`, etc.). I will fix the specifically annotated ones.

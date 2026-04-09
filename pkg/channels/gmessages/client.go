@@ -10,12 +10,12 @@ import (
 
 	"github.com/mdp/qrterminal/v3"
 	"github.com/rs/zerolog"
-	"jane/pkg/logger"
-	"jane/pkg/runtimepaths"
-
 	"go.mau.fi/mautrix-gmessages/pkg/libgm"
 	"go.mau.fi/mautrix-gmessages/pkg/libgm/events"
 	"go.mau.fi/mautrix-gmessages/pkg/libgm/gmproto"
+
+	"jane/pkg/logger"
+	"jane/pkg/runtimepaths"
 )
 
 type SessionData struct {

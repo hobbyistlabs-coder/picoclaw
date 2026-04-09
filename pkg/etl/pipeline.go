@@ -22,12 +22,12 @@ type Pipeline struct {
 
 // SystemMetrics represents the extracted system KPIs
 type SystemMetrics struct {
-	Timestamp       time.Time `json:"timestamp"`
-	Goroutines      int       `json:"goroutines"`
-	MemoryAllocMB   float64   `json:"memory_alloc_mb"`
-	MemoryTotalMB   float64   `json:"memory_total_mb"`
-	MemorySysMB     float64   `json:"memory_sys_mb"`
-	NumGC           uint32    `json:"num_gc"`
+	Timestamp     time.Time `json:"timestamp"`
+	Goroutines    int       `json:"goroutines"`
+	MemoryAllocMB float64   `json:"memory_alloc_mb"`
+	MemoryTotalMB float64   `json:"memory_total_mb"`
+	MemorySysMB   float64   `json:"memory_sys_mb"`
+	NumGC         uint32    `json:"num_gc"`
 }
 
 // NewPipeline creates a new ETL pipeline
