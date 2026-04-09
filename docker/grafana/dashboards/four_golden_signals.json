@@ -1,0 +1,66 @@
+{
+  "title": "Four Golden Signals",
+  "uid": "four_golden_signals",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Latency (GC Pause)",
+      "targets": [
+        {
+          "expr": "sum(rate(etl_gc_pause_ms_sum[1m])) / sum(rate(etl_gc_pause_ms_count[1m]))",
+          "legendFormat": "Avg GC Pause (ms)",
+          "refId": "A",
+          "datasource": "Prometheus"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Traffic (Requests)",
+      "targets": [
+        {
+          "expr": "rate(etl_request_count[1m])",
+          "legendFormat": "RPS",
+          "refId": "A",
+          "datasource": "Prometheus"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Errors",
+      "targets": [
+        {
+          "expr": "rate(etl_request_count{level=\"error\"}[1m])",
+          "legendFormat": "Error Rate",
+          "refId": "A",
+          "datasource": "Prometheus"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Saturation (Goroutines & Memory)",
+      "targets": [
+        {
+          "expr": "etl_goroutines",
+          "legendFormat": "Goroutines",
+          "refId": "A",
+          "datasource": "Prometheus"
+        },
+        {
+          "expr": "etl_memory_alloc_mb",
+          "legendFormat": "Memory Alloc MB",
+          "refId": "B",
+          "datasource": "Prometheus"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 }
+    }
+  ],
+  "schemaVersion": 16,
+  "version": 1
+}

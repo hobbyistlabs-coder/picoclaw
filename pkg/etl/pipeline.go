@@ -28,6 +28,7 @@ type SystemMetrics struct {
 	MemoryTotalMB   float64   `json:"memory_total_mb"`
 	MemorySysMB     float64   `json:"memory_sys_mb"`
 	NumGC           uint32    `json:"num_gc"`
+	GCPauseMs       float64   `json:"gc_pause_ms"`
 }
 
 // NewPipeline creates a new ETL pipeline
@@ -87,6 +88,7 @@ func (p *Pipeline) extractAndLoad() {
 		MemoryTotalMB: float64(m.TotalAlloc) / 1024 / 1024,
 		MemorySysMB:   float64(m.Sys) / 1024 / 1024,
 		NumGC:         m.NumGC,
+		GCPauseMs:     float64(m.PauseNs[(m.NumGC+255)%256]) / 1e6,
 	}
 
 	// Transform (JSON serialization)
