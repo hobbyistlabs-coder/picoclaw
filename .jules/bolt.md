@@ -15,6 +15,3 @@
 ## 2025-03-25 - Efficient HTTP Response Prefix Checking
 **Learning:** Using `strings.ToLower(string(body))` on large HTTP response payloads (which can be megabytes in size) to check for a small case-insensitive prefix (like `<html` or `<!doctype`) causes massive memory allocation, large garbage collection overhead, and $O(N)$ string iterations.
 **Action:** Use bounded byte slice checks combined with `bytes.EqualFold` (e.g., `bytes.EqualFold(body[:5], []byte("<html"))`) for large payloads. This makes the check $O(1)$ without any string allocations or full-body case conversions.
-## 2025-02-18 - String Concatenation in Loops
-**Learning:** Found an instance in `pkg/agent/async_batches.go` where string concatenation (`+=`) was used inside a loop to join `state.results` into a single string. This is a classic $O(N^2)$ memory allocation anti-pattern in Go, as a new string backing array must be allocated and copied on every iteration.
-**Action:** Replaced the loop with `strings.Join(state.results, "\n\n")`. `strings.Join` calculates the required string length upfront and allocates the memory exactly once, reducing memory overhead and time complexity to $O(N)$.
