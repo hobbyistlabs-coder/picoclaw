@@ -12,7 +12,6 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
-	"strings"
 	"time"
 
 	"jane/pkg/bus"
@@ -379,15 +378,12 @@ func (al *AgentLoop) runLLMIteration(
 			})
 
 			// Format approval message
-			var approvalMsg strings.Builder
-			approvalMsg.WriteString("The following tool execution requires your approval:\n")
+			approvalMsg := "The following tool execution requires your approval:\n"
 			for _, tc := range normalizedToolCalls {
 				argsJSON, _ := json.MarshalIndent(tc.Arguments, "", "  ")
-				approvalMsg.WriteString(
-					fmt.Sprintf("\n- `%s`:\n```json\n%s\n```\n", tc.Name, string(argsJSON)),
-				)
+				approvalMsg += fmt.Sprintf("\n- `%s`:\n```json\n%s\n```\n", tc.Name, string(argsJSON))
 			}
-			approvalMsg.WriteString("\nDo you approve? (Yes/No)")
+			approvalMsg += "\nDo you approve? (Yes/No)"
 
 			al.pendingApprovals.Store(opts.SessionKey, pendingApprovalState{
 				agent:               agent,
@@ -402,7 +398,7 @@ func (al *AgentLoop) runLLMIteration(
 			al.bus.PublishOutbound(ctx, bus.OutboundMessage{
 				Channel: opts.Channel,
 				ChatID:  opts.ChatID,
-				Content: approvalMsg.String(),
+				Content: approvalMsg,
 			})
 
 			return "", iteration, metrics, errApprovalPending
@@ -410,13 +406,7 @@ func (al *AgentLoop) runLLMIteration(
 		// --- End HITL ---
 
 		// Execute tool calls in parallel
-		agentResults, hasAsync := al.executeToolBatch(
-			ctx,
-			agent,
-			opts,
-			normalizedToolCalls,
-			iteration,
-		)
+		agentResults, hasAsync := al.executeToolBatch(ctx, agent, opts, normalizedToolCalls, iteration)
 		if hasAsync {
 			return "", iteration, metrics, errAsyncPending
 		}
