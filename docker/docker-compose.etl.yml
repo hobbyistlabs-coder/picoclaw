@@ -1,0 +1,40 @@
+
+services:
+  vector:
+    image: timberio/vector:0.34.0-alpine
+    volumes:
+      - ./etl/vector/vector.toml:/etc/vector/vector.toml:ro
+      - ..:/workspace:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - loki
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./etl/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./etl/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+    ports:
+      - "9091:9090"
+    depends_on:
+      - vector
+
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - ./etl/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./etl/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - loki
