@@ -32,9 +32,7 @@ func SQLitePath(dir string) string {
 }
 
 func NewSQLiteStore(path string) (*SQLiteStore, error) {
-	// SECURITY: Restrict directory permissions to 0o700 (user read/write/execute only)
-	// to prevent other local users from reading the sensitive sessions SQLite database.
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, fmt.Errorf("memory: create sqlite dir: %w", err)
 	}
 	db, err := sql.Open("sqlite", path+"?_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)")

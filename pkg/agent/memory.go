@@ -32,9 +32,7 @@ func NewMemoryStore(workspace string) *MemoryStore {
 	memoryFile := filepath.Join(memoryDir, "MEMORY.md")
 
 	// Ensure memory directory exists
-	// SECURITY: Restrict directory permissions to 0o700 (user read/write/execute only)
-	// to prevent other local users from reading sensitive agent memory.
-	os.MkdirAll(memoryDir, 0o700)
+	os.MkdirAll(memoryDir, 0o755)
 
 	return &MemoryStore{
 		workspace:  workspace,
@@ -83,10 +81,8 @@ func (ms *MemoryStore) AppendToday(content string) error {
 	todayFile := ms.getTodayFile()
 
 	// Ensure month directory exists
-	// SECURITY: Restrict directory permissions to 0o700 (user read/write/execute only)
-	// to prevent other local users from reading sensitive daily notes.
 	monthDir := filepath.Dir(todayFile)
-	if err := os.MkdirAll(monthDir, 0o700); err != nil {
+	if err := os.MkdirAll(monthDir, 0o755); err != nil {
 		return err
 	}
 
