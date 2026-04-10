@@ -60,7 +60,7 @@ type JSONLStore struct {
 
 // NewJSONLStore creates a new JSONL-backed store rooted at dir.
 func NewJSONLStore(dir string) (*JSONLStore, error) {
-	err := os.MkdirAll(dir, 0o755)
+	err := os.MkdirAll(dir, 0o700)
 	if err != nil {
 		return nil, fmt.Errorf("memory: create directory: %w", err)
 	}

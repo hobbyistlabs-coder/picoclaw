@@ -32,7 +32,7 @@ func NewMemoryStore(workspace string) *MemoryStore {
 	memoryFile := filepath.Join(memoryDir, "MEMORY.md")
 
 	// Ensure memory directory exists
-	os.MkdirAll(memoryDir, 0o755)
+	os.MkdirAll(memoryDir, 0o700)
 
 	return &MemoryStore{
 		workspace:  workspace,
@@ -82,7 +82,7 @@ func (ms *MemoryStore) AppendToday(content string) error {
 
 	// Ensure month directory exists
 	monthDir := filepath.Dir(todayFile)
-	if err := os.MkdirAll(monthDir, 0o755); err != nil {
+	if err := os.MkdirAll(monthDir, 0o700); err != nil {
 		return err
 	}
 

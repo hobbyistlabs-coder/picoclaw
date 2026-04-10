@@ -12,3 +12,8 @@
 **Vulnerability:** The Pico WebSocket authentication handler was using standard string equality (`==`) to compare the provided bearer token against the configured secret token.
 **Learning:** String equality operators in Go return early as soon as a character mismatch is found. This allows an attacker to measure the time it takes for the server to reject the connection and iteratively guess the token character by character (a timing attack).
 **Prevention:** Always use `subtle.ConstantTimeCompare` from the `crypto/subtle` package when comparing secrets, tokens, passwords, or cryptographic signatures to ensure the comparison time depends only on the length of the secret, not the contents.
+
+## 2026-04-10 - [Medium] Fix Insecure Directory Permissions in Memory Stores
+**Vulnerability:** The memory stores (SQLite, JSONL, and Agent Memory) were creating directories with `0o755` permissions, allowing any local user to read sensitive session and agent memory data.
+**Learning:** Defaulting to standard `0o755` for directory creation in data storage paths exposes sensitive agent memory and user session files to other users on the same machine.
+**Prevention:** Always use `0o700` (user read/write/execute only) when creating directories that will store sensitive data, configuration, or session files.

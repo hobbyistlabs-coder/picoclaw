@@ -32,7 +32,7 @@ func SQLitePath(dir string) string {
 }
 
 func NewSQLiteStore(path string) (*SQLiteStore, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, fmt.Errorf("memory: create sqlite dir: %w", err)
 	}
 	db, err := sql.Open("sqlite", path+"?_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)")
