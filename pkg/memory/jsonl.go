@@ -60,9 +60,7 @@ type JSONLStore struct {
 
 // NewJSONLStore creates a new JSONL-backed store rooted at dir.
 func NewJSONLStore(dir string) (*JSONLStore, error) {
-	// SECURITY: Restrict directory permissions to 0o700 (user read/write/execute only)
-	// to prevent other local users from reading sensitive session JSONL logs.
-	err := os.MkdirAll(dir, 0o700)
+	err := os.MkdirAll(dir, 0o755)
 	if err != nil {
 		return nil, fmt.Errorf("memory: create directory: %w", err)
 	}
