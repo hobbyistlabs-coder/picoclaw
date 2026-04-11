@@ -1,0 +1,20 @@
+groups:
+  - name: etl_alerts
+    rules:
+      - alert: HighGoroutineCount
+        expr: deriv(etl_goroutines[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Goroutine Count detected"
+          description: "Goroutine count is continuously rising over the last 5 minutes."
+
+      - alert: HighGCPause
+        expr: etl_num_gc > 0 and (sum(rate(etl_gc_pause_ms_sum[1m])) / sum(rate(etl_gc_pause_ms_count[1m]))) > 20
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High GC Pause detected"
+          description: "Average GC pause is over 20ms in the last minute."
