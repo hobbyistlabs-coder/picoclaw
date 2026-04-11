@@ -52,9 +52,13 @@ func createAntigravityTokenSource() func() (string, string, error) {
 			// Try to fetch project ID from API
 			fetchedID, err := FetchAntigravityProjectID(cred.AccessToken)
 			if err != nil {
-				logger.WarnCF("provider.antigravity", "Could not fetch project ID, using fallback", map[string]any{
-					"error": err.Error(),
-				})
+				logger.WarnCF(
+					"provider.antigravity",
+					"Could not fetch project ID, using fallback",
+					map[string]any{
+						"error": err.Error(),
+					},
+				)
 				projectID = "rising-fact-p41fc" // Default fallback (same as OpenCode)
 			} else {
 				projectID = fetchedID
@@ -77,7 +81,11 @@ func FetchAntigravityProjectID(accessToken string) (string, error) {
 		},
 	})
 
-	req, err := http.NewRequest("POST", antigravityBaseURL+"/v1internal:loadCodeAssist", bytes.NewReader(reqBody))
+	req, err := http.NewRequest(
+		"POST",
+		antigravityBaseURL+"/v1internal:loadCodeAssist",
+		bytes.NewReader(reqBody),
+	)
 	if err != nil {
 		return "", err
 	}
@@ -121,7 +129,11 @@ func FetchAntigravityModels(accessToken, projectID string) ([]AntigravityModelIn
 		"project": projectID,
 	})
 
-	req, err := http.NewRequest("POST", antigravityBaseURL+"/v1internal:fetchAvailableModels", bytes.NewReader(reqBody))
+	req, err := http.NewRequest(
+		"POST",
+		antigravityBaseURL+"/v1internal:fetchAvailableModels",
+		bytes.NewReader(reqBody),
+	)
 	if err != nil {
 		return nil, err
 	}

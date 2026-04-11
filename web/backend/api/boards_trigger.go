@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -65,9 +66,12 @@ func (h *Handler) dispatchBoardPrompt(
 	sessionID := generateSecureToken()
 	dialURL := wsURL + "?session_id=" + url.QueryEscape(sessionID)
 	header := http.Header{"Authorization": []string{"Bearer " + cfg.Channels.Pico.Token}}
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, dialURL, header)
+	conn, res, err := websocket.DefaultDialer.DialContext(ctx, dialURL, header)
 	if err != nil {
 		return "", fmt.Errorf("connect to gateway pico websocket: %w", err)
+	}
+	if res != nil && res.Body != nil {
+		defer res.Body.Close()
 	}
 
 	if err := conn.WriteJSON(map[string]any{
@@ -102,7 +106,10 @@ func (h *Handler) gatewayPicoWSURL(cfg *config.Config) (string, error) {
 	}
 
 	host := gatewayProbeHost(h.effectiveGatewayBindHost(cfg))
-	return fmt.Sprintf("ws://%s:%d/pico/ws", host, cfg.Gateway.Port), nil
+	return fmt.Sprintf(
+		"ws://%s/pico/ws",
+		net.JoinHostPort(host, fmt.Sprintf("%d", cfg.Gateway.Port)),
+	), nil
 }
 
 func drainPicoConn(conn *websocket.Conn, maxDuration time.Duration) {
