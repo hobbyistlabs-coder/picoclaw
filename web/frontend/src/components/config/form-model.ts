@@ -20,6 +20,7 @@ export interface CoreConfigForm {
   workspace: string
   restrictToWorkspace: boolean
   allowRemote: boolean
+  autoApprove: boolean
   maxTokens: string
   maxToolIterations: string
   summarizeMessageThreshold: string
@@ -73,6 +74,7 @@ export const EMPTY_FORM: CoreConfigForm = {
   workspace: "",
   restrictToWorkspace: true,
   allowRemote: true,
+  autoApprove: false,
   maxTokens: "32768",
   maxToolIterations: "50",
   summarizeMessageThreshold: "20",
@@ -195,6 +197,10 @@ export function buildFormFromConfig(config: unknown): CoreConfigForm {
       exec.allow_remote === undefined
         ? EMPTY_FORM.allowRemote
         : asBool(exec.allow_remote),
+    autoApprove:
+      tools.auto_approve === undefined
+        ? EMPTY_FORM.autoApprove
+        : asBool(tools.auto_approve),
     maxTokens: asNumberString(defaults.max_tokens, EMPTY_FORM.maxTokens),
     maxToolIterations: asNumberString(
       defaults.max_tool_iterations,

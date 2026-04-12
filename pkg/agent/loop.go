@@ -9,6 +9,7 @@ package agent
 import (
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"jane/pkg/bus"
 	"jane/pkg/channels"
@@ -32,11 +33,15 @@ type AgentLoop struct {
 	summaryJobs      chan summaryJob
 	wg               sync.WaitGroup
 	fallback         *providers.FallbackChain
+	provider         providers.LLMProvider
 	channelManager   *channels.Manager
 	mediaStore       media.MediaStore
 	transcriber      voice.Transcriber
 	cmdRegistry      *commands.Registry
 	mcp              mcpRuntime
+	configPath       string
+	configModTime    time.Time
+	reloadMu         sync.Mutex
 }
 
 type pendingApprovalState struct {

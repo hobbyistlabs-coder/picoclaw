@@ -1,5 +1,7 @@
 import { refreshGatewayState } from "@/store/gateway"
 
+import type { OpenRouterModel } from "./openrouter"
+
 // API client for model list management.
 
 export interface ModelInfo {
@@ -18,9 +20,12 @@ export interface ModelInfo {
   request_timeout?: number
   thinking_level?: string
   price_per_m_token?: number
+  input_price_per_m_token?: number
+  output_price_per_m_token?: number
   // Meta
   configured: boolean
   is_default: boolean
+  catalog?: OpenRouterModel
 }
 
 interface ModelsListResponse {

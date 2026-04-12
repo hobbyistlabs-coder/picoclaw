@@ -16,7 +16,7 @@ func NewOnboardCommand() *cobra.Command {
 		Aliases: []string{"o"},
 		Short:   "Initialize Jane AI configuration and workspace",
 		Run: func(cmd *cobra.Command, args []string) {
-			onboard()
+			Onboard()
 		},
 	}
 

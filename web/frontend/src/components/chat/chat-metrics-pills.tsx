@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next"
 
-import type { ChatMetrics } from "@/lib/chat-metrics"
+import type { ChatMetricPricing, ChatMetrics } from "@/lib/chat-metrics"
 import {
   formatEstimatedCost,
   formatTokenCount,
@@ -9,9 +9,10 @@ import {
 
 interface ChatMetricsPillsProps {
   metrics?: ChatMetrics | null
+  pricing?: ChatMetricPricing | null
 }
 
-export function ChatMetricsPills({ metrics }: ChatMetricsPillsProps) {
+export function ChatMetricsPills({ metrics, pricing }: ChatMetricsPillsProps) {
   const { t } = useTranslation()
 
   if (!hasChatMetrics(metrics)) return null
@@ -26,7 +27,7 @@ export function ChatMetricsPills({ metrics }: ChatMetricsPillsProps) {
         {formatTokenCount(metrics?.total_tokens ?? 0)}
       </span>
       <span className="bg-muted text-muted-foreground rounded-full px-2.5 py-1">
-        {t("chat.metrics.cost")}: {formatEstimatedCost(metrics)}
+        {t("chat.metrics.cost")}: {formatEstimatedCost(metrics, pricing)}
       </span>
     </div>
   )

@@ -2,6 +2,7 @@ package openai_compat
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -198,6 +199,122 @@ func TestProviderChat_ParsesReasoningContent(t *testing.T) {
 	}
 	if len(out.ToolCalls) != 1 {
 		t.Fatalf("len(ToolCalls) = %d, want 1", len(out.ToolCalls))
+	}
+}
+
+func TestProviderChat_StreamsChunksAndUsage(t *testing.T) {
+	var requestBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		events := []string{
+			"data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"Thinking \"}}]}\n\n",
+			"data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n\n",
+			"data: {\"choices\":[{\"delta\":{\"content\":\" world\"}}]}\n\n",
+			"data: {\"choices\":[{\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":7,\"total_tokens\":18}}\n\n",
+			"data: [DONE]\n\n",
+		}
+		for _, event := range events {
+			_, _ = w.Write([]byte(event))
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+	}))
+	defer server.Close()
+
+	p := NewProvider("key", server.URL, "")
+	var chunks []string
+	var reasoning []string
+	out, err := p.Chat(
+		t.Context(),
+		[]Message{{Role: "user", Content: "hi"}},
+		nil,
+		"gpt-4o",
+		map[string]any{
+			"stream_callback": func(_ context.Context, chunk string, isReasoning bool) {
+				if isReasoning {
+					reasoning = append(reasoning, chunk)
+					return
+				}
+				chunks = append(chunks, chunk)
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("Chat() error = %v", err)
+	}
+
+	if requestBody["stream"] != true {
+		t.Fatalf("stream = %v, want true", requestBody["stream"])
+	}
+	streamOptions, ok := requestBody["stream_options"].(map[string]any)
+	if !ok || streamOptions["include_usage"] != true {
+		t.Fatalf("stream_options = %v, want include_usage=true", requestBody["stream_options"])
+	}
+	if got := strings.Join(chunks, ""); got != "Hello world" {
+		t.Fatalf("streamed chunks = %q, want %q", got, "Hello world")
+	}
+	if got := strings.Join(reasoning, ""); got != "Thinking " {
+		t.Fatalf("reasoning chunks = %q, want %q", got, "Thinking ")
+	}
+	if out.Content != "Hello world" {
+		t.Fatalf("Content = %q, want %q", out.Content, "Hello world")
+	}
+	if out.ReasoningContent != "Thinking " {
+		t.Fatalf("ReasoningContent = %q, want %q", out.ReasoningContent, "Thinking ")
+	}
+	if out.Usage == nil || out.Usage.TotalTokens != 18 {
+		t.Fatalf("Usage = %+v, want total_tokens=18", out.Usage)
+	}
+}
+
+func TestProviderChat_StreamingAccumulatesToolCalls(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		events := []string{
+			"data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_1\",\"type\":\"function\",\"function\":{\"name\":\"search\",\"arguments\":\"{\\\"q\\\":\"}}]}}]}\n\n",
+			"data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"weather\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}]}\n\n",
+			"data: [DONE]\n\n",
+		}
+		for _, event := range events {
+			_, _ = w.Write([]byte(event))
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+	}))
+	defer server.Close()
+
+	p := NewProvider("key", server.URL, "")
+	out, err := p.Chat(
+		t.Context(),
+		[]Message{{Role: "user", Content: "hi"}},
+		nil,
+		"gpt-4o",
+		map[string]any{
+			"stream_callback": func(context.Context, string, bool) {},
+		},
+	)
+	if err != nil {
+		t.Fatalf("Chat() error = %v", err)
+	}
+	if out.FinishReason != "tool_calls" {
+		t.Fatalf("FinishReason = %q, want %q", out.FinishReason, "tool_calls")
+	}
+	if len(out.ToolCalls) != 1 {
+		t.Fatalf("len(ToolCalls) = %d, want 1", len(out.ToolCalls))
+	}
+	if out.ToolCalls[0].Name != "search" {
+		t.Fatalf("ToolCalls[0].Name = %q, want %q", out.ToolCalls[0].Name, "search")
+	}
+	if out.ToolCalls[0].Arguments["q"] != "weather" {
+		t.Fatalf("ToolCalls[0].Arguments[q] = %v, want %q", out.ToolCalls[0].Arguments["q"], "weather")
 	}
 }
 

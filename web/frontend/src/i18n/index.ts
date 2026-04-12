@@ -8,7 +8,6 @@ import LanguageDetector from "i18next-browser-languagedetector"
 import { initReactI18next } from "react-i18next"
 
 import en from "./locales/en.json"
-import zh from "./locales/zh.json"
 
 dayjs.extend(relativeTime)
 dayjs.extend(localizedFormat)
@@ -26,9 +25,6 @@ i18n
       en: {
         translation: en,
       },
-      zh: {
-        translation: zh,
-      },
     },
     fallbackLng: "en",
     debug: false,
@@ -40,7 +36,7 @@ i18n
 
 i18n.on("languageChanged", (lng) => {
   if (lng.startsWith("zh")) {
-    dayjs.locale("zh-cn")
+    dayjs.locale("en")
   } else {
     dayjs.locale("en")
   }

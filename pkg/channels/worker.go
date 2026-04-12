@@ -14,12 +14,14 @@ import (
 )
 
 type channelWorker struct {
-	ch         Channel
-	queue      chan bus.OutboundMessage
-	mediaQueue chan bus.OutboundMediaMessage
-	done       chan struct{}
-	mediaDone  chan struct{}
-	limiter    *rate.Limiter
+	ch          Channel
+	queue       chan bus.OutboundMessage
+	streamQueue chan bus.OutboundStreamMessage
+	mediaQueue  chan bus.OutboundMediaMessage
+	done        chan struct{}
+	streamDone  chan struct{}
+	mediaDone   chan struct{}
+	limiter     *rate.Limiter
 }
 
 // newChannelWorker creates a channelWorker with a rate limiter configured
@@ -32,12 +34,14 @@ func newChannelWorker(name string, ch Channel) *channelWorker {
 	burst := int(math.Max(1, math.Ceil(rateVal/2)))
 
 	return &channelWorker{
-		ch:         ch,
-		queue:      make(chan bus.OutboundMessage, defaultChannelQueueSize),
-		mediaQueue: make(chan bus.OutboundMediaMessage, defaultChannelQueueSize),
-		done:       make(chan struct{}),
-		mediaDone:  make(chan struct{}),
-		limiter:    rate.NewLimiter(rate.Limit(rateVal), burst),
+		ch:          ch,
+		queue:       make(chan bus.OutboundMessage, defaultChannelQueueSize),
+		streamQueue: make(chan bus.OutboundStreamMessage, defaultChannelQueueSize),
+		mediaQueue:  make(chan bus.OutboundMediaMessage, defaultChannelQueueSize),
+		done:        make(chan struct{}),
+		streamDone:  make(chan struct{}),
+		mediaDone:   make(chan struct{}),
+		limiter:     rate.NewLimiter(rate.Limit(rateVal), burst),
 	}
 }
 
@@ -81,6 +85,35 @@ func (m *Manager) runMediaWorker(ctx context.Context, name string, w *channelWor
 				return
 			}
 			m.sendMediaWithRetry(ctx, name, w, msg)
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (m *Manager) runStreamWorker(ctx context.Context, name string, w *channelWorker) {
+	defer close(w.streamDone)
+	sender, ok := w.ch.(StreamCapable)
+	if !ok {
+		for {
+			select {
+			case _, ok := <-w.streamQueue:
+				if !ok {
+					return
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}
+
+	for {
+		select {
+		case msg, ok := <-w.streamQueue:
+			if !ok {
+				return
+			}
+			_ = sender.SendStream(ctx, msg)
 		case <-ctx.Done():
 			return
 		}

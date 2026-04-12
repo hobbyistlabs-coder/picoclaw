@@ -31,6 +31,9 @@ func (al *AgentLoop) ProcessDirectWithChannel(
 	ctx context.Context,
 	content, sessionKey, channel, chatID string,
 ) (string, error) {
+	if err := al.reloadRuntimeConfigIfChanged(ctx); err != nil {
+		return "", err
+	}
 	if err := al.ensureMCPInitialized(ctx); err != nil {
 		return "", err
 	}
@@ -52,6 +55,9 @@ func (al *AgentLoop) ProcessHeartbeat(
 	ctx context.Context,
 	content, channel, chatID string,
 ) (string, error) {
+	if err := al.reloadRuntimeConfigIfChanged(ctx); err != nil {
+		return "", err
+	}
 	agent := al.registry.GetDefaultAgent()
 	if agent == nil {
 		return "", fmt.Errorf("no default agent for heartbeat")
@@ -69,6 +75,9 @@ func (al *AgentLoop) ProcessHeartbeat(
 }
 
 func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage) (string, error) {
+	if err := al.reloadRuntimeConfigIfChanged(ctx); err != nil {
+		return "", err
+	}
 	// Add message preview to log (show full content for error messages)
 	var logContent string
 	if strings.Contains(msg.Content, "Error:") || strings.Contains(msg.Content, "error") {
@@ -288,14 +297,28 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 }
 
 func (al *AgentLoop) resolveMessageRoute(msg bus.InboundMessage) (routing.ResolvedRoute, *AgentInstance, error) {
-	route := al.registry.ResolveRoute(routing.RouteInput{
+	input := routing.RouteInput{
 		Channel:    msg.Channel,
 		AccountID:  inboundMetadata(msg, metadataKeyAccountID),
 		Peer:       extractPeer(msg),
 		ParentPeer: extractParentPeer(msg),
 		GuildID:    inboundMetadata(msg, metadataKeyGuildID),
 		TeamID:     inboundMetadata(msg, metadataKeyTeamID),
-	})
+	}
+
+	explicitAgentID := strings.TrimSpace(inboundMetadata(msg, "agent_id"))
+
+	// Extract agent ID from session key if it's in the form "agent:<agent_id>:<rest>"
+	if explicitAgentID == "" && strings.HasPrefix(msg.SessionKey, sessionKeyAgentPrefix) {
+		if parsed := routing.ParseAgentSessionKey(msg.SessionKey); parsed != nil {
+			explicitAgentID = parsed.AgentID
+		}
+	}
+
+	route := al.registry.ResolveRoute(input)
+	if explicitAgentID != "" {
+		route = al.registry.ResolveExplicitRoute(explicitAgentID, route)
+	}
 
 	agent, ok := al.registry.GetAgent(route.AgentID)
 	if !ok {

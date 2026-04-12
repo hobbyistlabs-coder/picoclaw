@@ -217,12 +217,17 @@ export function usePicoChat() {
         metrics: m.metrics,
         source: "history" as const,
         reasoningContent: m.reasoning_content,
-        toolEvents: (m.tool_calls || []).map((tool) => ({
-          id: tool.id,
-          name: tool.name,
+        // FIX: Map the full tool execution state from history!
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        toolEvents: (m.tool_calls || []).map((tool: any) => ({
+          id: tool.id || `tool-${Date.now()}-${Math.random()}`,
+          name: tool.name || "tool",
           kind: tool.kind || "tool",
-          status: "completed",
+          status: tool.status || "completed",
+          toolName: tool.tool_name,
           arguments: tool.arguments,
+          summary: tool.summary, // <- CRITICAL FOR UI
+          result: tool.result, // <- CRITICAL FOR UI
         })),
       })),
       metrics: detail.metrics ?? null,
@@ -263,6 +268,29 @@ export function usePicoChat() {
       )
     },
     [ensurePendingAssistant, setTrackedMessages],
+  )
+
+  const mergeAssistantMessage = useCallback(
+    (
+      current: ChatMessage,
+      next: {
+        id: string
+        content?: string
+        timestamp: number
+        metrics?: ChatMetrics
+      },
+    ): ChatMessage => ({
+      ...current,
+      id: next.id,
+      content:
+        next.content && next.content.length > 0
+          ? next.content
+          : current.content,
+      timestamp: next.timestamp,
+      metrics: next.metrics ?? current.metrics,
+      pending: false,
+    }),
+    [],
   )
 
   useEffect(() => {
@@ -338,6 +366,22 @@ export function usePicoChat() {
 
           const pendingId = pendingAssistantIdRef.current
           setTrackedMessages((prev) => {
+            const existingIndex = prev.findIndex(
+              (item) => item.id === messageId,
+            )
+            if (existingIndex >= 0) {
+              return prev.map((item, index) =>
+                index === existingIndex
+                  ? mergeAssistantMessage(item, {
+                      id: messageId,
+                      content,
+                      timestamp: timestampRaw,
+                      metrics: payload.metrics as ChatMetrics | undefined,
+                    })
+                  : item,
+              )
+            }
+
             if (!pendingId) {
               return [
                 ...prev,
@@ -354,14 +398,12 @@ export function usePicoChat() {
 
             return prev.map((msg) =>
               msg.id === pendingId
-                ? {
-                    ...msg,
+                ? mergeAssistantMessage(msg, {
                     id: messageId,
                     content,
                     timestamp: timestampRaw,
                     metrics: payload.metrics as ChatMetrics | undefined,
-                    pending: false,
-                  }
+                  })
                 : msg,
             )
           })
@@ -373,18 +415,22 @@ export function usePicoChat() {
         case "message.update": {
           const content = (payload.content as string) || ""
           const messageId = payload.message_id as string
+          const timestampRaw =
+            msg.timestamp !== undefined &&
+            Number.isFinite(Number(msg.timestamp))
+              ? normalizeUnixTimestamp(Number(msg.timestamp))
+              : Date.now()
           if (!messageId) break
 
           setTrackedMessages((prev) =>
             prev.map((m) =>
               m.id === messageId || m.id === pendingAssistantIdRef.current
-                ? {
-                    ...m,
+                ? mergeAssistantMessage(m, {
                     id: messageId,
                     content,
-                    metrics:
-                      (payload.metrics as ChatMetrics | undefined) ?? m.metrics,
-                  }
+                    timestamp: timestampRaw,
+                    metrics: payload.metrics as ChatMetrics | undefined,
+                  })
                 : m,
             ),
           )
@@ -398,6 +444,23 @@ export function usePicoChat() {
             ...message,
             reasoningContent: content,
           }))
+          break
+        }
+
+        case "message.stream": {
+          const content = (payload.content as string) || ""
+          if (!content) break
+          const isReasoning = Boolean(payload.is_reasoning)
+          updatePendingAssistant((message) => ({
+            ...message,
+            content: isReasoning
+              ? message.content
+              : `${message.content}${content}`,
+            reasoningContent: isReasoning
+              ? `${message.reasoningContent || ""}${content}`
+              : message.reasoningContent,
+          }))
+          setIsTyping(true)
           break
         }
 
@@ -466,7 +529,12 @@ export function usePicoChat() {
           console.log("Unknown pico message type:", msg.type)
       }
     },
-    [resetPendingAssistant, setTrackedMessages, updatePendingAssistant],
+    [
+      mergeAssistantMessage,
+      resetPendingAssistant,
+      setTrackedMessages,
+      updatePendingAssistant,
+    ],
   )
 
   const connect = useCallback(async () => {
@@ -580,7 +648,7 @@ export function usePicoChat() {
   }, [disconnect])
 
   const sendMessage = useCallback(
-    (content: string) => {
+    (content: string, agentId?: string) => {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
         console.warn("WebSocket not connected")
         return
@@ -602,7 +670,10 @@ export function usePicoChat() {
       const picoMsg: PicoMessage = {
         type: "message.send",
         id,
-        payload: { content },
+        payload:
+          agentId && agentId !== "__auto__"
+            ? { content, agent_id: agentId }
+            : { content },
       }
       wsRef.current.send(JSON.stringify(picoMsg))
     },

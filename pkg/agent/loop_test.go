@@ -43,6 +43,8 @@ func (p *approvalMockProvider) Chat(
 
 func (p *approvalMockProvider) GetDefaultModel() string { return "mock-model" }
 
+type autoApprovalMockProvider struct{}
+
 type approvalTool struct{}
 
 func (t *approvalTool) Name() string { return "approval_tool" }
@@ -61,6 +63,23 @@ func (t *approvalTool) Execute(ctx context.Context, args map[string]any) *tools.
 	return &tools.ToolResult{ForLLM: "approved"}
 }
 func (t *approvalTool) RequiresApproval() bool { return true }
+
+type captureModelProvider struct {
+	lastModel string
+}
+
+func (p *captureModelProvider) Chat(
+	ctx context.Context,
+	messages []providers.Message,
+	toolDefs []providers.ToolDefinition,
+	model string,
+	opts map[string]any,
+) (*providers.LLMResponse, error) {
+	p.lastModel = model
+	return &providers.LLMResponse{Content: "captured"}, nil
+}
+
+func (p *captureModelProvider) GetDefaultModel() string { return "mock-model" }
 
 type fakeChannel struct{ id string }
 
@@ -87,7 +106,7 @@ func newTestAgentLoop(
 				Workspace:         tmpDir,
 				Model:             "test-model",
 				MaxTokens:         4096,
-				MaxToolIterations: 10,
+				MaxToolIterations: 1,
 			},
 		},
 	}
@@ -111,6 +130,98 @@ func TestRecordLastChannel(t *testing.T) {
 	al2 := NewAgentLoop(cfg, msgBus, provider)
 	if got := al2.state.GetLastChannel(); got != testChannel {
 		t.Errorf("Expected persistent channel '%s', got '%s'", testChannel, got)
+	}
+}
+
+func TestResolveExplicitRoute_PreservesSessionKey(t *testing.T) {
+	cfg := &config.Config{
+		Agents: config.AgentsConfig{
+			Defaults: config.AgentDefaults{Workspace: t.TempDir()},
+			List: []config.AgentConfig{
+				{ID: "coding"},
+			},
+		},
+		Session: config.SessionConfig{
+			DMScope: string(routing.DMScopePerChannelPeer),
+		},
+	}
+
+	registry := NewAgentRegistry(cfg, &mockProvider{})
+	base := registry.ResolveRoute(routing.RouteInput{
+		Channel:   "pico",
+		AccountID: routing.DefaultAccountID,
+		Peer:      &routing.RoutePeer{Kind: "direct", ID: "pico:test-session"},
+	})
+	override := registry.ResolveExplicitRoute("coding", base)
+
+	if override.AgentID != "coding" {
+		t.Fatalf("override.AgentID = %q, want coding", override.AgentID)
+	}
+	if override.SessionKey != base.SessionKey {
+		t.Fatalf("override.SessionKey = %q, want %q", override.SessionKey, base.SessionKey)
+	}
+	if override.MatchedBy != "explicit" {
+		t.Fatalf("override.MatchedBy = %q, want explicit", override.MatchedBy)
+	}
+}
+
+func TestAgentLoop_ReloadsConfigWhenModelChanges(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+	t.Setenv("PICOCLAW_CONFIG", configPath)
+
+	cfg := &config.Config{
+		Agents: config.AgentsConfig{
+			Defaults: config.AgentDefaults{
+				Workspace:         tmpDir,
+				Model:             "alias-a",
+				ModelName:         "alias-a",
+				MaxTokens:         4096,
+				MaxToolIterations: 10,
+			},
+		},
+		ModelList: []config.ModelConfig{
+			{ModelName: "alias-a", Model: "openai/model-a"},
+			{ModelName: "alias-b", Model: "openrouter/openai/model-b"},
+		},
+	}
+	if err := config.SaveConfig(configPath, cfg); err != nil {
+		t.Fatalf("SaveConfig(initial) error = %v", err)
+	}
+
+	provider := &captureModelProvider{}
+	loop := NewAgentLoop(cfg, bus.NewMessageBus(), provider)
+	defer loop.Close()
+
+	cfg.Agents.Defaults.Model = "alias-b"
+	cfg.Agents.Defaults.ModelName = "alias-b"
+	if err := config.SaveConfig(configPath, cfg); err != nil {
+		t.Fatalf("SaveConfig(updated) error = %v", err)
+	}
+	nextTime := time.Now().Add(2 * time.Second)
+	if err := os.Chtimes(configPath, nextTime, nextTime); err != nil {
+		t.Fatalf("Chtimes() error = %v", err)
+	}
+
+	if err := loop.reloadRuntimeConfigIfChanged(context.Background()); err != nil {
+		t.Fatalf("reloadRuntimeConfigIfChanged() error = %v", err)
+	}
+
+	response, err := loop.ProcessDirectWithChannel(
+		context.Background(),
+		"use the refreshed model",
+		"reload-session",
+		"cli",
+		"direct",
+	)
+	if err != nil {
+		t.Fatalf("ProcessDirectWithChannel() error = %v", err)
+	}
+	if response == "" {
+		t.Fatal("expected non-empty response")
+	}
+	if provider.lastModel != "openai/model-b" {
+		t.Fatalf("provider.lastModel = %q, want openai/model-b", provider.lastModel)
 	}
 }
 
@@ -146,7 +257,7 @@ func TestNewAgentLoop_StateInitialized(t *testing.T) {
 				Workspace:         tmpDir,
 				Model:             "test-model",
 				MaxTokens:         4096,
-				MaxToolIterations: 10,
+				MaxToolIterations: 1,
 			},
 		},
 	}
@@ -1158,6 +1269,64 @@ func TestTargetReasoningChannelID_AllChannels(t *testing.T) {
 				t.Fatalf("targetReasoningChannelID(%q) = %q, want %q", tt.channel, got, tt.wantID)
 			}
 		})
+	}
+}
+
+func TestRunAgentLoop_AutoApproveExecutesTool(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := &config.Config{
+		Agents: config.AgentsConfig{
+			Defaults: config.AgentDefaults{
+				Workspace:         tmpDir,
+				Model:             "test-model",
+				MaxTokens:         4096,
+				MaxToolIterations: 10,
+			},
+		},
+		Tools: config.ToolsConfig{
+			AutoApprove: true,
+		},
+	}
+
+	msgBus := bus.NewMessageBus()
+	al := NewAgentLoop(cfg, msgBus, &approvalMockProvider{})
+	defaultAgent := al.registry.GetDefaultAgent()
+	if defaultAgent == nil {
+		t.Fatal("No default agent found")
+	}
+	defaultAgent.Tools.Register(&approvalTool{})
+
+	sessionKey := "agent:main:test:direct:test:auto-approval-session"
+	response, err := al.runAgentLoop(context.Background(), defaultAgent, processOptions{
+		SessionKey:      sessionKey,
+		Channel:         "test",
+		ChatID:          "chat-1",
+		UserMessage:     "explore host machine",
+		DefaultResponse: defaultResponse,
+		EnableSummary:   false,
+		SendResponse:    false,
+	})
+	if err != nil {
+		t.Fatalf("runAgentLoop() error = %v", err)
+	}
+	if response == "" {
+		t.Fatal("expected non-empty response after auto-approved execution")
+	}
+	checkCtx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+	if _, ok := msgBus.SubscribeOutbound(checkCtx); ok {
+		t.Fatal("did not expect approval outbound message")
+	}
+
+	history := defaultAgent.Sessions.GetHistory(sessionKey)
+	if len(history) < 3 {
+		t.Fatalf("len(history) = %d, want at least 3", len(history))
+	}
+	if history[2].Role != "tool" {
+		t.Fatalf("history[2].Role = %q, want tool", history[2].Role)
+	}
+	if history[2].Content != "approved" {
+		t.Fatalf("history[2].Content = %q, want approved", history[2].Content)
 	}
 }
 

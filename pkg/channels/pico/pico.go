@@ -189,6 +189,13 @@ func (c *PicoChannel) EditOutboundMessage(
 	return c.broadcastToSession(msg.ChatID, outMsg)
 }
 
+func (c *PicoChannel) SendStream(ctx context.Context, msg bus.OutboundStreamMessage) error {
+	return c.broadcastToSession(msg.ChatID, newMessage(TypeMessageStream, map[string]any{
+		"content":      msg.Content,
+		"is_reasoning": msg.IsReasoning,
+	}))
+}
+
 // StartTyping implements channels.TypingCapable.
 func (c *PicoChannel) StartTyping(ctx context.Context, chatID string) (func(), error) {
 	startMsg := newMessage(TypeTypingStart, nil)
@@ -462,6 +469,9 @@ func (c *PicoChannel) handleMessageSend(pc *picoConn, msg PicoMessage) {
 		"platform":   "pico",
 		"session_id": sessionID,
 		"conn_id":    pc.id,
+	}
+	if agentID, ok := msg.Payload["agent_id"].(string); ok && strings.TrimSpace(agentID) != "" {
+		metadata["agent_id"] = agentID
 	}
 
 	logger.DebugCF("pico", "Received message", map[string]any{

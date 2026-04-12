@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"slices"
 	"sync"
 
 	"jane/pkg/config"
@@ -83,6 +84,20 @@ func (r *AgentRegistry) ResolveRoute(input routing.RouteInput) routing.ResolvedR
 	return r.resolver.ResolveRoute(input)
 }
 
+func (r *AgentRegistry) ResolveExplicitRoute(
+	agentID string,
+	base routing.ResolvedRoute,
+) routing.ResolvedRoute {
+	normalized := routing.NormalizeAgentID(agentID)
+	if _, ok := r.GetAgent(normalized); !ok {
+		return base
+	}
+	base.AgentID = normalized
+	base.MainSessionKey = routing.BuildAgentMainSessionKey(normalized)
+	base.MatchedBy = "explicit"
+	return base
+}
+
 // ListAgentIDs returns all registered agent IDs.
 func (r *AgentRegistry) ListAgentIDs() []string {
 	r.mu.RLock()
@@ -144,11 +159,13 @@ func (r *AgentRegistry) Close() {
 func (r *AgentRegistry) GetDefaultAgent() *AgentInstance {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	if agent, ok := r.agents["main"]; ok {
+	if agent, ok := r.agents[routing.DefaultAgentID]; ok {
 		return agent
 	}
-	for _, agent := range r.agents {
-		return agent
+	ids := r.ListAgentIDs()
+	if len(ids) == 0 {
+		return nil
 	}
-	return nil
+	slices.Sort(ids)
+	return r.agents[ids[0]]
 }

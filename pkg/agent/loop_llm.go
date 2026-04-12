@@ -223,6 +223,15 @@ func (al *AgentLoop) runLLMIteration(
 	// all tool-follow-up iterations within the same turn so that a multi-step
 	// tool chain doesn't switch models mid-way through.
 	activeCandidates, activeModel := al.selectCandidates(agent, opts.UserMessage, messages)
+	logger.InfoCF("agent", "Chat turn model selection", map[string]any{
+		"agent_id":     agent.ID,
+		"session_key":  opts.SessionKey,
+		"channel":      opts.Channel,
+		"chat_id":      opts.ChatID,
+		"selected":     activeModel,
+		"candidates":   len(activeCandidates),
+		"user_message": opts.UserMessage,
+	})
 
 	for iteration < agent.MaxIterations {
 		iteration++
@@ -371,7 +380,7 @@ func (al *AgentLoop) runLLMIteration(
 			}
 		}
 
-		if requiresApproval {
+		if requiresApproval && !al.cfg.Tools.AutoApprove {
 			logger.InfoCF("agent", "Tool execution paused for user approval", map[string]any{
 				"agent_id":    agent.ID,
 				"session_key": opts.SessionKey,
@@ -502,8 +511,15 @@ func (al *AgentLoop) selectCandidates(
 	userMsg string,
 	history []providers.Message,
 ) (candidates []providers.FallbackCandidate, model string) {
+	displayModel := func(candidates []providers.FallbackCandidate, fallback string) string {
+		if len(candidates) == 0 {
+			return fallback
+		}
+		return fmt.Sprintf("%s/%s", candidates[0].Provider, candidates[0].Model)
+	}
+
 	if agent.Router == nil || len(agent.LightCandidates) == 0 {
-		return agent.Candidates, agent.Model
+		return agent.Candidates, displayModel(agent.Candidates, agent.Model)
 	}
 
 	_, usedLight, score := agent.Router.SelectModel(userMsg, history, agent.Model)
@@ -514,7 +530,7 @@ func (al *AgentLoop) selectCandidates(
 				"score":     score,
 				"threshold": agent.Router.Threshold(),
 			})
-		return agent.Candidates, agent.Model
+		return agent.Candidates, displayModel(agent.Candidates, agent.Model)
 	}
 
 	logger.InfoCF("agent", "Model routing: light model selected",
@@ -524,5 +540,5 @@ func (al *AgentLoop) selectCandidates(
 			"score":       score,
 			"threshold":   agent.Router.Threshold(),
 		})
-	return agent.LightCandidates, agent.Router.LightModel()
+	return agent.LightCandidates, displayModel(agent.LightCandidates, agent.Router.LightModel())
 }

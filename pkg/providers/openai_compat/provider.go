@@ -40,6 +40,8 @@ type Option func(*Provider)
 
 const defaultRequestTimeout = 120 * time.Second
 
+type streamCallback func(context.Context, string, bool)
+
 func WithMaxTokensField(maxTokensField string) Option {
 	return func(p *Provider) {
 		p.maxTokensField = maxTokensField
@@ -164,6 +166,14 @@ func (p *Provider) Chat(
 		}
 	}
 
+	if cb := extractStreamCallback(options); cb != nil {
+		requestBody["stream"] = true
+		requestBody["stream_options"] = map[string]any{
+			"include_usage": true,
+		}
+		return p.chatStreaming(ctx, requestBody, model, cb)
+	}
+
 	jsonData, err := json.Marshal(requestBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
@@ -219,6 +229,53 @@ func (p *Provider) Chat(
 	}
 
 	return out, nil
+}
+
+func (p *Provider) chatStreaming(
+	ctx context.Context,
+	requestBody map[string]any,
+	model string,
+	cb streamCallback,
+) (*LLMResponse, error) {
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", p.apiBase+"/chat/completions", bytes.NewReader(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+	if p.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+p.apiKey)
+	}
+
+	resp, err := p.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	contentType := resp.Header.Get("Content-Type")
+	if resp.StatusCode != http.StatusOK {
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 256))
+		if readErr != nil {
+			return nil, fmt.Errorf("failed to read response: %w", readErr)
+		}
+		if looksLikeHTML(body, contentType) {
+			return nil, wrapHTMLResponseError(resp.StatusCode, body, contentType, p.apiBase)
+		}
+		return nil, fmt.Errorf(
+			"API request failed:\n  Status: %d\n  Body:   %s",
+			resp.StatusCode,
+			responsePreview(body, 128),
+		)
+	}
+
+	return parseStreamingResponse(ctx, resp.Body, cb, model)
 }
 
 func wrapHTMLResponseError(statusCode int, body []byte, contentType, apiBase string) error {
@@ -357,6 +414,110 @@ func parseResponse(body io.Reader) (*LLMResponse, error) {
 	}, nil
 }
 
+func parseStreamingResponse(
+	ctx context.Context,
+	body io.Reader,
+	cb streamCallback,
+	model string,
+) (*LLMResponse, error) {
+	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	var dataLines []string
+	contentBuilder := strings.Builder{}
+	reasoningBuilder := strings.Builder{}
+	toolCalls := make(map[int]*streamToolCall)
+	finishReason := "stop"
+	var usage *UsageInfo
+
+	flushEvent := func() error {
+		if len(dataLines) == 0 {
+			return nil
+		}
+		payload := strings.Join(dataLines, "\n")
+		dataLines = nil
+		if payload == "[DONE]" {
+			return io.EOF
+		}
+
+		var chunk streamChunk
+		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
+			return fmt.Errorf("failed to decode stream chunk: %w", err)
+		}
+		if chunk.Usage != nil {
+			usage = chunk.Usage
+		}
+		for _, choice := range chunk.Choices {
+			if choice.FinishReason != "" {
+				finishReason = choice.FinishReason
+			}
+			delta := choice.Delta
+			if delta.Content != "" {
+				contentBuilder.WriteString(delta.Content)
+				cb(ctx, delta.Content, false)
+			}
+			reasoningChunk := delta.ReasoningContent
+			if reasoningChunk == "" {
+				reasoningChunk = delta.Reasoning
+			}
+			if reasoningChunk != "" {
+				reasoningBuilder.WriteString(reasoningChunk)
+				cb(ctx, reasoningChunk, true)
+			}
+			for _, tc := range delta.ToolCalls {
+				entry := toolCalls[tc.Index]
+				if entry == nil {
+					entry = &streamToolCall{}
+					toolCalls[tc.Index] = entry
+				}
+				if tc.ID != "" {
+					entry.ID = tc.ID
+				}
+				if tc.Type != "" {
+					entry.Type = tc.Type
+				}
+				if tc.Function != nil {
+					if tc.Function.Name != "" {
+						entry.Name = tc.Function.Name
+					}
+					entry.Arguments.WriteString(streamArgumentFragment(tc.Function.Arguments))
+				}
+			}
+		}
+		return nil
+	}
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			if err := flushEvent(); err != nil {
+				if err == io.EOF {
+					break
+				}
+				return nil, err
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "data:") {
+			dataLines = append(dataLines, strings.TrimSpace(strings.TrimPrefix(line, "data:")))
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read stream: %w", err)
+	}
+	if err := flushEvent(); err != nil && err != io.EOF {
+		return nil, err
+	}
+
+	return &LLMResponse{
+		Content:          contentBuilder.String(),
+		ReasoningContent: reasoningBuilder.String(),
+		ToolCalls:        buildStreamToolCalls(toolCalls),
+		FinishReason:     finishReason,
+		Usage:            usage,
+	}, nil
+}
+
 func decodeToolCallArguments(raw json.RawMessage, name string) map[string]any {
 	arguments := make(map[string]any)
 	raw = bytes.TrimSpace(raw)
@@ -388,6 +549,91 @@ func decodeToolCallArguments(raw json.RawMessage, name string) map[string]any {
 		arguments["raw"] = string(raw)
 		return arguments
 	}
+}
+
+type streamChunk struct {
+	Choices []struct {
+		Delta struct {
+			Content          string `json:"content"`
+			ReasoningContent string `json:"reasoning_content"`
+			Reasoning        string `json:"reasoning"`
+			ToolCalls        []struct {
+				Index    int    `json:"index"`
+				ID       string `json:"id"`
+				Type     string `json:"type"`
+				Function *struct {
+					Name      string          `json:"name"`
+					Arguments json.RawMessage `json:"arguments"`
+				} `json:"function"`
+			} `json:"tool_calls"`
+		} `json:"delta"`
+		FinishReason string `json:"finish_reason"`
+	} `json:"choices"`
+	Usage *UsageInfo `json:"usage"`
+}
+
+type streamToolCall struct {
+	ID        string
+	Type      string
+	Name      string
+	Arguments bytes.Buffer
+}
+
+func buildStreamToolCalls(toolCalls map[int]*streamToolCall) []ToolCall {
+	if len(toolCalls) == 0 {
+		return nil
+	}
+
+	ordered := make([]ToolCall, 0, len(toolCalls))
+	for index := 0; index < len(toolCalls); index++ {
+		entry := toolCalls[index]
+		if entry == nil {
+			continue
+		}
+		rawArgs := bytes.TrimSpace(entry.Arguments.Bytes())
+		call := ToolCall{
+			ID:        entry.ID,
+			Type:      entry.Type,
+			Name:      entry.Name,
+			Arguments: decodeToolCallArguments(rawArgs, entry.Name),
+		}
+		if call.Type == "" {
+			call.Type = "function"
+		}
+		if call.Name != "" {
+			call.Function = &FunctionCall{
+				Name:      call.Name,
+				Arguments: string(rawArgs),
+			}
+		}
+		ordered = append(ordered, call)
+	}
+	return ordered
+}
+
+func streamArgumentFragment(raw json.RawMessage) string {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || bytes.Equal(raw, []byte("null")) {
+		return ""
+	}
+
+	var fragment string
+	if err := json.Unmarshal(raw, &fragment); err == nil {
+		return fragment
+	}
+
+	return string(raw)
+}
+
+func extractStreamCallback(options map[string]any) streamCallback {
+	if options == nil {
+		return nil
+	}
+	cb, ok := options["stream_callback"].(func(context.Context, string, bool))
+	if !ok {
+		return nil
+	}
+	return cb
 }
 
 // openaiMessage is the wire-format message for OpenAI-compatible APIs.

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
 
 	"jane/pkg/boards"
 	"jane/pkg/cron"
@@ -21,7 +23,7 @@ func NewBoardsTool(store *boards.Store, cronService *cron.CronService) *BoardsTo
 func (t *BoardsTool) Name() string { return "boards" }
 
 func (t *BoardsTool) Description() string {
-	return "Read and update kanban boards, cards, and recurring review schedules."
+	return "Read and update kanban boards. Supports bulk moves to handle multiple tasks efficiently."
 }
 
 func (t *BoardsTool) Parameters() map[string]any {
@@ -32,12 +34,13 @@ func (t *BoardsTool) Parameters() map[string]any {
 				"type": "string",
 				"enum": []string{
 					"list_boards", "get_board", "create_board", "add_card",
-					"add_column", "update_card", "move_card", "delete_card",
-					"set_review_schedule",
+					"add_column", "update_card", "move_card", "bulk_move_cards",
+					"delete_card", "set_review_schedule",
 				},
 			},
 			"board_id":      map[string]any{"type": "string"},
 			"card_id":       map[string]any{"type": "string"},
+			"card_ids":      map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
 			"title":         map[string]any{"type": "string"},
 			"description":   map[string]any{"type": "string"},
 			"column_id":     map[string]any{"type": "string"},
@@ -48,6 +51,23 @@ func (t *BoardsTool) Parameters() map[string]any {
 		},
 		"required": []string{"action"},
 	}
+}
+
+// withRetries handles "database is locked" errors internally to prevent agent loops.
+func (t *BoardsTool) withRetries(fn func() (*ToolResult, error)) *ToolResult {
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		res, err := fn()
+		if err == nil {
+			return res
+		}
+		if strings.Contains(strings.ToLower(err.Error()), "locked") {
+			time.Sleep(time.Duration(100*(i+1)) * time.Millisecond)
+			continue
+		}
+		return ErrorResult(err.Error())
+	}
+	return ErrorResult("database remained locked after multiple retries")
 }
 
 func (t *BoardsTool) Execute(ctx context.Context, args map[string]any) *ToolResult {
@@ -64,9 +84,15 @@ func (t *BoardsTool) Execute(ctx context.Context, args map[string]any) *ToolResu
 	case "add_column":
 		return t.addColumn(ctx, args)
 	case "update_card":
-		return t.updateCard(ctx, args, false)
+		return t.withRetries(func() (*ToolResult, error) {
+			return t.updateCard(ctx, args, false), nil
+		})
 	case "move_card":
-		return t.updateCard(ctx, args, true)
+		return t.withRetries(func() (*ToolResult, error) {
+			return t.updateCard(ctx, args, true), nil
+		})
+	case "bulk_move_cards":
+		return t.bulkMoveCards(ctx, args)
 	case "delete_card":
 		return t.deleteCard(ctx, args)
 	case "set_review_schedule":
@@ -78,6 +104,30 @@ func (t *BoardsTool) Execute(ctx context.Context, args map[string]any) *ToolResu
 
 func (t *BoardsTool) RequiresApproval() bool { return false }
 
+func (t *BoardsTool) bulkMoveCards(ctx context.Context, args map[string]any) *ToolResult {
+	cardIDs, _ := args["card_ids"].([]any)
+	columnID, _ := args["column_id"].(string)
+
+	if len(cardIDs) == 0 || columnID == "" {
+		return ErrorResult("card_ids and column_id are required for bulk moves")
+	}
+
+	return t.withRetries(func() (*ToolResult, error) {
+		results := make(map[string]string)
+		for _, idAny := range cardIDs {
+			id := idAny.(string)
+			input := boards.UpdateCardInput{ColumnID: &columnID}
+			_, err := t.store.UpdateCard(ctx, id, input)
+			if err != nil {
+				results[id] = fmt.Sprintf("error: %s", err.Error())
+			} else {
+				results[id] = "success"
+			}
+		}
+		return jsonResult(results), nil
+	})
+}
+
 func (t *BoardsTool) listBoards(ctx context.Context) *ToolResult {
 	items, err := t.store.ListBoards(ctx)
 	if err != nil {
@@ -88,14 +138,15 @@ func (t *BoardsTool) listBoards(ctx context.Context) *ToolResult {
 
 func (t *BoardsTool) getBoard(ctx context.Context, args map[string]any) *ToolResult {
 	boardID, _ := args["board_id"].(string)
+	var board *boards.Board
+	var err error
+
 	if boardID == "" {
-		board, err := t.store.EnsureDefaultBoard(ctx)
-		if err != nil {
-			return ErrorResult(err.Error())
-		}
-		return jsonResult(board)
+		board, err = t.store.EnsureDefaultBoard(ctx)
+	} else {
+		board, err = t.store.GetBoard(ctx, boardID)
 	}
-	board, err := t.store.GetBoard(ctx, boardID)
+
 	if err != nil {
 		return ErrorResult(err.Error())
 	}

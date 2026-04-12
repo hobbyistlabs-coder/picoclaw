@@ -108,6 +108,7 @@ type ReadFileToolConfig struct {
 
 type ToolsConfig struct {
 	Alpaca          AlpacaConfig       `json:"alpaca,omitempty"`
+	AutoApprove     bool               `json:"auto_approve" env:"PICOCLAW_TOOLS_AUTO_APPROVE"`
 	Boards          ToolConfig         `json:"boards"                                                   envPrefix:"PICOCLAW_TOOLS_BOARDS_"`
 	AllowReadPaths  []string           `json:"allow_read_paths"  env:"PICOCLAW_TOOLS_ALLOW_READ_PATHS"`
 	AllowWritePaths []string           `json:"allow_write_paths" env:"PICOCLAW_TOOLS_ALLOW_WRITE_PATHS"`

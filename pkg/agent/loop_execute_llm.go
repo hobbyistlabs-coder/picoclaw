@@ -88,6 +88,10 @@ func (al *AgentLoop) executeLLMWithRetry(
 		return agent.Provider.Chat(ctx, *messages, providerToolDefs, activeModel, llmOpts)
 	}
 
+	if len(activeCandidates) == 1 {
+		activeModel = activeCandidates[0].Model
+	}
+
 	var response *providers.LLMResponse
 	var err error
 

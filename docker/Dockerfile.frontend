@@ -2,7 +2,7 @@ FROM oven/bun:1 AS builder
 
 WORKDIR /src/web/frontend
 
-COPY web/frontend/package.json web/frontend/pnpm-lock.yaml ./
+COPY web/frontend/package.json web/frontend/bun.lock* web/frontend/pnpm-lock.yaml ./
 RUN bun install
 
 COPY web/frontend ./

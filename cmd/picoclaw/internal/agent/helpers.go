@@ -12,6 +12,7 @@ import (
 	"github.com/chzyer/readline"
 
 	"jane/cmd/picoclaw/internal"
+	"jane/cmd/picoclaw/internal/onboard"
 	"jane/pkg/agent"
 	"jane/pkg/bus"
 	"jane/pkg/logger"
@@ -30,7 +31,16 @@ func agentCmd(message, sessionKey, model string, debug bool) error {
 
 	cfg, err := internal.LoadConfig()
 	if err != nil {
-		return fmt.Errorf("error loading config: %w", err)
+		if strings.Contains(err.Error(), "config file not found") {
+			onboard.Onboard()
+			// Reload after onboarding
+			cfg, err = internal.LoadConfig()
+			if err != nil {
+				return fmt.Errorf("error loading config after onboarding: %w", err)
+			}
+		} else {
+			return fmt.Errorf("error loading config: %w", err)
+		}
 	}
 
 	if model != "" {

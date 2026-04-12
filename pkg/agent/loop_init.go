@@ -19,6 +19,7 @@ import (
 	"jane/pkg/logger"
 	"jane/pkg/media"
 	"jane/pkg/providers"
+	"jane/pkg/runtimepaths"
 	"jane/pkg/skills"
 	"jane/pkg/state"
 	"jane/pkg/tools"
@@ -55,8 +56,11 @@ func NewAgentLoop(
 		summarizing: sync.Map{},
 		summaryJobs: make(chan summaryJob, 100),
 		fallback:    fallbackChain,
+		provider:    provider,
 		cmdRegistry: commands.NewRegistry(commands.BuiltinDefinitions()),
+		configPath:  runtimepaths.ConfigPath(),
 	}
+	al.configModTime = configFileModTime(al.configPath)
 
 	return al
 }

@@ -17,9 +17,9 @@ export function PageHeader({
   children,
 }: PageHeaderProps) {
   return (
-    <div className="flex shrink-0 flex-col gap-3 px-4 pt-3 pb-2 md:px-6">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3 md:gap-4">
+    <div className="flex shrink-0 flex-col gap-4 px-4 pt-4 pb-2 md:px-6">
+      <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+        <div className="flex min-w-0 items-start gap-3 md:gap-4">
           <SidebarTrigger className="border-border/60 bg-background text-muted-foreground hover:bg-accent hover:text-foreground hidden h-9 w-9 rounded-lg border sm:flex [&>svg]:size-5">
             <IconMenu2 />
           </SidebarTrigger>
@@ -33,9 +33,11 @@ export function PageHeader({
               </p>
             ) : null}
           </div>
-          {titleExtra}
         </div>
-        {children && <div className="flex items-center gap-2">{children}</div>}
+        <div className="flex flex-col gap-3 xl:items-end">
+          {titleExtra ? <div className="flex flex-wrap items-center gap-2">{titleExtra}</div> : null}
+          {children ? <div className="flex flex-wrap items-center gap-2">{children}</div> : null}
+        </div>
       </div>
     </div>
   )

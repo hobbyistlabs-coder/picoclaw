@@ -369,6 +369,7 @@ func DefaultConfig() *Config {
 			Port: 18790,
 		},
 		Tools: ToolsConfig{
+			AutoApprove: false,
 			Boards: ToolConfig{
 				Enabled: true,
 			},

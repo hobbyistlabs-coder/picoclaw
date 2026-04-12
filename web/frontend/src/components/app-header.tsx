@@ -93,11 +93,7 @@ export function AppHeader() {
         </SidebarTrigger>
         <div className="flex shrink-0 items-center">
           <Link to="/">
-            <img
-              className="h-10 w-auto"
-              src="/jane-wordmark.svg"
-              alt="JANE-ai"
-            />
+            <img className="h-10 w-auto" src="/jane-wordmark.svg" alt="JANE" />
           </Link>
         </div>
       </div>

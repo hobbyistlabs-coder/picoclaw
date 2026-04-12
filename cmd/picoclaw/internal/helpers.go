@@ -1,6 +1,9 @@
 package internal
 
 import (
+	"fmt"
+	"os"
+
 	"jane/pkg/config"
 	"jane/pkg/runtimepaths"
 )
@@ -18,5 +21,9 @@ func GetConfigPath() string {
 }
 
 func LoadConfig() (*config.Config, error) {
-	return config.LoadConfig(GetConfigPath())
+	path := GetConfigPath()
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, fmt.Errorf("config file not found at %s", path)
+	}
+	return config.LoadConfig(path)
 }

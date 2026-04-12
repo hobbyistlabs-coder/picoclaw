@@ -3,6 +3,7 @@ import type { ChatMetrics } from "@/lib/chat-metrics"
 // Sessions API — list and retrieve chat session history
 
 export interface SessionSummary {
+  agent_id?: string
   id: string
   title: string
   preview: string
@@ -12,6 +13,7 @@ export interface SessionSummary {
 }
 
 export interface SessionDetail {
+  agent_id?: string
   id: string
   messages: {
     role: "user" | "assistant"

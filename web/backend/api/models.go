@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"runtime"
 	"strconv"
 	"sync"
+	"syscall"
+	"time"
 
 	"jane/pkg/config"
 )
@@ -14,6 +17,7 @@ import (
 // registerModelRoutes binds model list management endpoints to the ServeMux.
 func (h *Handler) registerModelRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/models", h.handleListModels)
+	mux.HandleFunc("GET /api/models/openrouter/catalog", h.handleOpenRouterCatalog)
 	mux.HandleFunc("POST /api/models", h.handleAddModel)
 	mux.HandleFunc("POST /api/models/default", h.handleSetDefaultModel)
 	mux.HandleFunc("PUT /api/models/{index}", h.handleUpdateModel)
@@ -31,16 +35,45 @@ type modelResponse struct {
 	Proxy      string `json:"proxy,omitempty"`
 	AuthMethod string `json:"auth_method,omitempty"`
 	// Advanced fields
-	ConnectMode    string  `json:"connect_mode,omitempty"`
-	Workspace      string  `json:"workspace,omitempty"`
-	RPM            int     `json:"rpm,omitempty"`
-	MaxTokensField string  `json:"max_tokens_field,omitempty"`
-	RequestTimeout int     `json:"request_timeout,omitempty"`
-	ThinkingLevel  string  `json:"thinking_level,omitempty"`
-	PricePerMToken float64 `json:"price_per_m_token,omitempty"`
+	ConnectMode          string  `json:"connect_mode,omitempty"`
+	Workspace            string  `json:"workspace,omitempty"`
+	RPM                  int     `json:"rpm,omitempty"`
+	MaxTokensField       string  `json:"max_tokens_field,omitempty"`
+	RequestTimeout       int     `json:"request_timeout,omitempty"`
+	ThinkingLevel        string  `json:"thinking_level,omitempty"`
+	PricePerMToken       float64 `json:"price_per_m_token,omitempty"`
+	InputPricePerMToken  float64 `json:"input_price_per_m_token,omitempty"`
+	OutputPricePerMToken float64 `json:"output_price_per_m_token,omitempty"`
 	// Meta
 	Configured bool `json:"configured"`
 	IsDefault  bool `json:"is_default"`
+}
+
+func (h *Handler) restartManagedGatewayForModelChange() error {
+	if !h.managesGatewayProcess() {
+		return nil
+	}
+
+	gateway.mu.Lock()
+	if gateway.cmd == nil || gateway.cmd.Process == nil || !isGatewayProcessAliveLocked() {
+		gateway.mu.Unlock()
+		return nil
+	}
+
+	if runtime.GOOS == "windows" {
+		_ = gateway.cmd.Process.Kill()
+	} else {
+		_ = gateway.cmd.Process.Signal(syscall.SIGTERM)
+	}
+	gateway.cmd = nil
+	gateway.mu.Unlock()
+
+	time.Sleep(2 * time.Second)
+
+	gateway.mu.Lock()
+	defer gateway.mu.Unlock()
+	_, err := h.startGatewayLocked()
+	return err
 }
 
 // handleListModels returns all model_list entries with masked API keys.
@@ -69,22 +102,24 @@ func (h *Handler) handleListModels(w http.ResponseWriter, r *http.Request) {
 	models := make([]modelResponse, 0, len(cfg.ModelList))
 	for i, m := range cfg.ModelList {
 		models = append(models, modelResponse{
-			Index:          i,
-			ModelName:      m.ModelName,
-			Model:          m.Model,
-			APIBase:        m.APIBase,
-			APIKey:         maskAPIKey(m.APIKey),
-			Proxy:          m.Proxy,
-			AuthMethod:     m.AuthMethod,
-			ConnectMode:    m.ConnectMode,
-			Workspace:      m.Workspace,
-			RPM:            m.RPM,
-			MaxTokensField: m.MaxTokensField,
-			RequestTimeout: m.RequestTimeout,
-			ThinkingLevel:  m.ThinkingLevel,
-			PricePerMToken: m.PricePerMToken,
-			Configured:     configured[i],
-			IsDefault:      m.ModelName == defaultModel,
+			Index:                i,
+			ModelName:            m.ModelName,
+			Model:                m.Model,
+			APIBase:              m.APIBase,
+			APIKey:               maskAPIKey(m.APIKey),
+			Proxy:                m.Proxy,
+			AuthMethod:           m.AuthMethod,
+			ConnectMode:          m.ConnectMode,
+			Workspace:            m.Workspace,
+			RPM:                  m.RPM,
+			MaxTokensField:       m.MaxTokensField,
+			RequestTimeout:       m.RequestTimeout,
+			ThinkingLevel:        m.ThinkingLevel,
+			PricePerMToken:       m.PricePerMToken,
+			InputPricePerMToken:  m.InputPricePerMToken,
+			OutputPricePerMToken: m.OutputPricePerMToken,
+			Configured:           configured[i],
+			IsDefault:            m.ModelName == defaultModel,
 		})
 	}
 
@@ -128,6 +163,10 @@ func (h *Handler) handleAddModel(w http.ResponseWriter, r *http.Request) {
 
 	if err := config.SaveConfig(h.configPath, cfg); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to save config: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if err := h.restartManagedGatewayForModelChange(); err != nil {
+		http.Error(w, fmt.Sprintf("Saved config but failed to restart gateway: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -192,6 +231,10 @@ func (h *Handler) handleUpdateModel(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Failed to save config: %v", err), http.StatusInternalServerError)
 		return
 	}
+	if err := h.restartManagedGatewayForModelChange(); err != nil {
+		http.Error(w, fmt.Sprintf("Saved config but failed to restart gateway: %v", err), http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
@@ -232,6 +275,10 @@ func (h *Handler) handleDeleteModel(w http.ResponseWriter, r *http.Request) {
 
 	if err := config.SaveConfig(h.configPath, cfg); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to save config: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if err := h.restartManagedGatewayForModelChange(); err != nil {
+		http.Error(w, fmt.Sprintf("Saved config but failed to restart gateway: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -283,9 +330,14 @@ func (h *Handler) handleSetDefaultModel(w http.ResponseWriter, r *http.Request) 
 	}
 
 	cfg.Agents.Defaults.ModelName = req.ModelName
+	cfg.Agents.Defaults.Model = req.ModelName
 
 	if err := config.SaveConfig(h.configPath, cfg); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to save config: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if err := h.restartManagedGatewayForModelChange(); err != nil {
+		http.Error(w, fmt.Sprintf("Saved config but failed to restart gateway: %v", err), http.StatusInternalServerError)
 		return
 	}
 

@@ -95,3 +95,23 @@ func (m *Manager) dispatchOutboundMedia(ctx context.Context) {
 		"Channel has no active worker, skipping media message",
 	)
 }
+
+func (m *Manager) dispatchOutboundStream(ctx context.Context) {
+	dispatchLoop(
+		ctx, m,
+		m.bus.SubscribeOutboundStream,
+		func(msg bus.OutboundStreamMessage) string { return msg.Channel },
+		func(ctx context.Context, w *channelWorker, msg bus.OutboundStreamMessage) bool {
+			select {
+			case w.streamQueue <- msg:
+				return true
+			case <-ctx.Done():
+				return false
+			}
+		},
+		"Outbound stream dispatcher started",
+		"Outbound stream dispatcher stopped",
+		"Unknown channel for outbound stream message",
+		"Channel has no active worker, skipping stream message",
+	)
+}

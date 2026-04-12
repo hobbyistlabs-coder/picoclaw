@@ -95,6 +95,51 @@ func TestHandleListSessions_JSONLStorage(t *testing.T) {
 	}
 }
 
+func TestHandleListSessions_IncludesNonMainAgentSessions(t *testing.T) {
+	configPath, cleanup := setupOAuthTestEnv(t)
+	defer cleanup()
+
+	dir := sessionsTestDir(t, configPath)
+	store, err := memory.NewJSONLStore(dir)
+	if err != nil {
+		t.Fatalf("NewJSONLStore() error = %v", err)
+	}
+
+	sessionKey := picoSessionKey("coding", "persona-jsonl")
+	if err := store.AddFullMessage(nil, sessionKey, providers.Message{
+		Role:    "user",
+		Content: "route me to coding",
+	}); err != nil {
+		t.Fatalf("AddFullMessage() error = %v", err)
+	}
+
+	h := NewHandler(configPath)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/sessions", nil)
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var items []sessionListItem
+	if err := json.Unmarshal(rec.Body.Bytes(), &items); err != nil {
+		t.Fatalf("Unmarshal() error = %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("len(items) = %d, want 1", len(items))
+	}
+	if items[0].ID != "persona-jsonl" {
+		t.Fatalf("items[0].ID = %q, want persona-jsonl", items[0].ID)
+	}
+	if items[0].AgentID != "coding" {
+		t.Fatalf("items[0].AgentID = %q, want coding", items[0].AgentID)
+	}
+}
+
 func TestHandleListSessions_TitleUsesTrimmedSummary(t *testing.T) {
 	configPath, cleanup := setupOAuthTestEnv(t)
 	defer cleanup()
@@ -373,6 +418,44 @@ func TestHandleGetSession_IncludesReasoningAndToolCalls(t *testing.T) {
 	}
 	if resp.Messages[1].ToolCalls[0].Kind != "mcp" {
 		t.Fatalf("tool kind = %q, want mcp", resp.Messages[1].ToolCalls[0].Kind)
+	}
+}
+
+func TestBuildSessionMetrics_PartialEstimatedCostStillAggregatesKnownCost(t *testing.T) {
+	metrics := buildSessionMetrics([]providers.Message{
+		{
+			Role:    "assistant",
+			Content: "known cost",
+			Usage: &providers.UsageInfo{
+				PromptTokens:     100,
+				CompletionTokens: 50,
+				TotalTokens:      150,
+				EstimatedCostUSD: 0.0012,
+				HasEstimatedCost: true,
+			},
+		},
+		{
+			Role:    "assistant",
+			Content: "unknown cost",
+			Usage: &providers.UsageInfo{
+				PromptTokens:     30,
+				CompletionTokens: 20,
+				TotalTokens:      50,
+			},
+		},
+	})
+
+	if metrics == nil {
+		t.Fatal("metrics = nil, want aggregated metrics")
+	}
+	if metrics.TotalTokens != 200 {
+		t.Fatalf("TotalTokens = %d, want 200", metrics.TotalTokens)
+	}
+	if !metrics.HasEstimatedCost {
+		t.Fatalf("HasEstimatedCost = false, want true")
+	}
+	if metrics.EstimatedCostUSD != 0.0012 {
+		t.Fatalf("EstimatedCostUSD = %v, want 0.0012", metrics.EstimatedCostUSD)
 	}
 }
 

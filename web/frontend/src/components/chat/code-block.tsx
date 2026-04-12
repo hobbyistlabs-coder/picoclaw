@@ -25,7 +25,11 @@ function normalizeLanguage(language?: string) {
   }
   if (raw === "md" || raw === "markdown") return "markdown"
   if (raw === "json") return "json"
-  return "json"
+
+  // Add support for subagent terminal logs/text
+  if (raw === "text" || raw === "log" || raw === "plaintext") return "none"
+
+  return "json" // Fallback
 }
 
 export function CodeBlock({ code, language, className }: CodeBlockProps) {

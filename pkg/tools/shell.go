@@ -363,38 +363,38 @@ func (t *ExecTool) guardCommand(command, cwd string) string {
 		}
 	}
 
-	if t.restrictToWorkspace {
-		if strings.Contains(cmd, "..\\") || strings.Contains(cmd, "../") {
-			return "Command blocked by safety guard (path traversal detected)"
-		}
+//Validate against the static workspace root, not the dynamic CWD
+if t.restrictToWorkspace {
+    // 1. Block manual traversal attempts in the command string
+    if strings.Contains(cmd, "..\\") || strings.Contains(cmd, "../") {
+        return "Command blocked by safety guard (path traversal detected)"
+    }
 
-		cwdPath, err := filepath.Abs(cwd)
-		if err != nil {
-			return ""
-		}
+    // 2. Ensure the base workspace is resolved
+    absWorkspace, err := filepath.Abs(t.workingDir)
+    if err != nil {
+        return "Command blocked by safety guard (internal workspace error)"
+    }
 
-		matches := absolutePathPattern.FindAllString(cmd, -1)
+    matches := absolutePathPattern.FindAllString(cmd, -1)
+    for _, raw := range matches {
+        p, err := filepath.Abs(raw)
+        if err != nil {
+            continue
+        }
 
-		for _, raw := range matches {
-			p, err := filepath.Abs(raw)
-			if err != nil {
-				continue
-			}
+        if safePaths[p] {
+            continue
+        }
 
-			if safePaths[p] {
-				continue
-			}
-
-			rel, err := filepath.Rel(cwdPath, p)
-			if err != nil {
-				continue
-			}
-
-			if strings.HasPrefix(rel, "..") {
-				return "Command blocked by safety guard (path outside working dir)"
-			}
-		}
-	}
+        // 3. CHECK: Is the path 'p' a child of 'absWorkspace'?
+        rel, err := filepath.Rel(absWorkspace, p)
+        if err != nil || strings.HasPrefix(rel, "..") {
+            // ONLY block if it actually escapes the root workspace
+            return "Command blocked by safety guard (path outside allowed workspace)"
+        }
+    }
+}
 
 	return ""
 }

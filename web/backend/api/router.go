@@ -68,6 +68,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// Skills and tools support/actions
 	h.registerSkillRoutes(mux)
 	h.registerToolRoutes(mux)
+	h.registerWorkspaceRoutes(mux)
 
 	// OS startup / launch-at-login
 	h.registerStartupRoutes(mux)

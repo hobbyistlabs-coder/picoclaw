@@ -15,7 +15,7 @@ The service is structured as a monorepo containing both the backend and frontend
 ### Prerequisites
 
 *   Go 1.25+
-*   Node.js 20+ with pnpm
+*   Bun
 
 ### Development
 
@@ -25,11 +25,13 @@ Run both the frontend dev server and the Go backend simultaneously:
 make dev
 ```
 
+This starts the Go backend in API-only mode and the Vite frontend in dev mode, so you should open `http://localhost:5173` during development.
+
 Or run them separately:
 
 ```bash
 make dev-frontend   # Vite dev server
-make dev-backend    # Go backend
+make dev-backend    # Go backend (API-only for dev)
 ```
 
 ### Build

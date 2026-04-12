@@ -148,6 +148,9 @@ func TestNewAgentInstance_ResolveCandidatesFromModelListAlias(t *testing.T) {
 			provider := &mockProvider{}
 			agent := NewAgentInstance(nil, &cfg.Agents.Defaults, cfg, provider)
 
+			if agent.Model != tt.modelName {
+				t.Fatalf("agent model = %q, want %q", agent.Model, tt.modelName)
+			}
 			if len(agent.Candidates) != 1 {
 				t.Fatalf("len(Candidates) = %d, want 1", len(agent.Candidates))
 			}

@@ -12,6 +12,7 @@ const (
 	// TypeMessageCreate is sent from server to client.
 	TypeMessageCreate = "message.create"
 	TypeMessageUpdate = "message.update"
+	TypeMessageStream = "message.stream"
 	TypeMediaCreate   = "media.create"
 	TypeReasoningSet  = "reasoning.set"
 	TypeToolCall      = "tool.call"

@@ -35,7 +35,10 @@ func NewSQLiteStore(path string) (*SQLiteStore, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, fmt.Errorf("memory: create sqlite dir: %w", err)
 	}
-	db, err := sql.Open("sqlite", path+"?_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)")
+	// Keep session storage on the main database file. WAL sidecars have proven
+	// unreliable on shared Docker bind mounts, where one process can keep
+	// writing to an unlinked WAL that peer processes can no longer see.
+	db, err := sql.Open("sqlite", path+"?_pragma=journal_mode(DELETE)&_pragma=synchronous(NORMAL)")
 	if err != nil {
 		return nil, fmt.Errorf("memory: open sqlite: %w", err)
 	}
