@@ -27,7 +27,11 @@ func registerEmbedRoutes(mux *http.ServeMux) {
 	subFS, err := fs.Sub(frontendFS, "dist")
 	if err != nil {
 		// Log a warning if dist doesn't exist yet (e.g., during development before a frontend build)
-		logger.WarnCF("embed", "no 'dist' folder found in embedded frontend. Ensure you run `pnpm build:backend` in the frontend directory before building the Go backend.", nil)
+		logger.WarnCF(
+			"embed",
+			"no 'dist' folder found in embedded frontend. Ensure you run `pnpm build:backend` in the frontend directory before building the Go backend.",
+			nil,
+		)
 		return
 	}
 

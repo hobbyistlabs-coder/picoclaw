@@ -10,12 +10,12 @@ import (
 
 	"github.com/mdp/qrterminal/v3"
 	"github.com/rs/zerolog"
-	"jane/pkg/logger"
-	"jane/pkg/runtimepaths"
-
 	"go.mau.fi/mautrix-gmessages/pkg/libgm"
 	"go.mau.fi/mautrix-gmessages/pkg/libgm/events"
 	"go.mau.fi/mautrix-gmessages/pkg/libgm/gmproto"
+
+	"jane/pkg/logger"
+	"jane/pkg/runtimepaths"
 )
 
 type SessionData struct {
@@ -34,7 +34,7 @@ func (c *GMessagesChannel) initClient(ctx context.Context) error {
 		dataDir = filepath.Join(runtimepaths.HomeDir(), "gmessages")
 	}
 
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create gmessages data dir: %w", err)
 	}
 
@@ -155,7 +155,7 @@ func saveSession(path string, data *SessionData) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0600)
+	return os.WriteFile(path, b, 0o600)
 }
 
 func (c *GMessagesChannel) handlePairing(ctx context.Context, client *GMClient) error {
@@ -192,7 +192,11 @@ func (c *GMessagesChannel) handlePairing(ctx context.Context, client *GMClient) 
 
 	var pairErr2 error
 	pairCB := func(data *gmproto.PairedData) {
-		logger.InfoCF("channels.gmessages", "Pairing successful", map[string]any{"phone_id": data.GetMobile().GetSourceID()})
+		logger.InfoCF(
+			"channels.gmessages",
+			"Pairing successful",
+			map[string]any{"phone_id": data.GetMobile().GetSourceID()},
+		)
 
 		sessionData, err := client.SessionData()
 		if err != nil {

@@ -283,6 +283,9 @@ func (al *AgentLoop) runLLMIteration(
 					ReasoningContent: response.ReasoningContent,
 				})
 			}
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "cot", map[string]any{
+				"cot_text": response.ReasoningContent,
+			}, logger.ReplayErrorNone, "")
 		}
 
 		logger.DebugCF("agent", "LLM response",
@@ -320,6 +323,10 @@ func (al *AgentLoop) runLLMIteration(
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "tool_call", map[string]any{
+				"tool_name": tc.Name,
+				"inputs":    tc.Arguments,
+			}, logger.ReplayErrorNone, "")
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
@@ -401,6 +408,11 @@ func (al *AgentLoop) runLLMIteration(
 				Content: approvalMsg,
 			})
 
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "state_transition", map[string]any{
+				"from_state": "running",
+				"to_state":   "pending_approval",
+			}, logger.ReplayErrorNone, "")
+
 			return "", iteration, metrics, errApprovalPending
 		}
 		// --- End HITL ---
@@ -461,6 +473,15 @@ func (al *AgentLoop) runLLMIteration(
 						"error":          contentForLLM,
 						"error_category": "logic_failure",
 					})
+				logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "error", map[string]any{
+					"tool_name": r.tc.Name,
+					"outputs":   contentForLLM,
+				}, logger.ReplayErrorLogic, contentForLLM)
+			} else {
+				logger.LogSessionEvent(agent.Workspace, opts.SessionKey, "tool_result", map[string]any{
+					"tool_name": r.tc.Name,
+					"outputs":   contentForLLM,
+				}, logger.ReplayErrorNone, "")
 			}
 
 			toolResultMsg := providers.Message{

@@ -80,7 +80,11 @@ func main() {
 	launcherPath := launcherconfig.PathForAppConfig(absPath)
 	launcherCfg, err := launcherconfig.Load(launcherPath, launcherconfig.Default())
 	if err != nil {
-		logger.WarnCF("main", "Failed to load launcher config", map[string]any{"path": launcherPath, "error": err.Error()})
+		logger.WarnCF(
+			"main",
+			"Failed to load launcher config",
+			map[string]any{"path": launcherPath, "error": err.Error()},
+		)
 		launcherCfg = launcherconfig.Default()
 	}
 

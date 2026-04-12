@@ -46,9 +46,9 @@ type SearXNGConfig struct {
 }
 
 type GLMSearchConfig struct {
-	Enabled bool   `json:"enabled"  env:"PICOCLAW_TOOLS_WEB_GLM_ENABLED"`
-	APIKey  string `json:"api_key"  env:"PICOCLAW_TOOLS_WEB_GLM_API_KEY"`
-	BaseURL string `json:"base_url" env:"PICOCLAW_TOOLS_WEB_GLM_BASE_URL"`
+	Enabled bool   `json:"enabled"       env:"PICOCLAW_TOOLS_WEB_GLM_ENABLED"`
+	APIKey  string `json:"api_key"       env:"PICOCLAW_TOOLS_WEB_GLM_API_KEY"`
+	BaseURL string `json:"base_url"      env:"PICOCLAW_TOOLS_WEB_GLM_BASE_URL"`
 	// SearchEngine specifies the search backend: "search_std" (default),
 	// "search_pro", "search_pro_sogou", or "search_pro_quark".
 	SearchEngine string `json:"search_engine" env:"PICOCLAW_TOOLS_WEB_GLM_SEARCH_ENGINE"`
@@ -65,8 +65,8 @@ type WebToolsConfig struct {
 	GLMSearch  GLMSearchConfig  `                                json:"glm_search"`
 	// Proxy is an optional proxy URL for web tools (http/https/socks5/socks5h).
 	// For authenticated proxies, prefer HTTP_PROXY/HTTPS_PROXY env vars instead of embedding credentials in config.
-	Proxy           string `json:"proxy,omitempty"             env:"PICOCLAW_TOOLS_WEB_PROXY"`
-	FetchLimitBytes int64  `json:"fetch_limit_bytes,omitempty" env:"PICOCLAW_TOOLS_WEB_FETCH_LIMIT_BYTES"`
+	Proxy           string `                                json:"proxy,omitempty"             env:"PICOCLAW_TOOLS_WEB_PROXY"`
+	FetchLimitBytes int64  `                                json:"fetch_limit_bytes,omitempty" env:"PICOCLAW_TOOLS_WEB_FETCH_LIMIT_BYTES"`
 }
 
 type CronToolsConfig struct {
@@ -97,8 +97,8 @@ type MediaCleanupConfig struct {
 }
 
 type JulesConfig struct {
-	ToolConfig `envPrefix:"PICOCLAW_TOOLS_JULES_"`
-	APIKey     string `json:"api_key" env:"PICOCLAW_TOOLS_JULES_API_KEY"`
+	ToolConfig `       envPrefix:"PICOCLAW_TOOLS_JULES_"`
+	APIKey     string `                                  json:"api_key" env:"PICOCLAW_TOOLS_JULES_API_KEY"`
 }
 
 type ReadFileToolConfig struct {
@@ -108,9 +108,9 @@ type ReadFileToolConfig struct {
 
 type ToolsConfig struct {
 	Alpaca          AlpacaConfig       `json:"alpaca,omitempty"`
-	Boards          ToolConfig         `json:"boards"                                                   envPrefix:"PICOCLAW_TOOLS_BOARDS_"`
-	AllowReadPaths  []string           `json:"allow_read_paths"  env:"PICOCLAW_TOOLS_ALLOW_READ_PATHS"`
-	AllowWritePaths []string           `json:"allow_write_paths" env:"PICOCLAW_TOOLS_ALLOW_WRITE_PATHS"`
+	Boards          ToolConfig         `json:"boards"            envPrefix:"PICOCLAW_TOOLS_BOARDS_"`
+	AllowReadPaths  []string           `json:"allow_read_paths"                                             env:"PICOCLAW_TOOLS_ALLOW_READ_PATHS"`
+	AllowWritePaths []string           `json:"allow_write_paths"                                            env:"PICOCLAW_TOOLS_ALLOW_WRITE_PATHS"`
 	Web             WebToolsConfig     `json:"web"`
 	Jules           JulesConfig        `json:"jules"`
 	Cron            CronToolsConfig    `json:"cron"`
@@ -118,24 +118,24 @@ type ToolsConfig struct {
 	Skills          SkillsToolsConfig  `json:"skills"`
 	MediaCleanup    MediaCleanupConfig `json:"media_cleanup"`
 	MCP             MCPConfig          `json:"mcp"`
-	AppendFile      ToolConfig         `json:"append_file"                                              envPrefix:"PICOCLAW_TOOLS_APPEND_FILE_"`
-	EditFile        ToolConfig         `json:"edit_file"                                                envPrefix:"PICOCLAW_TOOLS_EDIT_FILE_"`
-	FindSkills      ToolConfig         `json:"find_skills"                                              envPrefix:"PICOCLAW_TOOLS_FIND_SKILLS_"`
-	I2C             ToolConfig         `json:"i2c"                                                      envPrefix:"PICOCLAW_TOOLS_I2C_"`
-	InstallSkill    ToolConfig         `json:"install_skill"                                            envPrefix:"PICOCLAW_TOOLS_INSTALL_SKILL_"`
-	ListDir         ToolConfig         `json:"list_dir"                                                 envPrefix:"PICOCLAW_TOOLS_LIST_DIR_"`
-	Message         ToolConfig         `json:"message"                                                  envPrefix:"PICOCLAW_TOOLS_MESSAGE_"`
-	MCP2Cli         ToolConfig         `json:"mcp2cli"                                                  envPrefix:"PICOCLAW_TOOLS_MCP2CLI_"`
-	ReadFile        ReadFileToolConfig `json:"read_file"                                                envPrefix:"PICOCLAW_TOOLS_READ_FILE_"`
-	SendFile        ToolConfig         `json:"send_file"                                                envPrefix:"PICOCLAW_TOOLS_SEND_FILE_"`
-	Spawn           ToolConfig         `json:"spawn"                                                    envPrefix:"PICOCLAW_TOOLS_SPAWN_"`
-	SPI             ToolConfig         `json:"spi"                                                      envPrefix:"PICOCLAW_TOOLS_SPI_"`
-	Subagent        ToolConfig         `json:"subagent"                                                 envPrefix:"PICOCLAW_TOOLS_SUBAGENT_"`
-	WebFetch        ToolConfig         `json:"web_fetch"                                                envPrefix:"PICOCLAW_TOOLS_WEB_FETCH_"`
-	WriteFile       ToolConfig         `json:"write_file"                                               envPrefix:"PICOCLAW_TOOLS_WRITE_FILE_"`
-	BrowserAction   ToolConfig         `json:"browser_action"                                           envPrefix:"PICOCLAW_TOOLS_BROWSER_ACTION_"`
-	GoEval          ToolConfig         `json:"go_eval"                                                  envPrefix:"PICOCLAW_TOOLS_GO_EVAL_"`
-	Calculator      ToolConfig         `json:"calculator"                                               envPrefix:"PICOCLAW_TOOLS_CALCULATOR_"`
+	AppendFile      ToolConfig         `json:"append_file"       envPrefix:"PICOCLAW_TOOLS_APPEND_FILE_"`
+	EditFile        ToolConfig         `json:"edit_file"         envPrefix:"PICOCLAW_TOOLS_EDIT_FILE_"`
+	FindSkills      ToolConfig         `json:"find_skills"       envPrefix:"PICOCLAW_TOOLS_FIND_SKILLS_"`
+	I2C             ToolConfig         `json:"i2c"               envPrefix:"PICOCLAW_TOOLS_I2C_"`
+	InstallSkill    ToolConfig         `json:"install_skill"     envPrefix:"PICOCLAW_TOOLS_INSTALL_SKILL_"`
+	ListDir         ToolConfig         `json:"list_dir"          envPrefix:"PICOCLAW_TOOLS_LIST_DIR_"`
+	Message         ToolConfig         `json:"message"           envPrefix:"PICOCLAW_TOOLS_MESSAGE_"`
+	MCP2Cli         ToolConfig         `json:"mcp2cli"           envPrefix:"PICOCLAW_TOOLS_MCP2CLI_"`
+	ReadFile        ReadFileToolConfig `json:"read_file"         envPrefix:"PICOCLAW_TOOLS_READ_FILE_"`
+	SendFile        ToolConfig         `json:"send_file"         envPrefix:"PICOCLAW_TOOLS_SEND_FILE_"`
+	Spawn           ToolConfig         `json:"spawn"             envPrefix:"PICOCLAW_TOOLS_SPAWN_"`
+	SPI             ToolConfig         `json:"spi"               envPrefix:"PICOCLAW_TOOLS_SPI_"`
+	Subagent        ToolConfig         `json:"subagent"          envPrefix:"PICOCLAW_TOOLS_SUBAGENT_"`
+	WebFetch        ToolConfig         `json:"web_fetch"         envPrefix:"PICOCLAW_TOOLS_WEB_FETCH_"`
+	WriteFile       ToolConfig         `json:"write_file"        envPrefix:"PICOCLAW_TOOLS_WRITE_FILE_"`
+	BrowserAction   ToolConfig         `json:"browser_action"    envPrefix:"PICOCLAW_TOOLS_BROWSER_ACTION_"`
+	GoEval          ToolConfig         `json:"go_eval"           envPrefix:"PICOCLAW_TOOLS_GO_EVAL_"`
+	Calculator      ToolConfig         `json:"calculator"        envPrefix:"PICOCLAW_TOOLS_CALCULATOR_"`
 }
 
 type SearchCacheConfig struct {
@@ -181,10 +181,10 @@ type MCPServerConfig struct {
 
 // MCPConfig defines configuration for all MCP servers
 type MCPConfig struct {
-	ToolConfig `                    envPrefix:"PICOCLAW_TOOLS_MCP_"`
+	ToolConfig `                           envPrefix:"PICOCLAW_TOOLS_MCP_"`
 	Discovery  ToolDiscoveryConfig `                                json:"discovery"`
 	// Servers is a map of server name to server configuration
-	Servers map[string]MCPServerConfig `json:"servers,omitempty"`
+	Servers map[string]MCPServerConfig `                                json:"servers,omitempty"`
 }
 
 func (t *ToolsConfig) IsToolEnabled(name string) bool {

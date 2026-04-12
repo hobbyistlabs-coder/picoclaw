@@ -78,7 +78,9 @@ func BuildCardActionPrompt(boardID, cardID string) string {
 	b.WriteString("Card ID: ")
 	b.WriteString(cardID)
 	b.WriteString("\n")
-	b.WriteString("Update progress, move the card if appropriate, and refine the card details with blockers or next steps when justified by the current context.")
+	b.WriteString(
+		"Update progress, move the card if appropriate, and refine the card details with blockers or next steps when justified by the current context.",
+	)
 	return b.String()
 }
 

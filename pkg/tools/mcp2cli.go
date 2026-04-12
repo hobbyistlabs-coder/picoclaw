@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
 	"jane/pkg/config"
 	janemcp "jane/pkg/mcp"
 )
@@ -53,7 +54,7 @@ func (t *MCP2CliTool) Parameters() map[string]any {
 	}
 }
 
-// mcp2cliArgs parses the string sent by the agent.
+// Execute parses the string sent by the agent.
 // Instead of a full `kong` CLI struct, we'll implement a custom parser
 // to handle dynamic tool names and arguments after the global flags.
 func (t *MCP2CliTool) Execute(ctx context.Context, args map[string]any) *ToolResult {
@@ -198,7 +199,7 @@ func (t *MCP2CliTool) executeCmd(ctx context.Context, cmdStr string) *ToolResult
 	}
 
 	// We need to parse toolArgs (which look like --param1 val1 --param2 val2) into a map
-	var mcpArgs = make(map[string]any)
+	mcpArgs := make(map[string]any)
 	j := 0
 	for j < len(toolArgs) {
 		arg := toolArgs[j]
