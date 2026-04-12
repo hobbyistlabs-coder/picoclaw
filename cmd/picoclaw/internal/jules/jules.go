@@ -41,7 +41,7 @@ func doRequest(method, url string, body []byte) error {
 		return fmt.Errorf("error creating request: %w", err)
 	}
 
-	req.Header.Set("x-goog-api-key", apiKey)
+	req.Header.Set("X-Goog-Api-Key", apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{
@@ -107,9 +107,9 @@ func newSessionCmd() *cobra.Command {
 				return fmt.Errorf("--prompt and --source are required")
 			}
 
-			payload := map[string]interface{}{
+			payload := map[string]any{
 				"prompt": prompt,
-				"sourceContext": map[string]interface{}{
+				"sourceContext": map[string]any{
 					"source": source,
 				},
 			}

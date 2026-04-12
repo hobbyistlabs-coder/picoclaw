@@ -162,6 +162,11 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 			al.pendingApprovals.Delete(sessionKey)
 
 			if isNo {
+				logger.LogSessionEvent(agent.Workspace, sessionKey, "state_transition", map[string]any{
+					"from_state": "pending_approval",
+					"to_state":   "rejected",
+				}, logger.None, "")
+
 				logger.InfoCF("agent", "User rejected tool execution", map[string]any{
 					"agent_id":    agent.ID,
 					"session_key": sessionKey,
@@ -199,6 +204,11 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 			}
 
 			if isYes {
+				logger.LogSessionEvent(agent.Workspace, sessionKey, "state_transition", map[string]any{
+					"from_state": "pending_approval",
+					"to_state":   "approved",
+				}, logger.None, "")
+
 				logger.InfoCF("agent", "User approved tool execution", map[string]any{
 					"agent_id":    agent.ID,
 					"session_key": sessionKey,
