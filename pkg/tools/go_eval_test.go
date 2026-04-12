@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
@@ -66,9 +67,15 @@ var (
 func TestGoEvalToolWithBindings(t *testing.T) {
 	tool := NewGoEvalTool("/tmp/test_workspace")
 
+	mockSend := func(channel, chatID, content string) error {
+		return nil
+	}
+
 	bindings := map[string]reflect.Value{
-		"Workspace": reflect.ValueOf(&TestWorkspace).Elem(),
-		"DoTask":    reflect.ValueOf(&DoMockTask).Elem(),
+		"Workspace":  reflect.ValueOf(&TestWorkspace).Elem(),
+		"DoTask":     reflect.ValueOf(&DoMockTask).Elem(),
+		"Send":       reflect.ValueOf(mockSend),
+		"HTTPClient": reflect.ValueOf(http.DefaultClient),
 	}
 
 	tool.SetBindings(bindings)
@@ -84,6 +91,15 @@ func TestGoEvalToolWithBindings(t *testing.T) {
 				func init() {
 					fmt.Println("workspace:", env.Workspace)
 					fmt.Println("task:", env.DoTask())
+
+					if env.HTTPClient != nil {
+						fmt.Println("http client is available")
+					}
+
+					err := env.Send("channel", "chat_id", "test message")
+					if err == nil {
+						fmt.Println("send function called successfully")
+					}
 				}
 			`,
 		}
@@ -137,6 +153,14 @@ func TestGoEvalToolWithBindings(t *testing.T) {
 				"Expected output to contain 'browser tool name: browser_action', got %q",
 				result.ForLLM,
 			)
+		}
+
+		if !strings.Contains(result.ForLLM, "http client is available") {
+			t.Errorf("Expected output to contain 'http client is available', got %q", result.ForLLM)
+		}
+
+		if !strings.Contains(result.ForLLM, "send function called successfully") {
+			t.Errorf("Expected output to contain 'send function called successfully', got %q", result.ForLLM)
 		}
 	})
 }
