@@ -24,7 +24,6 @@ func (al *AgentLoop) executeLLMWithRetry(
 	activeModel string,
 	iteration int,
 ) (*providers.LLMResponse, error) {
-
 	llmOpts := map[string]any{
 		"max_tokens":       agent.MaxTokens,
 		"temperature":      agent.Temperature,
@@ -171,7 +170,8 @@ func (al *AgentLoop) executeLLMWithRetry(
 	if err != nil {
 		errorCategory := "infrastructure_failure"
 		if failErr := providers.ClassifyError(err, agent.ID, activeModel); failErr != nil {
-			if failErr.Reason == providers.FailoverFormat || failErr.Reason == providers.FailoverContextLength {
+			if failErr.Reason == providers.FailoverFormat ||
+				failErr.Reason == providers.FailoverContextLength {
 				errorCategory = "model_failure"
 			}
 		}
