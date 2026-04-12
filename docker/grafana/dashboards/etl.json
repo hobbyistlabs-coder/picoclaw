@@ -1,0 +1,28 @@
+{
+  "title": "System Metrics",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Memory Allocation (MB)",
+      "targets": [
+        {
+          "expr": "etl_memory_alloc_mb",
+          "datasource": {"uid": "Prometheus"}
+        }
+      ],
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}
+    },
+    {
+      "type": "timeseries",
+      "title": "Goroutines",
+      "targets": [
+        {
+          "expr": "etl_goroutines",
+          "datasource": {"uid": "Prometheus"}
+        }
+      ],
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}
+    }
+  ],
+  "schemaVersion": 38
+}
