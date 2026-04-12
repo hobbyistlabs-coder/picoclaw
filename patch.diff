@@ -1,0 +1,14 @@
+<<<<<<< SEARCH
+	conn, _, err := websocket.DefaultDialer.DialContext(ctx, dialURL, header)
+	if err != nil {
+		return "", fmt.Errorf("connect to gateway pico websocket: %w", err)
+	}
+=======
+	conn, res, err := websocket.DefaultDialer.DialContext(ctx, dialURL, header)
+	if res != nil {
+		defer res.Body.Close()
+	}
+	if err != nil {
+		return "", fmt.Errorf("connect to gateway pico websocket: %w", err)
+	}
+>>>>>>> REPLACE
