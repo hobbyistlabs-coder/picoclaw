@@ -16,11 +16,11 @@ This document tracks the tasks required to implement the "Ultimate Visibility" E
 ## 2. Transform (Stream Processing & Enrichment)
 
 - [x] **Log Normalization:** Standardize error classifications (e.g., Model Failure, Infrastructure Failure, Logic Failure) to ensure consistent log querying.
-- [ ] **Aggregation Strategy:** Design the pipeline for aggregating high-volume events before they reach the data warehouse (e.g., Vector.dev configuration).
+- [x] **Aggregation Strategy:** Design the pipeline for aggregating high-volume events before they reach the data warehouse (e.g., Vector.dev configuration).
 
 ## 3. Load (Storage & Analytics)
 
-- [ ] **Time-Series Database:** Set up or integrate with a time-series database (e.g., Prometheus) for metrics storage.
-- [ ] **Log Warehouse:** Set up or integrate with an OLAP database (e.g., ClickHouse, Elasticsearch) for log and trace storage.
-- [ ] **Dashboards:** Create initial Grafana dashboards visualizing the Four Golden Signals (Latency, Traffic, Errors, Saturation).
-- [ ] **Alerting:** Configure alerts based on metric thresholds (e.g., GC pauses > 20ms, Goroutine counts continuously rising).
+- [x] **Time-Series Database:** Set up or integrate with a time-series database (e.g., Prometheus) for metrics storage.
+- [x] **Log Warehouse:** Set up or integrate with an OLAP database (e.g., ClickHouse, Elasticsearch) for log and trace storage.
+- [x] **Dashboards:** Create initial Grafana dashboards visualizing the Four Golden Signals (Latency, Traffic, Errors, Saturation).
+- [x] **Alerting:** Configure alerts based on metric thresholds (e.g., GC pauses > 20ms, Goroutine counts continuously rising).
