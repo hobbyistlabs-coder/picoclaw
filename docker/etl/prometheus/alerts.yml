@@ -1,0 +1,20 @@
+groups:
+  - name: ETLAlerts
+    rules:
+      - alert: GoroutinesRising
+        expr: deriv(etl_goroutines[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Goroutines continuously rising"
+          description: "The number of goroutines has been continuously rising for the past 5 minutes."
+
+      - alert: HighGCPauses
+        expr: sum(rate(etl_num_gc[1m])) > 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High GC pauses"
+          description: "There are more than 20 GC pauses per minute over the last 5 minutes."
