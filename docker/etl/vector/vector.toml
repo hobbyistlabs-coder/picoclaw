@@ -1,0 +1,60 @@
+[sources.system_metrics]
+type = "file"
+include = ["/var/log/etl/system_metrics.jsonl"]
+read_from = "beginning"
+
+[transforms.parse_json]
+type = "remap"
+inputs = ["system_metrics"]
+source = '''
+. = parse_json!(.message)
+.timestamp = parse_timestamp!(.timestamp, "%Y-%m-%dT%H:%M:%S%.fZ")
+'''
+
+[transforms.metrics_from_logs]
+type = "log_to_metric"
+inputs = ["parse_json"]
+[[transforms.metrics_from_logs.metrics]]
+type = "gauge"
+field = "goroutines"
+name = "sys_goroutines"
+namespace = "picoclaw"
+
+[[transforms.metrics_from_logs.metrics]]
+type = "gauge"
+field = "memory_alloc_mb"
+name = "sys_memory_alloc_mb"
+namespace = "picoclaw"
+
+[[transforms.metrics_from_logs.metrics]]
+type = "gauge"
+field = "memory_total_mb"
+name = "sys_memory_total_mb"
+namespace = "picoclaw"
+
+[[transforms.metrics_from_logs.metrics]]
+type = "gauge"
+field = "memory_sys_mb"
+name = "sys_memory_sys_mb"
+namespace = "picoclaw"
+
+[[transforms.metrics_from_logs.metrics]]
+type = "counter"
+field = "num_gc"
+name = "sys_num_gc"
+namespace = "picoclaw"
+
+
+[sinks.prometheus]
+type = "prometheus_exporter"
+inputs = ["metrics_from_logs"]
+address = "0.0.0.0:8686"
+default_namespace = "vector"
+
+[sinks.loki]
+type = "loki"
+inputs = ["parse_json"]
+endpoint = "http://loki:3100"
+encoding.codec = "json"
+labels.job = "vector"
+labels.source = "system_metrics"
