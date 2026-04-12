@@ -167,7 +167,7 @@ func registerSharedTools(
 			bindings["HTTPClient"] = reflect.ValueOf(http.DefaultClient)
 
 			if browserActionTool != nil {
-				bindings["BrowserActionTool"] = reflect.ValueOf(browserActionTool)
+				bindings["Browser"] = reflect.ValueOf(browserActionTool)
 			}
 
 			goEvalTool.SetBindings(bindings)

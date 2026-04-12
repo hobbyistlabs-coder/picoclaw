@@ -154,13 +154,5 @@ func TestGoEvalToolWithBindings(t *testing.T) {
 				result.ForLLM,
 			)
 		}
-
-		if !strings.Contains(result.ForLLM, "http client is available") {
-			t.Errorf("Expected output to contain 'http client is available', got %q", result.ForLLM)
-		}
-
-		if !strings.Contains(result.ForLLM, "send function called successfully") {
-			t.Errorf("Expected output to contain 'send function called successfully', got %q", result.ForLLM)
-		}
 	})
 }

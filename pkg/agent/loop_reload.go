@@ -51,7 +51,7 @@ func (al *AgentLoop) reloadRuntimeConfigIfChanged(ctx context.Context) error {
 	}
 
 	nextRegistry := NewAgentRegistry(nextCfg, al.provider)
-	registerSharedTools(nextCfg, al.bus, nextRegistry, al.provider)
+	registerSharedTools(nextCfg, al.bus, nextRegistry, al.provider, al)
 
 	if al.mediaStore != nil {
 		nextRegistry.ForEachTool("send_file", func(t tools.Tool) {
