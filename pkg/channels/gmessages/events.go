@@ -8,14 +8,14 @@ import (
 	"os"
 	"strings"
 
+	"go.mau.fi/mautrix-gmessages/pkg/libgm"
+	"go.mau.fi/mautrix-gmessages/pkg/libgm/events"
+	"go.mau.fi/mautrix-gmessages/pkg/libgm/gmproto"
+
 	"jane/pkg/bus"
 	"jane/pkg/channels"
 	"jane/pkg/logger"
 	mediaPkg "jane/pkg/media"
-
-	"go.mau.fi/mautrix-gmessages/pkg/libgm"
-	"go.mau.fi/mautrix-gmessages/pkg/libgm/events"
-	"go.mau.fi/mautrix-gmessages/pkg/libgm/gmproto"
 )
 
 type EventHandler struct {
