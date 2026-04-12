@@ -1,0 +1,82 @@
+sources:
+  system_metrics:
+    type: "file"
+    include:
+      - "/workspace/logs/etl/system_metrics.jsonl"
+      - "/workspace/workspace/logs/etl/system_metrics.jsonl"
+    read_from: "beginning"
+    ignore_older_secs: 600
+
+  app_logs:
+    type: "file"
+    include:
+      - "/workspace/logs/etl/*.log"
+      - "/workspace/workspace/logs/etl/*.log"
+      - "/workspace/logs/gateway.log"
+      - "/workspace/workspace/logs/gateway.log"
+      - "/workspace/logs/launcher.log"
+      - "/workspace/workspace/logs/launcher.log"
+    read_from: "beginning"
+
+transforms:
+  parse_system_metrics:
+    type: "remap"
+    inputs: ["system_metrics"]
+    source: |
+      . = parse_json!(.message)
+
+  parse_app_logs:
+    type: "remap"
+    inputs: ["app_logs"]
+    source: |
+      parsed, err = parse_json(.message)
+      if err == null {
+        . = merge(., parsed)
+      }
+
+  metrics_transform:
+    type: "log_to_metric"
+    inputs: ["parse_system_metrics"]
+    metrics:
+      - type: "gauge"
+        field: "num_gc"
+        name: "etl_num_gc"
+      - type: "gauge"
+        field: "alloc"
+        name: "etl_alloc"
+      - type: "gauge"
+        field: "sys"
+        name: "etl_sys"
+      - type: "gauge"
+        field: "num_goroutine"
+        name: "etl_goroutines"
+      - type: "histogram"
+        field: "pause_ms"
+        name: "etl_gc_pause_ms"
+
+  logs_to_metrics:
+    type: "log_to_metric"
+    inputs: ["parse_app_logs"]
+    metrics:
+      - type: "counter"
+        field: "level"
+        name: "etl_request_count"
+        increment_by_value: false
+        tags:
+          status: "{{status}}"
+
+sinks:
+  prometheus:
+    type: "prometheus_exporter"
+    inputs: ["metrics_transform", "logs_to_metrics"]
+    address: "0.0.0.0:9598"
+    default_namespace: "etl"
+
+  loki:
+    type: "loki"
+    inputs: ["parse_app_logs"]
+    endpoint: "http://loki:3100"
+    encoding:
+      codec: "json"
+    labels:
+      job: "app_logs"
