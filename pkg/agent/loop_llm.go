@@ -245,6 +245,10 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.EventError, logger.ReplayEventDetails{
+				FromState: "running",
+				ToState:   "failed",
+			}, logger.CategoryModelFailure, err.Error())
 			return "", iteration, metrics, err
 		}
 		metrics.addUsage(enrichUsageWithCost(agent.Config, activeModel, response.Usage))
@@ -265,6 +269,16 @@ func (al *AgentLoop) runLLMIteration(
 				"target_channel": al.targetReasoningChannelID(opts.Channel),
 				"channel":        opts.Channel,
 			})
+		if response.Reasoning != "" || response.ReasoningContent != "" {
+			cotText := response.Reasoning
+			if cotText == "" {
+				cotText = response.ReasoningContent
+			}
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.EventCoT, logger.ReplayEventDetails{
+				CoTText: cotText,
+			}, logger.CategoryNone, "")
+		}
+
 		// Check if no tool calls - then check reasoning content if any
 		if len(response.ToolCalls) == 0 {
 			finalContent = response.Content
@@ -290,6 +304,10 @@ func (al *AgentLoop) runLLMIteration(
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.EventToolCall, logger.ReplayEventDetails{
+				ToolName: tc.Name,
+				Inputs:   tc.Arguments,
+			}, logger.CategoryNone, "")
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
@@ -346,6 +364,10 @@ func (al *AgentLoop) runLLMIteration(
 				"agent_id":    agent.ID,
 				"session_key": opts.SessionKey,
 			})
+			logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.EventStateTransition, logger.ReplayEventDetails{
+				FromState: "running",
+				ToState:   "pending_approval",
+			}, logger.CategoryNone, "")
 
 			// Format approval message
 			approvalMsg := "The following tool execution requires your approval:\n"
@@ -428,6 +450,17 @@ func (al *AgentLoop) runLLMIteration(
 						"error":          contentForLLM,
 						"error_category": "logic_failure",
 					})
+				logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.EventError, logger.ReplayEventDetails{
+					ToolName: r.tc.Name,
+				}, logger.CategoryLogicFailure, contentForLLM)
+			} else {
+				// We don't have direct access to tool result JSON here but we can log that it completed
+				// For LLM we pass string format. So let's just log the raw output
+				outputs := map[string]any{"contentForLLM": contentForLLM}
+				logger.LogSessionEvent(agent.Workspace, opts.SessionKey, logger.EventToolResult, logger.ReplayEventDetails{
+					ToolName: r.tc.Name,
+					Outputs:  outputs,
+				}, logger.CategoryNone, "")
 			}
 
 			toolResultMsg := providers.Message{
