@@ -41,7 +41,7 @@ func doRequest(method, url string, body []byte) error {
 		return fmt.Errorf("error creating request: %w", err)
 	}
 
-	req.Header.Set("x-goog-api-key", apiKey)
+	req.Header.Set("X-Goog-Api-Key", apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{
@@ -128,7 +128,8 @@ func newSessionCmd() *cobra.Command {
 	}
 	createCmd.Flags().StringVar(&prompt, "prompt", "", "The prompt for the session")
 	createCmd.Flags().StringVar(&title, "title", "", "The title of the session")
-	createCmd.Flags().StringVar(&source, "source", "", "The source repository (e.g., sources/github-owner-repo)")
+	createCmd.Flags().
+		StringVar(&source, "source", "", "The source repository (e.g., sources/github-owner-repo)")
 	createCmd.Flags().StringVar(&branch, "branch", "", "The starting branch")
 
 	listCmd := &cobra.Command{
