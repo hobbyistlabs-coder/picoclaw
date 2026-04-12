@@ -34,6 +34,8 @@ func (al *AgentLoop) runAgentLoop(
 	agent *AgentInstance,
 	opts processOptions,
 ) (string, error) {
+	defer logger.CleanupSessionLocks(opts.SessionKey)
+
 	// 0. Record last channel for heartbeat notifications (skip internal channels and cli)
 	if opts.Channel != "" && opts.ChatID != "" {
 		if !constants.IsInternalChannel(opts.Channel) {
@@ -265,6 +267,23 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			errCat := logger.ErrorCategoryInfrastructureFailureReplay
+			// Using context cancellation/timeout as a heuristic for infrastructure failure,
+			// otherwise assume model failure as instructed by memory.
+			if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+				errCat = logger.ErrorCategoryModelFailureReplay
+			}
+
+			logger.LogSessionEvent(
+				agent.Workspace,
+				opts.SessionKey,
+				"error",
+				logger.SessionEventDetails{
+					Outputs: err.Error(),
+				},
+				errCat,
+				err.Error(),
+			)
 			return "", iteration, metrics, err
 		}
 		metrics.addUsage(enrichUsageWithCost(agent.Config, activeModel, response.Usage))
@@ -283,6 +302,18 @@ func (al *AgentLoop) runLLMIteration(
 					ReasoningContent: response.ReasoningContent,
 				})
 			}
+
+			// Log CoT event for observability
+			logger.LogSessionEvent(
+				agent.Workspace,
+				opts.SessionKey,
+				"cot",
+				logger.SessionEventDetails{
+					CotText: response.ReasoningContent,
+				},
+				logger.ErrorCategoryNoneReplay,
+				"",
+			)
 		}
 
 		logger.DebugCF("agent", "LLM response",
@@ -381,7 +412,11 @@ func (al *AgentLoop) runLLMIteration(
 			approvalMsg := "The following tool execution requires your approval:\n"
 			for _, tc := range normalizedToolCalls {
 				argsJSON, _ := json.MarshalIndent(tc.Arguments, "", "  ")
-				approvalMsg += fmt.Sprintf("\n- `%s`:\n```json\n%s\n```\n", tc.Name, string(argsJSON))
+				approvalMsg += fmt.Sprintf(
+					"\n- `%s`:\n```json\n%s\n```\n",
+					tc.Name,
+					string(argsJSON),
+				)
 			}
 			approvalMsg += "\nDo you approve? (Yes/No)"
 
@@ -401,12 +436,31 @@ func (al *AgentLoop) runLLMIteration(
 				Content: approvalMsg,
 			})
 
+			// Log state transition
+			logger.LogSessionEvent(
+				agent.Workspace,
+				opts.SessionKey,
+				"state_transition",
+				logger.SessionEventDetails{
+					FromState: "processing",
+					ToState:   "pending_approval",
+				},
+				logger.ErrorCategoryNoneReplay,
+				"",
+			)
+
 			return "", iteration, metrics, errApprovalPending
 		}
 		// --- End HITL ---
 
 		// Execute tool calls in parallel
-		agentResults, hasAsync := al.executeToolBatch(ctx, agent, opts, normalizedToolCalls, iteration)
+		agentResults, hasAsync := al.executeToolBatch(
+			ctx,
+			agent,
+			opts,
+			normalizedToolCalls,
+			iteration,
+		)
 		if hasAsync {
 			return "", iteration, metrics, errAsyncPending
 		}

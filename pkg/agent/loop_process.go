@@ -160,12 +160,27 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 
 		if isYes || isNo {
 			al.pendingApprovals.Delete(sessionKey)
+			defer logger.CleanupSessionLocks(sessionKey)
 
 			if isNo {
 				logger.InfoCF("agent", "User rejected tool execution", map[string]any{
 					"agent_id":    agent.ID,
 					"session_key": sessionKey,
 				})
+
+				// Log state transition
+				logger.LogSessionEvent(
+					agent.Workspace,
+					sessionKey,
+					"state_transition",
+					logger.SessionEventDetails{
+						FromState: "pending_approval",
+						ToState:   "rejected",
+					},
+					logger.ErrorCategoryNoneReplay,
+					"",
+				)
+
 				for _, tc := range pending.normalizedToolCalls {
 					rejectMsg := providers.Message{
 						Role:       "tool",
@@ -180,7 +195,12 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 				agent.Tools.TickTTL()
 
 				// Continue loop with rejection feedback
-				finalContent, _, metrics, err := al.runLLMIteration(ctx, pending.agent, pending.messages, pending.opts)
+				finalContent, _, metrics, err := al.runLLMIteration(
+					ctx,
+					pending.agent,
+					pending.messages,
+					pending.opts,
+				)
 				if err != nil {
 					return "", err
 				}
@@ -203,6 +223,19 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 					"agent_id":    agent.ID,
 					"session_key": sessionKey,
 				})
+
+				// Log state transition
+				logger.LogSessionEvent(
+					agent.Workspace,
+					sessionKey,
+					"state_transition",
+					logger.SessionEventDetails{
+						FromState: "pending_approval",
+						ToState:   "approved",
+					},
+					logger.ErrorCategoryNoneReplay,
+					"",
+				)
 
 				// Execute the approved tools
 				agentResults, _ := al.executeToolBatch(
@@ -260,7 +293,12 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 				agent.Tools.TickTTL()
 
 				// Continue loop with execution feedback
-				finalContent, _, metrics, err := al.runLLMIteration(ctx, pending.agent, pending.messages, pending.opts)
+				finalContent, _, metrics, err := al.runLLMIteration(
+					ctx,
+					pending.agent,
+					pending.messages,
+					pending.opts,
+				)
 				if err != nil {
 					return "", err
 				}
@@ -287,7 +325,9 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 	return al.runAgentLoop(ctx, agent, opts)
 }
 
-func (al *AgentLoop) resolveMessageRoute(msg bus.InboundMessage) (routing.ResolvedRoute, *AgentInstance, error) {
+func (al *AgentLoop) resolveMessageRoute(
+	msg bus.InboundMessage,
+) (routing.ResolvedRoute, *AgentInstance, error) {
 	route := al.registry.ResolveRoute(routing.RouteInput{
 		Channel:    msg.Channel,
 		AccountID:  inboundMetadata(msg, metadataKeyAccountID),
@@ -302,7 +342,10 @@ func (al *AgentLoop) resolveMessageRoute(msg bus.InboundMessage) (routing.Resolv
 		agent = al.registry.GetDefaultAgent()
 	}
 	if agent == nil {
-		return routing.ResolvedRoute{}, nil, fmt.Errorf("no agent available for route (agent_id=%s)", route.AgentID)
+		return routing.ResolvedRoute{}, nil, fmt.Errorf(
+			"no agent available for route (agent_id=%s)",
+			route.AgentID,
+		)
 	}
 
 	return route, agent, nil
