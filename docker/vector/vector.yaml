@@ -1,0 +1,52 @@
+sources:
+  system_metrics_logs:
+    type: file
+    include:
+      - /workspace/logs/etl/system_metrics.jsonl
+    read_from: beginning
+
+transforms:
+  json_parser:
+    type: remap
+    inputs:
+      - system_metrics_logs
+    source: |-
+      . = parse_json!(.message)
+
+  metrics_extractor:
+    type: log_to_metric
+    inputs:
+      - json_parser
+    metrics:
+      - type: counter
+        field: status
+        name: etl_http_requests_total
+        tags:
+          status: "{{status}}"
+      - type: histogram
+        field: duration_seconds
+        name: etl_http_request_duration_seconds
+        tags:
+          endpoint: "{{endpoint}}"
+      - type: gauge
+        field: goroutines
+        name: etl_goroutines
+      - type: gauge
+        field: gc_pause_ms
+        name: etl_gc_pause_ms
+
+sinks:
+  prometheus_exporter:
+    type: prometheus_exporter
+    inputs:
+      - metrics_extractor
+    address: 0.0.0.0:8686
+
+  loki_sink:
+    type: loki
+    inputs:
+      - json_parser
+    endpoint: http://loki:3100
+    labels:
+      source: "vector"
+      job: "system_metrics"
