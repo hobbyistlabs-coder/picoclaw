@@ -126,15 +126,14 @@ func IsSubagentSessionKey(sessionKey string) bool {
 	if raw == "" {
 		return false
 	}
-	prefix := "subagent:"
-	if len(raw) >= len(prefix) && strings.EqualFold(raw[:len(prefix)], prefix) {
+	if strings.HasPrefix(strings.ToLower(raw), "subagent:") {
 		return true
 	}
 	parsed := ParseAgentSessionKey(raw)
 	if parsed == nil {
 		return false
 	}
-	return len(parsed.Rest) >= len(prefix) && strings.EqualFold(parsed.Rest[:len(prefix)], prefix)
+	return strings.HasPrefix(strings.ToLower(parsed.Rest), "subagent:")
 }
 
 func normalizeChannel(channel string) string {
