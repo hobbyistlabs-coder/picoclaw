@@ -12,3 +12,8 @@
 **Vulnerability:** The Pico WebSocket authentication handler was using standard string equality (`==`) to compare the provided bearer token against the configured secret token.
 **Learning:** String equality operators in Go return early as soon as a character mismatch is found. This allows an attacker to measure the time it takes for the server to reject the connection and iteratively guess the token character by character (a timing attack).
 **Prevention:** Always use `subtle.ConstantTimeCompare` from the `crypto/subtle` package when comparing secrets, tokens, passwords, or cryptographic signatures to ensure the comparison time depends only on the length of the secret, not the contents.
+
+## 2025-04-01 - [HIGH] Fix Path Traversal in filename extraction
+**Vulnerability:** The functions `sanitizeSessionKey` in `web/backend/api/session.go` and `SanitizeFilename` in `pkg/utils/media.go` used sequential string replacements (`strings.ReplaceAll`) to strip dangerous path characters like `..`, `/`, and `\`.
+**Learning:** Sequential string replacements are fundamentally flawed for path sanitization because attackers can use nested payloads (e.g., `.//.` or `....//`) which collapse into `../` after the sequential replacements execute, allowing them to bypass the sanitization and traverse directories.
+**Prevention:** Always use `filepath.Base(filepath.Clean(filename))` instead of manual string slicing or sequential replacements to robustly extract just the final filename segment, and explicitly reject empty strings or traversal remnants (like `.`, `/`, `\`, or `..`) that may result from edge case inputs.
