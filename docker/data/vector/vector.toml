@@ -1,0 +1,63 @@
+[sources.etl_logs]
+type = "file"
+include = ["/var/log/etl/system_metrics.jsonl"]
+read_from = "beginning"
+
+[transforms.parse_json]
+type = "remap"
+inputs = ["etl_logs"]
+source = '''
+. = parse_json!(.message)
+'''
+
+[transforms.metrics_generator]
+type = "log_to_metric"
+inputs = ["parse_json"]
+
+[[transforms.metrics_generator.metrics]]
+type = "gauge"
+field = "goroutines"
+name = "etl_goroutines"
+namespace = "jane"
+
+[[transforms.metrics_generator.metrics]]
+type = "gauge"
+field = "memory_alloc_mb"
+name = "etl_memory_alloc_mb"
+namespace = "jane"
+
+[[transforms.metrics_generator.metrics]]
+type = "gauge"
+field = "memory_total_mb"
+name = "etl_memory_total_mb"
+namespace = "jane"
+
+[[transforms.metrics_generator.metrics]]
+type = "gauge"
+field = "memory_sys_mb"
+name = "etl_memory_sys_mb"
+namespace = "jane"
+
+[[transforms.metrics_generator.metrics]]
+type = "gauge"
+field = "num_gc"
+name = "etl_num_gc_total"
+namespace = "jane"
+
+[[transforms.metrics_generator.metrics]]
+type = "histogram"
+field = "gc_pause_ms"
+name = "etl_gc_pause_ms"
+namespace = "jane"
+
+[sinks.prometheus_exporter]
+type = "prometheus_exporter"
+inputs = ["metrics_generator"]
+address = "0.0.0.0:9090"
+
+[sinks.loki]
+type = "loki"
+inputs = ["parse_json"]
+endpoint = "http://loki:3100"
+labels = { source = "etl_logs" }
+encoding.codec = "json"

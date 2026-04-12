@@ -1,0 +1,39 @@
+{
+  "title": "Ultimate Visibility (ETL)",
+  "uid": "etl-dashboard",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Active Goroutines (Saturation)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "jane_etl_goroutines", "refId": "A", "datasource": "Prometheus" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory Allocation (Saturation)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "jane_etl_memory_alloc_mb", "refId": "A", "datasource": "Prometheus" },
+        { "expr": "jane_etl_memory_total_mb", "refId": "B", "datasource": "Prometheus" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Average GC Pause Duration (Latency)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "sum(rate(jane_etl_gc_pause_ms_sum[1m])) / sum(rate(jane_etl_gc_pause_ms_count[1m]))", "refId": "A", "datasource": "Prometheus" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Number of GCs (Traffic/Throughput)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "rate(jane_etl_num_gc_total[1m])", "refId": "A", "datasource": "Prometheus" }
+      ]
+    }
+  ]
+}
