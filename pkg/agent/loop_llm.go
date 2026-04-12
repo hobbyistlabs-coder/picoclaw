@@ -34,6 +34,9 @@ func (al *AgentLoop) runAgentLoop(
 	agent *AgentInstance,
 	opts processOptions,
 ) (string, error) {
+	// Clean up session locks on exit
+	defer logger.CleanupSessionLocks(opts.SessionKey)
+
 	// 0. Record last channel for heartbeat notifications (skip internal channels and cli)
 	if opts.Channel != "" && opts.ChatID != "" {
 		if !constants.IsInternalChannel(opts.Channel) {
@@ -274,6 +277,12 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID:     opts.SessionKey,
+				EventType:     logger.EventTypeError,
+				ErrorCategory: logger.ReplayErrorCategoryInfrastructureFailure,
+				ErrorMessage:  err.Error(),
+			})
 			return "", iteration, metrics, err
 		}
 		metrics.addUsage(enrichUsageWithCost(agent.Config, activeModel, response.Usage))
@@ -304,6 +313,26 @@ func (al *AgentLoop) runLLMIteration(
 				"target_channel": al.targetReasoningChannelID(opts.Channel),
 				"channel":        opts.Channel,
 			})
+		// Log CoT to session replay
+		if response.ReasoningContent != "" {
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeCoT,
+				Details: logger.SessionEventDetails{
+					CoTText: response.ReasoningContent,
+				},
+			})
+		} else if response.Content != "" && len(response.ToolCalls) > 0 {
+			// If there's no explicit reasoning content but there is content with tool calls, log it as CoT
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeCoT,
+				Details: logger.SessionEventDetails{
+					CoTText: response.Content,
+				},
+			})
+		}
+
 		// Check if no tool calls - then check reasoning content if any
 		if len(response.ToolCalls) == 0 {
 			finalContent = response.Content
@@ -329,6 +358,14 @@ func (al *AgentLoop) runLLMIteration(
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeToolCall,
+				Details: logger.SessionEventDetails{
+					ToolName: tc.Name,
+					Inputs:   tc.Arguments,
+				},
+			})
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
@@ -422,6 +459,32 @@ func (al *AgentLoop) runLLMIteration(
 
 		// Process results in original order (send to user, save to session)
 		for _, r := range agentResults {
+			// Log tool result to session replay
+			errCat := logger.ReplayErrorCategoryNone
+			var errMsg string
+			if r.result.IsError {
+				errCat = logger.ReplayErrorCategoryLogicFailure
+				if r.result.Err != nil {
+					errMsg = r.result.Err.Error()
+				} else {
+					errMsg = r.result.ForLLM
+				}
+			}
+
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID:     opts.SessionKey,
+				EventType:     logger.EventTypeToolResult,
+				ErrorCategory: errCat,
+				ErrorMessage:  errMsg,
+				Details: logger.SessionEventDetails{
+					ToolName: r.tc.Name,
+					Outputs: map[string]any{
+						"for_llm":  r.result.ForLLM,
+						"for_user": r.result.ForUser,
+					},
+				},
+			})
+
 			// Send ForUser content to user immediately if not Silent
 			if !r.result.Silent && r.result.ForUser != "" && opts.SendResponse {
 				al.bus.PublishOutbound(ctx, bus.OutboundMessage{

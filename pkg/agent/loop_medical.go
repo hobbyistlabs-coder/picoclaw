@@ -71,7 +71,7 @@ func (al *AgentLoop) processMedicalRequest(
 		PhaseSafetyDisclaimers,
 	}
 
-	for _, phase := range phases {
+	for i, phase := range phases {
 		logger.DebugCF("medical", "Executing phase", map[string]any{"phase": phase})
 
 		prompt := buildPhasePrompt(phase, currentContext)
@@ -98,6 +98,20 @@ func (al *AgentLoop) processMedicalRequest(
 
 		// Pass result as context to next phase
 		currentContext = currentContext + "\n\n" + fmt.Sprintf("Result of %s:\n%s", phase, phaseResult)
+
+		// Capture state transition in session replay
+		nextPhase := "end"
+		if i+1 < len(phases) {
+			nextPhase = phases[i+1]
+		}
+		logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+			SessionID: opts.SessionKey,
+			EventType: logger.EventTypeStateTransition,
+			Details: logger.SessionEventDetails{
+				FromState: phase,
+				ToState:   nextPhase,
+			},
+		})
 
 		// Mandatory safety check abort
 		if phase == PhaseSafetyDisclaimers {
