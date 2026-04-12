@@ -88,7 +88,11 @@ func picoSessionKey(agentID, sessionID string) string {
 
 func sanitizeSessionKey(key string) string {
 	key = strings.ReplaceAll(key, ":", "_")
-	return filepath.Base(filepath.Clean(key))
+	base := filepath.Base(filepath.Clean(key))
+	if base == "." || base == "/" || base == "\\" || base == ".." {
+		return ""
+	}
+	return base
 }
 
 func (h *Handler) readLegacySessions(dir string) ([]legacySessionRecord, error) {
