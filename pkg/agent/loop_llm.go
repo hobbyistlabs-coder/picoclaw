@@ -447,6 +447,8 @@ func (al *AgentLoop) runLLMIteration(
 				Content: approvalMsg,
 			})
 
+			logSessionStateTransition(agent.Workspace, opts.SessionKey, "generating", "pending_approval")
+
 			return "", iteration, metrics, errApprovalPending
 		}
 		// --- End HITL ---
@@ -454,36 +456,13 @@ func (al *AgentLoop) runLLMIteration(
 		// Execute tool calls in parallel
 		agentResults, hasAsync := al.executeToolBatch(ctx, agent, opts, normalizedToolCalls, iteration)
 		if hasAsync {
+			logSessionStateTransition(agent.Workspace, opts.SessionKey, "executing_tools", "pending_async")
 			return "", iteration, metrics, errAsyncPending
 		}
 
 		// Process results in original order (send to user, save to session)
 		for _, r := range agentResults {
-			// Log tool result to session replay
-			errCat := logger.ReplayErrorCategoryNone
-			var errMsg string
-			if r.result.IsError {
-				errCat = logger.ReplayErrorCategoryLogicFailure
-				if r.result.Err != nil {
-					errMsg = r.result.Err.Error()
-				} else {
-					errMsg = r.result.ForLLM
-				}
-			}
-
-			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
-				SessionID:     opts.SessionKey,
-				EventType:     logger.EventTypeToolResult,
-				ErrorCategory: errCat,
-				ErrorMessage:  errMsg,
-				Details: logger.SessionEventDetails{
-					ToolName: r.tc.Name,
-					Outputs: map[string]any{
-						"for_llm":  r.result.ForLLM,
-						"for_user": r.result.ForUser,
-					},
-				},
-			})
+			logSessionToolResult(agent.Workspace, opts.SessionKey, r.tc.Name, r.result)
 
 			// Send ForUser content to user immediately if not Silent
 			if !r.result.Silent && r.result.ForUser != "" && opts.SendResponse {

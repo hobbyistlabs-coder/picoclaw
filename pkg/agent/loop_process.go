@@ -175,6 +175,7 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 					"agent_id":    agent.ID,
 					"session_key": sessionKey,
 				})
+				logSessionStateTransition(agent.Workspace, sessionKey, "pending_approval", "generating")
 				for _, tc := range pending.normalizedToolCalls {
 					rejectMsg := providers.Message{
 						Role:       "tool",
@@ -212,18 +213,24 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 					"agent_id":    agent.ID,
 					"session_key": sessionKey,
 				})
+				logSessionStateTransition(agent.Workspace, sessionKey, "pending_approval", "executing_tools")
 
 				// Execute the approved tools
-				agentResults, _ := al.executeToolBatch(
+				agentResults, hasAsync := al.executeToolBatch(
 					ctx,
 					pending.agent,
 					pending.opts,
 					pending.normalizedToolCalls,
 					pending.iteration,
 				)
+				if hasAsync {
+					logSessionStateTransition(agent.Workspace, sessionKey, "executing_tools", "pending_async")
+					return "", nil
+				}
 
 				// Inject results into context, matching original logic from loop_llm.go
 				for _, r := range agentResults {
+					logSessionToolResult(agent.Workspace, sessionKey, r.tc.Name, r.result)
 					if !r.result.Silent && r.result.ForUser != "" && pending.opts.SendResponse {
 						al.bus.PublishOutbound(ctx, bus.OutboundMessage{
 							Channel: pending.opts.Channel,
