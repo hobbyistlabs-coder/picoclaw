@@ -26,6 +26,8 @@ func newTestRegistry(serverURL, authToken string) *ClawHubRegistry {
 }
 
 func TestClawHubRegistrySearch(t *testing.T) {
+	utils.AllowPrivateWebFetchHosts(true)
+	t.Cleanup(func() { utils.AllowPrivateWebFetchHosts(false) })
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/api/v1/search", r.URL.Path)
 		assert.Equal(t, "github", r.URL.Query().Get("q"))
@@ -55,6 +57,8 @@ func TestClawHubRegistrySearch(t *testing.T) {
 }
 
 func TestClawHubRegistrySearchRetries429(t *testing.T) {
+	utils.AllowPrivateWebFetchHosts(true)
+	t.Cleanup(func() { utils.AllowPrivateWebFetchHosts(false) })
 	attempts := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attempts++
@@ -88,6 +92,8 @@ func TestClawHubRegistrySearchRetries429(t *testing.T) {
 }
 
 func TestClawHubRegistryGetSkillMeta(t *testing.T) {
+	utils.AllowPrivateWebFetchHosts(true)
+	t.Cleanup(func() { utils.AllowPrivateWebFetchHosts(false) })
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/api/v1/skills/github", r.URL.Path)
 
@@ -124,6 +130,8 @@ func TestClawHubRegistryGetSkillMetaUnsafeSlug(t *testing.T) {
 }
 
 func TestClawHubRegistryDownloadAndInstall(t *testing.T) {
+	utils.AllowPrivateWebFetchHosts(true)
+	t.Cleanup(func() { utils.AllowPrivateWebFetchHosts(false) })
 	// Create a valid ZIP in memory.
 	zipBuf := createTestZip(t, map[string]string{
 		"SKILL.md":  "---\nname: test-skill\ndescription: A test\n---\nHello skill",
@@ -171,6 +179,8 @@ func TestClawHubRegistryDownloadAndInstall(t *testing.T) {
 }
 
 func TestClawHubRegistryDownloadAndInstallRetries429(t *testing.T) {
+	utils.AllowPrivateWebFetchHosts(true)
+	t.Cleanup(func() { utils.AllowPrivateWebFetchHosts(false) })
 	zipBuf := createTestZip(t, map[string]string{
 		"SKILL.md": "---\nname: retry-skill\ndescription: A test\n---\nHello skill",
 	})
@@ -219,6 +229,8 @@ func TestClawHubRegistryDownloadAndInstallRetries429(t *testing.T) {
 }
 
 func TestClawHubRegistryAuthToken(t *testing.T) {
+	utils.AllowPrivateWebFetchHosts(true)
+	t.Cleanup(func() { utils.AllowPrivateWebFetchHosts(false) })
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		assert.Equal(t, "Bearer test-token-123", authHeader)
@@ -276,6 +288,8 @@ func TestExtractZipWithSubdirectories(t *testing.T) {
 }
 
 func TestClawHubRegistrySearchHTTPError(t *testing.T) {
+	utils.AllowPrivateWebFetchHosts(true)
+	t.Cleanup(func() { utils.AllowPrivateWebFetchHosts(false) })
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal Server Error"))
@@ -289,6 +303,8 @@ func TestClawHubRegistrySearchHTTPError(t *testing.T) {
 }
 
 func TestClawHubRegistrySearchNullableFields(t *testing.T) {
+	utils.AllowPrivateWebFetchHosts(true)
+	t.Cleanup(func() { utils.AllowPrivateWebFetchHosts(false) })
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		validSlug := "valid-slug"
 		validSummary := "valid summary"

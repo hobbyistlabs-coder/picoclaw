@@ -14,6 +14,8 @@ import (
 )
 
 func TestDoRequestWithRetry(t *testing.T) {
+	AllowPrivateWebFetchHosts(true)
+	t.Cleanup(func() { AllowPrivateWebFetchHosts(false) })
 	retryDelayUnit = time.Millisecond
 	t.Cleanup(func() { retryDelayUnit = time.Second })
 
@@ -81,6 +83,8 @@ func TestDoRequestWithRetry(t *testing.T) {
 }
 
 func TestDoRequestWithRetry_ContextCancel(t *testing.T) {
+	AllowPrivateWebFetchHosts(true)
+	t.Cleanup(func() { AllowPrivateWebFetchHosts(false) })
 	// Use a long retry delay so cancellation always hits during sleepWithCtx.
 	retryDelayUnit = 10 * time.Second
 	t.Cleanup(func() { retryDelayUnit = time.Second })
@@ -166,6 +170,8 @@ func (c *closeNotifier) Close() error {
 }
 
 func TestDoRequestWithRetry_Delay(t *testing.T) {
+	AllowPrivateWebFetchHosts(true)
+	t.Cleanup(func() { AllowPrivateWebFetchHosts(false) })
 	retryDelayUnit = time.Millisecond
 	t.Cleanup(func() { retryDelayUnit = time.Second })
 

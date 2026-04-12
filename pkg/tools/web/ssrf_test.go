@@ -8,14 +8,16 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"jane/pkg/utils"
 )
 
 func withPrivateWebFetchHostsAllowed(t *testing.T) {
 	t.Helper()
-	previous := allowPrivateWebFetchHosts.Load()
-	allowPrivateWebFetchHosts.Store(true)
+	previous := utils.GetAllowPrivateWebFetchHosts()
+	utils.AllowPrivateWebFetchHosts(true)
 	t.Cleanup(func() {
-		allowPrivateWebFetchHosts.Store(previous)
+		utils.AllowPrivateWebFetchHosts(previous)
 	})
 }
 
@@ -147,8 +149,8 @@ func TestWebFetch_RedirectToPrivateBlocked(t *testing.T) {
 	defer server.Close()
 
 	// Temporarily disable private host allowance for the redirect check
-	allowPrivateWebFetchHosts.Store(false)
-	defer allowPrivateWebFetchHosts.Store(true)
+	utils.AllowPrivateWebFetchHosts(false)
+	defer utils.AllowPrivateWebFetchHosts(true)
 
 	tool, err := NewWebFetchTool(50000, testFetchLimit)
 	if err != nil {
@@ -197,9 +199,9 @@ func TestIsPrivateOrRestrictedIP_Table(t *testing.T) {
 			if ip == nil {
 				t.Fatalf("failed to parse IP: %s", tt.ip)
 			}
-			got := isPrivateOrRestrictedIP(ip)
+			got := utils.IsPrivateOrRestrictedIP(ip)
 			if got != tt.blocked {
-				t.Errorf("isPrivateOrRestrictedIP(%s) = %v, want %v", tt.ip, got, tt.blocked)
+				t.Errorf("utils.IsPrivateOrRestrictedIP(%s) = %v, want %v", tt.ip, got, tt.blocked)
 			}
 		})
 	}

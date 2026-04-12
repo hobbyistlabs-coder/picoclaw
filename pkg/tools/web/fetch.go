@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"jane/pkg/tools"
+	"jane/pkg/utils"
 	"net"
 	"net/http"
 	"net/url"
@@ -40,13 +41,13 @@ func NewWebFetchToolWithProxy(maxChars int, proxy string, fetchLimitBytes int64)
 			Timeout:   15 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}
-		transport.DialContext = newSafeDialContext(dialer)
+		transport.DialContext = utils.NewSafeDialContext(dialer)
 	}
 	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		if len(via) >= maxRedirects {
 			return fmt.Errorf("stopped after %d redirects", maxRedirects)
 		}
-		if isObviousPrivateHost(req.URL.Hostname()) {
+		if utils.IsObviousPrivateHost(req.URL.Hostname()) {
 			return fmt.Errorf("redirect target is private or local network host")
 		}
 		return nil
@@ -108,9 +109,9 @@ func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) *tools.
 	}
 
 	// Lightweight pre-flight: block obvious localhost/literal-IP without DNS resolution.
-	// The real SSRF guard is newSafeDialContext at connect time.
+	// The real SSRF guard is utils.NewSafeDialContext at connect time.
 	hostname := parsedURL.Hostname()
-	if isObviousPrivateHost(hostname) {
+	if utils.IsObviousPrivateHost(hostname) {
 		return tools.ErrorResult("fetching private or local network hosts is not allowed")
 	}
 

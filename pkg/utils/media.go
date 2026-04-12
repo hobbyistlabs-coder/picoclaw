@@ -2,6 +2,7 @@ package utils
 
 import (
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -93,7 +94,17 @@ func DownloadFile(urlStr, filename string, opts DownloadOptions) string {
 		req.Header.Set(key, value)
 	}
 
-	client := &http.Client{Timeout: opts.Timeout}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = NewSafeDialContext(&net.Dialer{
+		Timeout:   15 * time.Second,
+		KeepAlive: 30 * time.Second,
+	})
+
+	client := &http.Client{
+		Timeout:   opts.Timeout,
+		Transport: transport,
+	}
+
 	if opts.ProxyURL != "" {
 		proxyURL, parseErr := url.Parse(opts.ProxyURL)
 		if parseErr != nil {
@@ -103,9 +114,7 @@ func DownloadFile(urlStr, filename string, opts DownloadOptions) string {
 			})
 			return ""
 		}
-		client.Transport = &http.Transport{
-			Proxy: http.ProxyURL(proxyURL),
-		}
+		transport.Proxy = http.ProxyURL(proxyURL)
 	}
 	resp, err := client.Do(req)
 	if err != nil {

@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 )
@@ -17,6 +18,33 @@ func shouldRetry(statusCode int) bool {
 }
 
 func DoRequestWithRetry(client *http.Client, req *http.Request) (*http.Response, error) {
+	// Ensure the client uses our SSRF-safe dialer if it's using the default transport or a custom transport without one
+	safeClient := client
+	if transport, ok := client.Transport.(*http.Transport); ok {
+		if transport.DialContext == nil {
+			// Shallow copy the transport to avoid modifying shared state
+			safeTransport := transport.Clone()
+			safeTransport.DialContext = NewSafeDialContext(&net.Dialer{
+				Timeout:   15 * time.Second,
+				KeepAlive: 30 * time.Second,
+			})
+
+			// Shallow copy the client
+			safeClientCopy := *client
+			safeClientCopy.Transport = safeTransport
+			safeClient = &safeClientCopy
+		}
+	} else if client.Transport == nil {
+		safeTransport := http.DefaultTransport.(*http.Transport).Clone()
+		safeTransport.DialContext = NewSafeDialContext(&net.Dialer{
+			Timeout:   15 * time.Second,
+			KeepAlive: 30 * time.Second,
+		})
+		safeClientCopy := *client
+		safeClientCopy.Transport = safeTransport
+		safeClient = &safeClientCopy
+	}
+
 	var resp *http.Response
 	var err error
 
@@ -25,7 +53,7 @@ func DoRequestWithRetry(client *http.Client, req *http.Request) (*http.Response,
 			resp.Body.Close()
 		}
 
-		resp, err = client.Do(req)
+		resp, err = safeClient.Do(req)
 		if err == nil {
 			if resp.StatusCode == http.StatusOK {
 				break

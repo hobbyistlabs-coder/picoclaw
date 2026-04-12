@@ -1,4 +1,4 @@
-package web
+package utils
 
 import (
 	"context"
@@ -12,9 +12,19 @@ import (
 // This is false in normal runtime to reduce SSRF exposure, and tests can override it temporarily.
 var allowPrivateWebFetchHosts atomic.Bool
 
-// newSafeDialContext re-resolves DNS at connect time to mitigate DNS rebinding (TOCTOU)
+// AllowPrivateWebFetchHosts sets the toggle for whether private hosts are permitted in dial contexts.
+func AllowPrivateWebFetchHosts(allow bool) {
+	allowPrivateWebFetchHosts.Store(allow)
+}
+
+// GetAllowPrivateWebFetchHosts returns the current toggle state.
+func GetAllowPrivateWebFetchHosts() bool {
+	return allowPrivateWebFetchHosts.Load()
+}
+
+// NewSafeDialContext re-resolves DNS at connect time to mitigate DNS rebinding (TOCTOU)
 // where a hostname resolves to a public IP during pre-flight but a private IP at connect time.
-func newSafeDialContext(dialer *net.Dialer) func(context.Context, string, string) (net.Conn, error) {
+func NewSafeDialContext(dialer *net.Dialer) func(context.Context, string, string) (net.Conn, error) {
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
 		if allowPrivateWebFetchHosts.Load() {
 			return dialer.DialContext(ctx, network, address)
@@ -29,7 +39,7 @@ func newSafeDialContext(dialer *net.Dialer) func(context.Context, string, string
 		}
 
 		if ip := net.ParseIP(host); ip != nil {
-			if isPrivateOrRestrictedIP(ip) {
+			if IsPrivateOrRestrictedIP(ip) {
 				return nil, fmt.Errorf("blocked private or local target: %s", host)
 			}
 			return dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
@@ -43,7 +53,7 @@ func newSafeDialContext(dialer *net.Dialer) func(context.Context, string, string
 		attempted := 0
 		var lastErr error
 		for _, ipAddr := range ipAddrs {
-			if isPrivateOrRestrictedIP(ipAddr.IP) {
+			if IsPrivateOrRestrictedIP(ipAddr.IP) {
 				continue
 			}
 			attempted++
@@ -64,10 +74,10 @@ func newSafeDialContext(dialer *net.Dialer) func(context.Context, string, string
 	}
 }
 
-// isObviousPrivateHost performs a lightweight, no-DNS check for obviously private hosts.
+// IsObviousPrivateHost performs a lightweight, no-DNS check for obviously private hosts.
 // It catches localhost, literal private IPs, and empty hosts. It does NOT resolve DNS —
-// the real SSRF guard is newSafeDialContext which checks IPs at connect time.
-func isObviousPrivateHost(host string) bool {
+// the real SSRF guard is NewSafeDialContext which checks IPs at connect time.
+func IsObviousPrivateHost(host string) bool {
 	if allowPrivateWebFetchHosts.Load() {
 		return false
 	}
@@ -83,16 +93,16 @@ func isObviousPrivateHost(host string) bool {
 	}
 
 	if ip := net.ParseIP(h); ip != nil {
-		return isPrivateOrRestrictedIP(ip)
+		return IsPrivateOrRestrictedIP(ip)
 	}
 
 	return false
 }
 
-// isPrivateOrRestrictedIP returns true for IPs that should never be reached via web_fetch:
+// IsPrivateOrRestrictedIP returns true for IPs that should never be reached:
 // RFC 1918, loopback, link-local (incl. cloud metadata 169.254.x.x), carrier-grade NAT,
 // IPv6 unique-local (fc00::/7), 6to4 (2002::/16), and Teredo (2001:0000::/32).
-func isPrivateOrRestrictedIP(ip net.IP) bool {
+func IsPrivateOrRestrictedIP(ip net.IP) bool {
 	if ip == nil {
 		return true
 	}
@@ -124,12 +134,12 @@ func isPrivateOrRestrictedIP(ip net.IP) bool {
 		// 6to4 addresses (2002::/16): check the embedded IPv4 at bytes [2:6].
 		if ip[0] == 0x20 && ip[1] == 0x02 {
 			embedded := net.IPv4(ip[2], ip[3], ip[4], ip[5])
-			return isPrivateOrRestrictedIP(embedded)
+			return IsPrivateOrRestrictedIP(embedded)
 		}
 		// Teredo (2001:0000::/32): client IPv4 is at bytes [12:16], XOR-inverted.
 		if ip[0] == 0x20 && ip[1] == 0x01 && ip[2] == 0x00 && ip[3] == 0x00 {
 			client := net.IPv4(ip[12]^0xff, ip[13]^0xff, ip[14]^0xff, ip[15]^0xff)
-			return isPrivateOrRestrictedIP(client)
+			return IsPrivateOrRestrictedIP(client)
 		}
 	}
 

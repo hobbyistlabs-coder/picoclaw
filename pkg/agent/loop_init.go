@@ -9,8 +9,6 @@ package agent
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"reflect"
 	"sync"
 	"time"
 
@@ -118,39 +116,13 @@ func registerSharedTools(
 			}
 		}
 
-		var browserActionTool *tools.BrowserActionTool
-		if cfg.Tools.IsToolEnabled("browser_action") || cfg.Tools.IsToolEnabled("go_eval") {
-			// Initialize BrowserActionTool if either browser_action or go_eval is enabled,
-			// because go_eval might need it as a binding.
-			browserActionTool = tools.NewBrowserActionTool()
-			if cfg.Tools.IsToolEnabled("browser_action") {
-				agent.Tools.Register(browserActionTool)
-			}
+		if cfg.Tools.IsToolEnabled("browser_action") {
+			browserActionTool := tools.NewBrowserActionTool()
+			agent.Tools.Register(browserActionTool)
 		}
 
 		if cfg.Tools.IsToolEnabled("go_eval") {
 			goEvalTool := tools.NewGoEvalTool(agent.Workspace)
-
-			sendFunc := func(channel, chatID, content string) error {
-				pubCtx, pubCancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer pubCancel()
-				return msgBus.PublishOutbound(pubCtx, bus.OutboundMessage{
-					Channel: channel,
-					ChatID:  chatID,
-					Content: content,
-				})
-			}
-
-			bindings := map[string]reflect.Value{
-				"Workspace":  reflect.ValueOf(agent.Workspace),
-				"HTTPClient": reflect.ValueOf(&http.Client{Timeout: 30 * time.Second}),
-				"Send":       reflect.ValueOf(sendFunc),
-			}
-			if browserActionTool != nil {
-				bindings["BrowserActionTool"] = reflect.ValueOf(browserActionTool)
-			}
-			goEvalTool.SetBindings(bindings)
-
 			agent.Tools.Register(goEvalTool)
 		}
 
