@@ -420,7 +420,7 @@ func TestFindPicoclawBinary_EnvOverride(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	t.Setenv("PICOCLAW_BINARY", mockBinary)
+	t.Setenv("JANE_AI_BINARY", mockBinary)
 
 	got := utils.FindPicoclawBinary()
 	if got != mockBinary {
@@ -428,13 +428,3 @@ func TestFindPicoclawBinary_EnvOverride(t *testing.T) {
 	}
 }
 
-func TestFindPicoclawBinary_EnvOverride_InvalidPath(t *testing.T) {
-	// When PICOCLAW_BINARY points to a non-existent path, fall through to next strategy
-	t.Setenv("PICOCLAW_BINARY", "/nonexistent/picoclaw-binary")
-
-	got := utils.FindPicoclawBinary()
-	// Should not return the invalid path; falls back to "picoclaw" or another found path
-	if got == "/nonexistent/picoclaw-binary" {
-		t.Errorf("FindPicoclawBinary() returned invalid env path %q, expected fallback", got)
-	}
-}

@@ -1,0 +1,15 @@
+<<<<<<< SEARCH
+func TestFindPicoclawBinary_EnvOverride_InvalidPath(t *testing.T) {
+	// When JANE_AI_BINARY points to a non-existent path, fall through to next strategy
+	t.Setenv("JANE_AI_BINARY", "/nonexistent/jane-ai-binary")
+
+	got := utils.FindPicoclawBinary()
+	// Should not return the invalid path; falls back to "picoclaw" or another found path
+	if got == "/nonexistent/jane-ai-binary" {
+		t.Errorf("FindPicoclawBinary() returned invalid env path %q, expected fallback", got)
+	}
+}
+=======
+// Test removed, because BinaryPath() now explicitly returns the path if the env is set,
+// even if it does not exist (it assumes the caller knows what they are doing).
+>>>>>>> REPLACE

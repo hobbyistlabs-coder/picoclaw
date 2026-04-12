@@ -67,7 +67,7 @@ func TestAgentConfig_FullParse(t *testing.T) {
 	jsonData := `{
 		"agents": {
 			"defaults": {
-				"workspace": "~/.picoclaw/workspace",
+				"workspace": "~/.jane-ai/workspace",
 				"model": "glm-4.7",
 				"max_tokens": 8192,
 				"max_tool_iterations": 20
@@ -168,7 +168,7 @@ func TestConfig_BackwardCompat_NoAgentsList(t *testing.T) {
 	jsonData := `{
 		"agents": {
 			"defaults": {
-				"workspace": "~/.picoclaw/workspace",
+				"workspace": "~/.jane-ai/workspace",
 				"model": "glm-4.7",
 				"max_tokens": 8192,
 				"max_tool_iterations": 20
@@ -488,7 +488,7 @@ func TestDefaultConfig_WorkspacePath_Default(t *testing.T) {
 	t.Setenv("HOME", "/tmp/home")
 
 	cfg := DefaultConfig()
-	want := filepath.Join("/tmp/home", ".picoclaw", "workspace")
+	want := filepath.Join("/tmp/home", ".jane-ai", "workspace")
 
 	if cfg.Agents.Defaults.Workspace != want {
 		t.Errorf("Default workspace path = %q, want %q", cfg.Agents.Defaults.Workspace, want)
