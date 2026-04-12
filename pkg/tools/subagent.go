@@ -10,6 +10,14 @@ import (
 	"jane/pkg/utils"
 )
 
+// AgentDispatcher executes a task on a specific agent instance
+type AgentDispatcher interface {
+	DispatchSubagent(
+		ctx context.Context,
+		agentID, task, originChannel, originChatID, sessionKey string,
+	) (*ToolResult, error)
+}
+
 type SubagentTask struct {
 	ID                string
 	Task              string
@@ -51,6 +59,7 @@ type SubagentManager struct {
 	hasMaxTokens      bool
 	hasTemperature    bool
 	nextID            int
+	dispatcher        AgentDispatcher
 }
 
 func NewSubagentManager(
@@ -78,6 +87,13 @@ func (sm *SubagentManager) SetLLMOptions(maxTokens int, temperature float64) {
 	sm.hasMaxTokens = true
 	sm.temperature = temperature
 	sm.hasTemperature = true
+}
+
+// SetDispatcher sets the agent dispatcher for multi-agent delegation.
+func (sm *SubagentManager) SetDispatcher(dispatcher AgentDispatcher) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.dispatcher = dispatcher
 }
 
 // SetTools sets the tool registry for subagent execution.
@@ -159,68 +175,104 @@ After completing the task, provide a clear summary of what was done.`
 
 	select {
 	case <-ctx.Done():
-		sm.emit(taskID, "task.failed", SubagentCancelled, "Task cancelled before execution",
-			map[string]any{"error": "context cancelled"})
+		sm.emit(taskID, "task.failed", SubagentCanceled, "Task canceled before execution",
+			map[string]any{"error": "context canceled"})
 		return
 	default:
 	}
 
+	var result *ToolResult
+
 	sm.mu.RLock()
-	tools := sm.tools
-	maxIter := sm.maxIterations
-	maxTokens := sm.maxTokens
-	temperature := sm.temperature
-	hasMaxTokens := sm.hasMaxTokens
-	hasTemperature := sm.hasTemperature
+	dispatcher := sm.dispatcher
 	sm.mu.RUnlock()
 
-	var llmOptions map[string]any
-	if hasMaxTokens || hasTemperature {
-		llmOptions = map[string]any{}
-		if hasMaxTokens {
-			llmOptions["max_tokens"] = maxTokens
+	if dispatcher != nil && task.AgentID != "" {
+		var err error
+		result, err = dispatcher.DispatchSubagent(
+			ctx,
+			task.AgentID,
+			task.Task,
+			task.OriginChannel,
+			task.OriginChatID,
+			task.ParentSessionID,
+		)
+		if err != nil {
+			status := SubagentFailed
+			message := fmt.Sprintf("Delegated task failed: %v", err)
+			if ctx.Err() != nil {
+				status = SubagentCanceled
+				message = "Task canceled during execution"
+			}
+			sm.emit(taskID, "task.failed", status, message, map[string]any{"error": err.Error()})
+			result = ErrorResult(message).WithError(err)
+		} else {
+			sm.emit(taskID, "task.completed", SubagentCompleted, "Delegated task completed",
+				map[string]any{
+					"result":           utils.Truncate(result.ForLLM, 240),
+					"progress_percent": 100,
+				})
+			result.ForLLM = fmt.Sprintf("Subagent '%s' (Agent %s) completed:\n%s",
+				task.Codename, task.AgentID, result.ForLLM)
 		}
-		if hasTemperature {
-			llmOptions["temperature"] = temperature
-		}
-	}
-
-	loopResult, err := RunToolLoop(ctx, ToolLoopConfig{
-		Provider:      sm.provider,
-		Model:         sm.defaultModel,
-		Tools:         tools,
-		MaxIterations: maxIter,
-		LLMOptions:    llmOptions,
-		OnToolCall: func(tc providers.ToolCall, status string, result *ToolResult) {
-			sm.recordToolEvent(taskID, tc, status, result)
-		},
-	}, messages, task.OriginChannel, task.OriginChatID)
-
-	var result *ToolResult
-	if err != nil {
-		status := SubagentFailed
-		message := fmt.Sprintf("Delegated task failed: %v", err)
-		if ctx.Err() != nil {
-			status = SubagentCancelled
-			message = "Task cancelled during execution"
-		}
-		sm.emit(taskID, "task.failed", status, message, map[string]any{"error": err.Error()})
-		result = ErrorResult(message).WithError(err)
 	} else {
-		sm.emit(taskID, "task.completed", SubagentCompleted, "Delegated task completed",
-			map[string]any{
-				"result":           utils.Truncate(loopResult.Content, 240),
-				"progress_percent": 100,
-			})
-		result = &ToolResult{
-			ForLLM: fmt.Sprintf("Subagent '%s' completed (iterations: %d): %s",
-				task.Codename, loopResult.Iterations, loopResult.Content),
-			ForUser: loopResult.Content,
-			Silent:  false,
-			IsError: false,
-			Async:   false,
+		sm.mu.RLock()
+		tools := sm.tools
+		maxIter := sm.maxIterations
+		maxTokens := sm.maxTokens
+		temperature := sm.temperature
+		hasMaxTokens := sm.hasMaxTokens
+		hasTemperature := sm.hasTemperature
+		sm.mu.RUnlock()
+
+		var llmOptions map[string]any
+		if hasMaxTokens || hasTemperature {
+			llmOptions = map[string]any{}
+			if hasMaxTokens {
+				llmOptions["max_tokens"] = maxTokens
+			}
+			if hasTemperature {
+				llmOptions["temperature"] = temperature
+			}
+		}
+
+		loopResult, err := RunToolLoop(ctx, ToolLoopConfig{
+			Provider:      sm.provider,
+			Model:         sm.defaultModel,
+			Tools:         tools,
+			MaxIterations: maxIter,
+			LLMOptions:    llmOptions,
+			OnToolCall: func(tc providers.ToolCall, status string, toolResult *ToolResult) {
+				sm.recordToolEvent(taskID, tc, status, toolResult)
+			},
+		}, messages, task.OriginChannel, task.OriginChatID)
+
+		if err != nil {
+			status := SubagentFailed
+			message := fmt.Sprintf("Delegated task failed: %v", err)
+			if ctx.Err() != nil {
+				status = SubagentCanceled
+				message = "Task canceled during execution"
+			}
+			sm.emit(taskID, "task.failed", status, message, map[string]any{"error": err.Error()})
+			result = ErrorResult(message).WithError(err)
+		} else {
+			sm.emit(taskID, "task.completed", SubagentCompleted, "Delegated task completed",
+				map[string]any{
+					"result":           utils.Truncate(loopResult.Content, 240),
+					"progress_percent": 100,
+				})
+			result = &ToolResult{
+				ForLLM: fmt.Sprintf("Subagent '%s' completed (iterations: %d): %s",
+					task.Codename, loopResult.Iterations, loopResult.Content),
+				ForUser: loopResult.Content,
+				Silent:  false,
+				IsError: false,
+				Async:   false,
+			}
 		}
 	}
+
 	if callback != nil && result != nil {
 		callback(ctx, result)
 	}
@@ -306,8 +358,8 @@ func (sm *SubagentManager) GetBatchStatus(batchID string) *SubagentBatchStatus {
 			status.Failed++
 		case SubagentCompleted:
 			status.Completed++
-		case SubagentCancelled:
-			status.Cancelled++
+		case SubagentCanceled:
+			status.Canceled++
 		}
 	}
 	if status.Total == 0 {
@@ -439,7 +491,7 @@ func toolResultSnippet(result *ToolResult) string {
 func isTerminalStatus(status string) bool {
 	return status == SubagentCompleted ||
 		status == SubagentFailed ||
-		status == SubagentCancelled
+		status == SubagentCanceled
 }
 
 func nextCodename(index int) string {
@@ -466,7 +518,9 @@ func (t *SubagentTool) Name() string {
 }
 
 func (t *SubagentTool) Description() string {
-	return "Execute a subagent task synchronously and return the result. Use this for delegating specific tasks to an independent agent instance. Returns execution summary to user and full details to LLM."
+	return "Execute a subagent task synchronously and return the result. " +
+		"Use this for delegating specific tasks to an independent agent instance. " +
+		"Returns execution summary to user and full details to LLM."
 }
 
 func (t *SubagentTool) Parameters() map[string]any {
@@ -493,10 +547,16 @@ func (t *SubagentTool) Execute(ctx context.Context, args map[string]any) *ToolRe
 	}
 	label, _ := args["label"].(string)
 	if t.manager == nil {
-		return ErrorResult("Subagent manager not configured").WithError(fmt.Errorf("manager is nil"))
+		return ErrorResult(
+			"Subagent manager not configured",
+		).WithError(fmt.Errorf("manager is nil"))
 	}
 	messages := []providers.Message{
-		{Role: "system", Content: "You are a subagent. Complete the given task independently and provide a clear, concise result."},
+		{
+			Role: "system",
+			Content: "You are a subagent. Complete the given task independently " +
+				"and provide a clear, concise result.",
+		},
 		{Role: "user", Content: task},
 	}
 
