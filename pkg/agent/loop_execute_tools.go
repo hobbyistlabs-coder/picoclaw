@@ -58,6 +58,18 @@ func (al *AgentLoop) executeToolBatch(
 		go func(idx int, tc providers.ToolCall) {
 			defer wg.Done()
 
+			logger.LogSessionEvent(opts.SessionKey, logger.SessionEvent{
+				EventType: logger.EventTypeToolCall,
+				Details: logger.EventDetails{
+					ToolName:  tc.Name,
+					FromState: "waiting_llm_response",
+					ToState:   "executing_tool",
+					Inputs: map[string]any{
+						"arguments": tc.Arguments,
+					},
+				},
+			})
+
 			// Panic recovery for robust tool execution
 			defer func() {
 				if r := recover(); r != nil {

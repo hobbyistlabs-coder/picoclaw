@@ -34,6 +34,8 @@ func (al *AgentLoop) runAgentLoop(
 	agent *AgentInstance,
 	opts processOptions,
 ) (string, error) {
+	// Clean up session locks when the run completes to avoid file descriptor leaks
+	defer logger.CleanupSessionLocks(opts.SessionKey)
 	// 0. Record last channel for heartbeat notifications (skip internal channels and cli)
 	if opts.Channel != "" && opts.ChatID != "" {
 		if !constants.IsInternalChannel(opts.Channel) {
@@ -70,6 +72,19 @@ func (al *AgentLoop) runAgentLoop(
 
 	// 2. Save user message to session
 	agent.Sessions.AddMessage(opts.SessionKey, "user", opts.UserMessage)
+
+	logger.LogSessionEvent(opts.SessionKey, logger.SessionEvent{
+		EventType: logger.EventTypeStateTransition,
+		Details: logger.EventDetails{
+			FromState: "idle",
+			ToState:   "processing_user_message",
+			Inputs: map[string]any{
+				"user_message": opts.UserMessage,
+				"media":        opts.Media,
+				"channel":      opts.Channel,
+			},
+		},
+	})
 
 	// 3. Run LLM iteration loop
 	startTime := time.Now()
@@ -137,6 +152,18 @@ func (al *AgentLoop) runAgentLoop(
 			"iterations":   iteration,
 			"final_length": len(finalContent),
 		})
+
+	logger.LogSessionEvent(opts.SessionKey, logger.SessionEvent{
+		EventType: logger.EventTypeStateTransition,
+		Details: logger.EventDetails{
+			FromState: "processing_user_message",
+			ToState:   "idle",
+			Outputs: map[string]any{
+				"response":   finalContent,
+				"iterations": iteration,
+			},
+		},
+	})
 
 	return finalContent, nil
 }
@@ -258,6 +285,20 @@ func (al *AgentLoop) runLLMIteration(
 				"tools_json":    formatToolsForLog(providerToolDefs),
 			})
 
+		// Log session event for LLM request
+		logger.LogSessionEvent(opts.SessionKey, logger.SessionEvent{
+			EventType: logger.EventTypeCoT,
+			Details: logger.EventDetails{
+				FromState: "requesting_llm",
+				ToState:   "waiting_llm_response",
+				Inputs: map[string]any{
+					"model":     activeModel,
+					"messages":  messages,
+					"iteration": iteration,
+				},
+			},
+		})
+
 		// Call LLM with fallback chain and retry logic
 		response, err := al.executeLLMWithRetry(
 			ctx, agent, opts, &messages,
@@ -265,8 +306,34 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			errCat := logger.ErrorCategoryModelFailure
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+				errCat = logger.ErrorCategoryInfrastructureFailure
+			}
+			logger.LogSessionEvent(opts.SessionKey, logger.SessionEvent{
+				EventType:     logger.EventTypeError,
+				ErrorCategory: string(errCat),
+				ErrorMessage:  err.Error(),
+				Details: logger.EventDetails{
+					FromState: "waiting_llm_response",
+					ToState:   "error",
+				},
+			})
 			return "", iteration, metrics, err
 		}
+
+		logger.LogSessionEvent(opts.SessionKey, logger.SessionEvent{
+			EventType: logger.EventTypeCoT,
+			Details: logger.EventDetails{
+				FromState: "waiting_llm_response",
+				ToState:   "processing_llm_response",
+				CoTText:   response.ReasoningContent,
+				Outputs: map[string]any{
+					"content":    response.Content,
+					"tool_calls": len(response.ToolCalls),
+				},
+			},
+		})
 		metrics.addUsage(enrichUsageWithCost(agent.Config, activeModel, response.Usage))
 		go al.handleReasoning(
 			ctx,
@@ -413,6 +480,29 @@ func (al *AgentLoop) runLLMIteration(
 
 		// Process results in original order (send to user, save to session)
 		for _, r := range agentResults {
+			event := logger.SessionEvent{
+				EventType: logger.EventTypeToolResult,
+				Details: logger.EventDetails{
+					ToolName:  r.tc.Name,
+					FromState: "executing_tool",
+					ToState:   "processing_tool_result",
+					Outputs: map[string]any{
+						"for_llm":  r.result.ForLLM,
+						"for_user": r.result.ForUser,
+						"is_error": r.result.IsError,
+					},
+				},
+			}
+
+			if r.result.IsError {
+				event.EventType = logger.EventTypeError
+				event.ErrorCategory = string(logger.ErrorCategoryLogicFailure)
+				event.ErrorMessage = r.result.ForLLM
+				if event.ErrorMessage == "" && r.result.Err != nil {
+					event.ErrorMessage = r.result.Err.Error()
+				}
+			}
+			logger.LogSessionEvent(opts.SessionKey, event)
 			// Send ForUser content to user immediately if not Silent
 			if !r.result.Silent && r.result.ForUser != "" && opts.SendResponse {
 				al.bus.PublishOutbound(ctx, bus.OutboundMessage{

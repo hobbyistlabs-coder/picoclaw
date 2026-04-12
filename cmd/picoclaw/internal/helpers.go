@@ -2,6 +2,7 @@ package internal
 
 import (
 	"jane/pkg/config"
+	"jane/pkg/logger"
 	"jane/pkg/runtimepaths"
 )
 
@@ -18,5 +19,10 @@ func GetConfigPath() string {
 }
 
 func LoadConfig() (*config.Config, error) {
-	return config.LoadConfig(GetConfigPath())
+	cfg, err := config.LoadConfig(GetConfigPath())
+	if err == nil && cfg != nil {
+		// Initialize the logger workspace directory for session replays
+		logger.SetWorkspaceDir(cfg.WorkspacePath())
+	}
+	return cfg, err
 }
