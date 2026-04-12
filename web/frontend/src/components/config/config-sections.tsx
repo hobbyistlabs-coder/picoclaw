@@ -218,6 +218,14 @@ export function RuntimeSection({ form, onFieldChange }: RuntimeSectionProps) {
         }
       />
 
+      <SwitchCardField
+        label={t("pages.config.auto_approve")}
+        hint={t("pages.config.auto_approve_hint")}
+        layout="setting-row"
+        checked={form.autoApprove}
+        onCheckedChange={(checked) => onFieldChange("autoApprove", checked)}
+      />
+
       {form.heartbeatEnabled && (
         <Field
           label={t("pages.config.heartbeat_interval")}

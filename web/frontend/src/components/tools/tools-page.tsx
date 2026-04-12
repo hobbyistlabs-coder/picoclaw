@@ -77,7 +77,7 @@ export function ToolsPage() {
               {data?.tools.length ? (
                 groupedTools.map(([category, items]) => (
                   <div key={category} className="space-y-3">
-                    <div className="text-foreground/85 text-sm font-semibold tracking-wide">
+                    <div className="text-background/85 text-sm font-semibold tracking-wide">
                       {t(`pages.agent.tools.categories.${category}`)}
                     </div>
                     <div className="grid gap-4 lg:grid-cols-2">

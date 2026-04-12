@@ -156,6 +156,21 @@ func TestToolRegistry_ExecuteWithContext_InjectsToolContext(t *testing.T) {
 	}
 }
 
+func TestToolRegistry_ExecuteWithContext_PreservesSessionKey(t *testing.T) {
+	r := NewToolRegistry()
+	ct := &mockContextAwareTool{
+		mockRegistryTool: *newMockTool("ctx_tool", "needs context"),
+	}
+	r.Register(ct)
+
+	ctx := WithToolSessionKey(context.Background(), "agent:test:session")
+	r.ExecuteWithContext(ctx, "ctx_tool", nil, "telegram", "chat-42", nil)
+
+	if got := ToolSessionKey(ct.lastCtx); got != "agent:test:session" {
+		t.Errorf("expected session key to survive context injection, got %q", got)
+	}
+}
+
 func TestToolRegistry_ExecuteWithContext_EmptyContext(t *testing.T) {
 	r := NewToolRegistry()
 	ct := &mockContextAwareTool{

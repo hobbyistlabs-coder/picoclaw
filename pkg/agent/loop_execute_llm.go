@@ -88,6 +88,10 @@ func (al *AgentLoop) executeLLMWithRetry(
 		return agent.Provider.Chat(ctx, *messages, providerToolDefs, activeModel, llmOpts)
 	}
 
+	if len(activeCandidates) == 1 {
+		activeModel = activeCandidates[0].Model
+	}
+
 	var response *providers.LLMResponse
 	var err error
 
@@ -129,6 +133,14 @@ func (al *AgentLoop) executeLLMWithRetry(
 				"retry":   retry,
 				"backoff": backoff.String(),
 			})
+
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID:     opts.SessionKey,
+				EventType:     logger.EventTypeError,
+				ErrorCategory: logger.ReplayErrorCategoryInfrastructureFailure,
+				ErrorMessage:  fmt.Sprintf("Timeout error, retrying after %s: %v", backoff, err),
+			})
+
 			time.Sleep(backoff)
 			continue
 		}
@@ -179,6 +191,19 @@ func (al *AgentLoop) executeLLMWithRetry(
 				"error":          err.Error(),
 				"error_category": errorCategory,
 			})
+
+		errCat := logger.ReplayErrorCategoryModelFailure
+		if errorCategory == "infrastructure_failure" {
+			errCat = logger.ReplayErrorCategoryInfrastructureFailure
+		}
+
+		logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+			SessionID:     opts.SessionKey,
+			EventType:     logger.EventTypeError,
+			ErrorCategory: errCat,
+			ErrorMessage:  fmt.Sprintf("LLM call failed after retries: %v", err),
+		})
+
 		return nil, fmt.Errorf("LLM call failed after retries: %w", err)
 	}
 

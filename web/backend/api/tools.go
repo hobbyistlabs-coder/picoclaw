@@ -1,3 +1,5 @@
+// backend/api/tools.go
+
 package api
 
 import (
@@ -69,6 +71,12 @@ var toolCatalog = []toolCatalogEntry{
 		Description: "Run shell commands inside the configured workspace sandbox.",
 		Category:    "filesystem",
 		ConfigKey:   "exec",
+	},
+	{
+		Name:        "boards",
+		Description: "Manage kanban boards, cards, and recurring review schedules.",
+		Category:    "automation",
+		ConfigKey:   "boards",
 	},
 	{
 		Name:        "cron",
@@ -304,6 +312,8 @@ func applyToolState(cfg *config.Config, toolName string, enabled bool) error {
 		cfg.Tools.I2C.Enabled = enabled
 	case "spi":
 		cfg.Tools.SPI.Enabled = enabled
+	case "boards":
+        cfg.Tools.Boards.Enabled = enabled
 	case "tool_search_tool_regex":
 		cfg.Tools.MCP.Discovery.UseRegex = enabled
 		if enabled {

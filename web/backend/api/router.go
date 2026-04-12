@@ -53,6 +53,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// Session history
 	h.registerSessionRoutes(mux)
 
+	// Boards / kanban
+	h.registerBoardRoutes(mux)
+
 	// OAuth login and credential management
 	h.registerOAuthRoutes(mux)
 
@@ -65,6 +68,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// Skills and tools support/actions
 	h.registerSkillRoutes(mux)
 	h.registerToolRoutes(mux)
+	h.registerWorkspaceRoutes(mux)
 
 	// OS startup / launch-at-login
 	h.registerStartupRoutes(mux)

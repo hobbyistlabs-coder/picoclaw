@@ -14,6 +14,7 @@ func (h *Handler) registerConfigRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/config", h.handleGetConfig)
 	mux.HandleFunc("PUT /api/config", h.handleUpdateConfig)
 	mux.HandleFunc("PATCH /api/config", h.handlePatchConfig)
+	mux.HandleFunc("GET /api/config/personas/{id}/system-prompt/history", h.handleGetPersonaPromptHistory)
 }
 
 // handleGetConfig returns the complete system configuration.
@@ -36,6 +37,12 @@ func (h *Handler) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 //
 //	PUT /api/config
 func (h *Handler) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
+	prevCfg, err := config.LoadConfig(h.configPath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to load current config: %v", err), http.StatusInternalServerError)
+		return
+	}
+
 	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
 		http.Error(w, "Failed to read request body", http.StatusBadRequest)
@@ -66,6 +73,10 @@ func (h *Handler) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Failed to save config: %v", err), http.StatusInternalServerError)
 		return
 	}
+	if err := recordPersonaPromptRevisions(prevCfg, &cfg); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to store prompt history: %v", err), http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
@@ -90,6 +101,12 @@ func execAllowRemoteOmitted(body []byte) bool {
 //
 //	PATCH /api/config
 func (h *Handler) handlePatchConfig(w http.ResponseWriter, r *http.Request) {
+	prevCfg, err := config.LoadConfig(h.configPath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to load current config: %v", err), http.StatusInternalServerError)
+		return
+	}
+
 	patchBody, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
 		http.Error(w, "Failed to read request body", http.StatusBadRequest)
@@ -151,6 +168,10 @@ func (h *Handler) handlePatchConfig(w http.ResponseWriter, r *http.Request) {
 
 	if err := config.SaveConfig(h.configPath, &newCfg); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to save config: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if err := recordPersonaPromptRevisions(prevCfg, &newCfg); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to store prompt history: %v", err), http.StatusInternalServerError)
 		return
 	}
 

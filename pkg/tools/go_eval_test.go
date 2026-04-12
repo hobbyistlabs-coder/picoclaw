@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
@@ -56,17 +57,25 @@ func TestGoEvalTool(t *testing.T) {
 	})
 }
 
-var TestWorkspace = "mock_workspace"
-var DoMockTask = func() string {
-	return "mock task completed"
-}
+var (
+	TestWorkspace = "mock_workspace"
+	DoMockTask    = func() string {
+		return "mock task completed"
+	}
+)
 
 func TestGoEvalToolWithBindings(t *testing.T) {
 	tool := NewGoEvalTool("/tmp/test_workspace")
 
+	mockSend := func(channel, chatID, content string) error {
+		return nil
+	}
+
 	bindings := map[string]reflect.Value{
-		"Workspace": reflect.ValueOf(&TestWorkspace).Elem(),
-		"DoTask":    reflect.ValueOf(&DoMockTask).Elem(),
+		"Workspace":  reflect.ValueOf(&TestWorkspace).Elem(),
+		"DoTask":     reflect.ValueOf(&DoMockTask).Elem(),
+		"Send":       reflect.ValueOf(mockSend),
+		"HTTPClient": reflect.ValueOf(http.DefaultClient),
 	}
 
 	tool.SetBindings(bindings)
@@ -82,6 +91,15 @@ func TestGoEvalToolWithBindings(t *testing.T) {
 				func init() {
 					fmt.Println("workspace:", env.Workspace)
 					fmt.Println("task:", env.DoTask())
+
+					if env.HTTPClient != nil {
+						fmt.Println("http client is available")
+					}
+
+					err := env.Send("channel", "chat_id", "test message")
+					if err == nil {
+						fmt.Println("send function called successfully")
+					}
 				}
 			`,
 		}
@@ -92,11 +110,49 @@ func TestGoEvalToolWithBindings(t *testing.T) {
 		}
 
 		if !strings.Contains(result.ForLLM, "workspace: mock_workspace") {
-			t.Errorf("Expected output to contain 'workspace: mock_workspace', got %q", result.ForLLM)
+			t.Errorf(
+				"Expected output to contain 'workspace: mock_workspace', got %q",
+				result.ForLLM,
+			)
 		}
 
 		if !strings.Contains(result.ForLLM, "task: mock task completed") {
-			t.Errorf("Expected output to contain 'task: mock task completed', got %q", result.ForLLM)
+			t.Errorf(
+				"Expected output to contain 'task: mock task completed', got %q",
+				result.ForLLM,
+			)
+		}
+	})
+
+	t.Run("execute with browser binding", func(t *testing.T) {
+		browserActionTool := NewBrowserActionTool()
+		tool.SetBindings(map[string]reflect.Value{
+			"Browser": reflect.ValueOf(browserActionTool),
+		})
+
+		args := map[string]any{
+			"code": `
+				import "jane/env"
+				import "fmt"
+
+				func init() {
+					fmt.Println("browser tool name:", env.Browser.Name())
+				}
+
+				func Run() {}
+			`,
+		}
+
+		result := tool.Execute(ctx, args)
+		if result.IsError {
+			t.Fatalf("Expected no error, got: %s", result.ForLLM)
+		}
+
+		if !strings.Contains(result.ForLLM, "browser tool name: browser_action") {
+			t.Errorf(
+				"Expected output to contain 'browser tool name: browser_action', got %q",
+				result.ForLLM,
+			)
 		}
 	})
 }

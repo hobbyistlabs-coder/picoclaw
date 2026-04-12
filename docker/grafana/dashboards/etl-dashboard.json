@@ -1,0 +1,47 @@
+{
+  "title": "ETL Ultimate Visibility",
+  "uid": "etl-ultimate-visibility",
+  "panels": [
+    {
+      "title": "Traffic",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "rate(etl_request_count[1m])",
+          "datasource": {"uid": "Prometheus"}
+        }
+      ]
+    },
+    {
+      "title": "Errors",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "rate(etl_request_count{status=\"error\"}[1m])",
+          "datasource": {"uid": "Prometheus"}
+        }
+      ]
+    },
+    {
+      "title": "Latency (GC Pauses)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(etl_gc_pause_ms_sum[1m])) / sum(rate(etl_gc_pause_ms_count[1m]))",
+          "datasource": {"uid": "Prometheus"}
+        }
+      ]
+    },
+    {
+      "title": "Saturation (Goroutines)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "etl_goroutines",
+          "datasource": {"uid": "Prometheus"}
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 38
+}

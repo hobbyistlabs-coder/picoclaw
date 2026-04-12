@@ -25,6 +25,7 @@ var (
 	metricsIterationDuration = expvar.NewFloat("agentloop_iteration_duration_seconds")
 	metricsFailureCounts     = expvar.NewInt("agentloop_failure_counts")
 	errApprovalPending       = errors.New("agent approval pending")
+	errAsyncPending          = errors.New("agent async batch pending")
 )
 
 // runAgentLoop is the core message processing logic.
@@ -33,6 +34,9 @@ func (al *AgentLoop) runAgentLoop(
 	agent *AgentInstance,
 	opts processOptions,
 ) (string, error) {
+	// Clean up session locks on exit
+	defer logger.CleanupSessionLocks(opts.SessionKey)
+
 	// 0. Record last channel for heartbeat notifications (skip internal channels and cli)
 	if opts.Channel != "" && opts.ChatID != "" {
 		if !constants.IsInternalChannel(opts.Channel) {
@@ -83,6 +87,14 @@ func (al *AgentLoop) runAgentLoop(
 			})
 			return "", nil
 		}
+		if errors.Is(err, errAsyncPending) {
+			logger.InfoCF("agent", "Turn paused pending async completion", map[string]any{
+				"agent_id":    agent.ID,
+				"session_key": opts.SessionKey,
+				"iterations":  iteration,
+			})
+			return "", nil
+		}
 		metricsFailureCounts.Add(1)
 		return "", err
 	}
@@ -97,9 +109,10 @@ func (al *AgentLoop) runAgentLoop(
 
 	// 5. Save final assistant message to session
 	agent.Sessions.AddFullMessage(opts.SessionKey, providers.Message{
-		Role:    "assistant",
-		Content: finalContent,
-		Usage:   metrics.usage(),
+		Role:             "assistant",
+		Content:          finalContent,
+		ReasoningContent: metrics.reasoningContent,
+		Usage:            metrics.usage(),
 	})
 	agent.Sessions.Save(opts.SessionKey)
 
@@ -155,6 +168,16 @@ func (al *AgentLoop) handleReasoning(
 		return
 	}
 
+	if channelName == "pico" {
+		pubCtx, pubCancel := context.WithTimeout(ctx, 5*time.Second)
+		defer pubCancel()
+		_ = al.bus.PublishOutbound(pubCtx, bus.OutboundMessage{
+			Channel:          channelName,
+			ChatID:           channelID,
+			ReasoningContent: reasoningContent,
+		})
+	}
+
 	// Use a short timeout so the goroutine does not block indefinitely when
 	// the outbound bus is full.  Reasoning output is best-effort; dropping it
 	// is acceptable to avoid goroutine accumulation.
@@ -203,6 +226,15 @@ func (al *AgentLoop) runLLMIteration(
 	// all tool-follow-up iterations within the same turn so that a multi-step
 	// tool chain doesn't switch models mid-way through.
 	activeCandidates, activeModel := al.selectCandidates(agent, opts.UserMessage, messages)
+	logger.InfoCF("agent", "Chat turn model selection", map[string]any{
+		"agent_id":     agent.ID,
+		"session_key":  opts.SessionKey,
+		"channel":      opts.Channel,
+		"chat_id":      opts.ChatID,
+		"selected":     activeModel,
+		"candidates":   len(activeCandidates),
+		"user_message": opts.UserMessage,
+	})
 
 	for iteration < agent.MaxIterations {
 		iteration++
@@ -245,6 +277,12 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID:     opts.SessionKey,
+				EventType:     logger.EventTypeError,
+				ErrorCategory: logger.ReplayErrorCategoryInfrastructureFailure,
+				ErrorMessage:  err.Error(),
+			})
 			return "", iteration, metrics, err
 		}
 		metrics.addUsage(enrichUsageWithCost(agent.Config, activeModel, response.Usage))
@@ -254,6 +292,16 @@ func (al *AgentLoop) runLLMIteration(
 			opts.Channel,
 			al.targetReasoningChannelID(opts.Channel),
 		)
+		if response.ReasoningContent != "" {
+			metrics.reasoningContent = response.ReasoningContent
+			if opts.Channel == "pico" {
+				al.bus.PublishOutbound(ctx, bus.OutboundMessage{
+					Channel:          opts.Channel,
+					ChatID:           opts.ChatID,
+					ReasoningContent: response.ReasoningContent,
+				})
+			}
+		}
 
 		logger.DebugCF("agent", "LLM response",
 			map[string]any{
@@ -265,6 +313,26 @@ func (al *AgentLoop) runLLMIteration(
 				"target_channel": al.targetReasoningChannelID(opts.Channel),
 				"channel":        opts.Channel,
 			})
+		// Log CoT to session replay
+		if response.ReasoningContent != "" {
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeCoT,
+				Details: logger.SessionEventDetails{
+					CoTText: response.ReasoningContent,
+				},
+			})
+		} else if response.Content != "" && len(response.ToolCalls) > 0 {
+			// If there's no explicit reasoning content but there is content with tool calls, log it as CoT
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeCoT,
+				Details: logger.SessionEventDetails{
+					CoTText: response.Content,
+				},
+			})
+		}
+
 		// Check if no tool calls - then check reasoning content if any
 		if len(response.ToolCalls) == 0 {
 			finalContent = response.Content
@@ -290,6 +358,14 @@ func (al *AgentLoop) runLLMIteration(
 		toolNames := make([]string, 0, len(normalizedToolCalls))
 		for _, tc := range normalizedToolCalls {
 			toolNames = append(toolNames, tc.Name)
+			logger.LogSessionEvent(agent.Workspace, logger.SessionEvent{
+				SessionID: opts.SessionKey,
+				EventType: logger.EventTypeToolCall,
+				Details: logger.SessionEventDetails{
+					ToolName: tc.Name,
+					Inputs:   tc.Arguments,
+				},
+			})
 		}
 		logger.InfoCF("agent", "LLM requested tool calls",
 			map[string]any{
@@ -341,7 +417,7 @@ func (al *AgentLoop) runLLMIteration(
 			}
 		}
 
-		if requiresApproval {
+		if requiresApproval && !al.cfg.Tools.AutoApprove {
 			logger.InfoCF("agent", "Tool execution paused for user approval", map[string]any{
 				"agent_id":    agent.ID,
 				"session_key": opts.SessionKey,
@@ -371,15 +447,23 @@ func (al *AgentLoop) runLLMIteration(
 				Content: approvalMsg,
 			})
 
+			logSessionStateTransition(agent.Workspace, opts.SessionKey, "generating", "pending_approval")
+
 			return "", iteration, metrics, errApprovalPending
 		}
 		// --- End HITL ---
 
 		// Execute tool calls in parallel
-		agentResults := al.executeToolBatch(ctx, agent, opts, normalizedToolCalls, iteration)
+		agentResults, hasAsync := al.executeToolBatch(ctx, agent, opts, normalizedToolCalls, iteration)
+		if hasAsync {
+			logSessionStateTransition(agent.Workspace, opts.SessionKey, "executing_tools", "pending_async")
+			return "", iteration, metrics, errAsyncPending
+		}
 
 		// Process results in original order (send to user, save to session)
 		for _, r := range agentResults {
+			logSessionToolResult(agent.Workspace, opts.SessionKey, r.tc.Name, r.result)
+
 			// Send ForUser content to user immediately if not Silent
 			if !r.result.Silent && r.result.ForUser != "" && opts.SendResponse {
 				al.bus.PublishOutbound(ctx, bus.OutboundMessage{
@@ -469,8 +553,15 @@ func (al *AgentLoop) selectCandidates(
 	userMsg string,
 	history []providers.Message,
 ) (candidates []providers.FallbackCandidate, model string) {
+	displayModel := func(candidates []providers.FallbackCandidate, fallback string) string {
+		if len(candidates) == 0 {
+			return fallback
+		}
+		return fmt.Sprintf("%s/%s", candidates[0].Provider, candidates[0].Model)
+	}
+
 	if agent.Router == nil || len(agent.LightCandidates) == 0 {
-		return agent.Candidates, agent.Model
+		return agent.Candidates, displayModel(agent.Candidates, agent.Model)
 	}
 
 	_, usedLight, score := agent.Router.SelectModel(userMsg, history, agent.Model)
@@ -481,7 +572,7 @@ func (al *AgentLoop) selectCandidates(
 				"score":     score,
 				"threshold": agent.Router.Threshold(),
 			})
-		return agent.Candidates, agent.Model
+		return agent.Candidates, displayModel(agent.Candidates, agent.Model)
 	}
 
 	logger.InfoCF("agent", "Model routing: light model selected",
@@ -491,5 +582,5 @@ func (al *AgentLoop) selectCandidates(
 			"score":       score,
 			"threshold":   agent.Router.Threshold(),
 		})
-	return agent.LightCandidates, agent.Router.LightModel()
+	return agent.LightCandidates, displayModel(agent.LightCandidates, agent.Router.LightModel())
 }

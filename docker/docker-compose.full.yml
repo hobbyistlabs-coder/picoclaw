@@ -11,7 +11,7 @@ services:
       PICOCLAW_CONFIG: /root/.picoclaw/config.json
     volumes:
       - ../config:/root/.picoclaw
-      - picoclaw-workspace:/root/.picoclaw/workspace
+      - ./workspace:/root/.picoclaw/workspace
       - picoclaw-npm-cache:/root/.npm
     entrypoint: ["picoclaw", "agent"]
     stdin_open: true
@@ -31,7 +31,7 @@ services:
       - "127.0.0.1:18790:18790"
     volumes:
       - ../config:/root/.picoclaw
-      - picoclaw-workspace:/root/.picoclaw/workspace
+      - ./workspace:/root/.picoclaw/workspace
       - picoclaw-npm-cache:/root/.npm
     command: ["gateway"]
   picoclaw-launcher:
@@ -51,6 +51,7 @@ services:
       - picoclaw-gateway
     volumes:
       - ../config:/root/.picoclaw
+      - ./workspace:/root/.picoclaw/workspace
     expose:
       - "18800"
   picoclaw-frontend:
@@ -65,5 +66,4 @@ services:
     ports:
       - "127.0.0.1:18800:80"
 volumes:
-  picoclaw-workspace:
   picoclaw-npm-cache:

@@ -24,6 +24,7 @@ type ToolLoopConfig struct {
 	Tools         *ToolRegistry
 	MaxIterations int
 	LLMOptions    map[string]any
+	OnToolCall    func(tc providers.ToolCall, status string, result *ToolResult)
 }
 
 // ToolLoopResult contains the result of running the tool loop.
@@ -145,12 +146,18 @@ func RunToolLoop(
 						"tool":      tc.Name,
 						"iteration": iteration,
 					})
+				if config.OnToolCall != nil {
+					config.OnToolCall(tc, "started", nil)
+				}
 
 				var toolResult *ToolResult
 				if config.Tools != nil {
 					toolResult = config.Tools.ExecuteWithContext(ctx, tc.Name, tc.Arguments, channel, chatID, nil)
 				} else {
 					toolResult = ErrorResult("No tools available")
+				}
+				if config.OnToolCall != nil {
+					config.OnToolCall(tc, "completed", toolResult)
 				}
 				results[idx].result = toolResult
 			}(i, tc)

@@ -32,6 +32,8 @@ var gateway = struct {
 	events: NewEventBroadcaster(),
 }
 
+var gatewaySSEHeartbeatInterval = 10 * time.Second
+
 // registerGatewayRoutes binds gateway lifecycle endpoints to the ServeMux.
 func (h *Handler) registerGatewayRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/gateway/status", h.handleGatewayStatus)
@@ -420,41 +422,47 @@ func (h *Handler) handleGatewayStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	gateway.mu.Unlock()
 
-	if !processAlive {
-		data["gateway_status"] = "stopped"
-	} else {
-		// Process is alive — probe its health endpoint
-		cfg, err := config.LoadConfig(h.configPath)
-		host := "127.0.0.1"
-		port := 18790
-		if err == nil && cfg != nil {
-			host = gatewayProbeHost(h.effectiveGatewayBindHost(cfg))
-			if cfg.Gateway.Port != 0 {
-				port = cfg.Gateway.Port
-			}
+	// Probe the configured health endpoint even when the launcher did not spawn
+	// the process itself, so dev setups with an external gateway still render
+	// the correct UI state.
+	cfg, err := config.LoadConfig(h.configPath)
+	host := "127.0.0.1"
+	port := 18790
+	if err == nil && cfg != nil {
+		host = gatewayProbeHost(h.effectiveGatewayBindHost(cfg))
+		if cfg.Gateway.Port != 0 {
+			port = cfg.Gateway.Port
 		}
+	}
 
-		url := fmt.Sprintf("http://%s/health", net.JoinHostPort(host, strconv.Itoa(port)))
-		client := http.Client{Timeout: 2 * time.Second}
-		resp, err := client.Get(url)
+	url := fmt.Sprintf("http://%s/health", net.JoinHostPort(host, strconv.Itoa(port)))
+	client := http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get(url)
 
-		if err != nil {
-			data["gateway_status"] = "starting"
+	if err != nil {
+		if !processAlive {
+			data["gateway_status"] = "stopped"
 		} else {
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				data["gateway_status"] = "error"
-				data["status_code"] = resp.StatusCode
+			data["gateway_status"] = "starting"
+		}
+	} else {
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			if !processAlive {
+				data["gateway_status"] = "stopped"
 			} else {
-				var healthData map[string]any
-				if decErr := json.NewDecoder(resp.Body).Decode(&healthData); decErr != nil {
-					data["gateway_status"] = "error"
-				} else {
-					for k, v := range healthData {
-						data[k] = v
-					}
-					data["gateway_status"] = "running"
+				data["gateway_status"] = "error"
+			}
+			data["status_code"] = resp.StatusCode
+		} else {
+			var healthData map[string]any
+			if decErr := json.NewDecoder(resp.Body).Decode(&healthData); decErr != nil {
+				data["gateway_status"] = "error"
+			} else {
+				for k, v := range healthData {
+					data[k] = v
 				}
+				data["gateway_status"] = "running"
 			}
 		}
 	}
@@ -531,21 +539,27 @@ func (h *Handler) handleGatewayEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Cache-Control", "no-cache, no-transform")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("X-Accel-Buffering", "no")
 
 	if !h.managesGatewayProcess() {
-		fmt.Fprintf(w, "data: %s\n\n", h.currentGatewayStatus())
+		writeSSEData(w, h.currentGatewayStatus())
 		flusher.Flush()
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
+		statusTicker := time.NewTicker(5 * time.Second)
+		heartbeat := time.NewTicker(gatewaySSEHeartbeatInterval)
+		defer statusTicker.Stop()
+		defer heartbeat.Stop()
 		for {
 			select {
 			case <-r.Context().Done():
 				return
-			case <-ticker.C:
-				fmt.Fprintf(w, "data: %s\n\n", h.currentGatewayStatus())
+			case <-statusTicker.C:
+				writeSSEData(w, h.currentGatewayStatus())
+				flusher.Flush()
+			case <-heartbeat.C:
+				writeSSEComment(w, "keepalive")
 				flusher.Flush()
 			}
 		}
@@ -557,21 +571,34 @@ func (h *Handler) handleGatewayEvents(w http.ResponseWriter, r *http.Request) {
 
 	// Send initial status so the client doesn't start blank
 	initial := h.currentGatewayStatus()
-	fmt.Fprintf(w, "data: %s\n\n", initial)
+	writeSSEData(w, initial)
 	flusher.Flush()
+	heartbeat := time.NewTicker(gatewaySSEHeartbeatInterval)
+	defer heartbeat.Stop()
 
 	for {
 		select {
 		case <-r.Context().Done():
 			return
+		case <-heartbeat.C:
+			writeSSEComment(w, "keepalive")
+			flusher.Flush()
 		case data, ok := <-ch:
 			if !ok {
 				return
 			}
-			fmt.Fprintf(w, "data: %s\n\n", data)
+			writeSSEData(w, data)
 			flusher.Flush()
 		}
 	}
+}
+
+func writeSSEData(w io.Writer, data string) {
+	fmt.Fprintf(w, "data: %s\n\n", data)
+}
+
+func writeSSEComment(w io.Writer, comment string) {
+	fmt.Fprintf(w, ": %s\n\n", comment)
 }
 
 // currentGatewayStatus returns the current gateway status as a JSON string.

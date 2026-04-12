@@ -11,6 +11,7 @@ import { Link } from "@tanstack/react-router"
 import * as React from "react"
 import { useTranslation } from "react-i18next"
 
+import { ThemeSettingsSheet } from "@/components/theme/theme-settings-sheet"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,7 +36,15 @@ import { useTheme } from "@/hooks/use-theme.ts"
 
 export function AppHeader() {
   const { i18n, t } = useTranslation()
-  const { theme, toggleTheme } = useTheme()
+  const {
+    theme,
+    palettes,
+    activePalette,
+    setTheme,
+    toggleTheme,
+    selectPalette,
+    savePalette,
+  } = useTheme()
   const {
     state: gwState,
     loading: gwLoading,
@@ -47,6 +56,16 @@ export function AppHeader() {
   const isRunning = gwState === "running"
   const isStarting = gwState === "starting"
   const isStopped = gwState === "stopped" || gwState === "unknown"
+  const gatewayTone = isRunning
+    ? "border-primary/30 bg-primary/10 text-primary"
+    : isStarting
+      ? "border-accent/40 bg-accent/20 text-accent-foreground"
+      : "border-border bg-secondary/60 text-secondary-foreground"
+  const gatewayLabel = isRunning
+    ? t("header.gateway.label.running")
+    : isStarting
+      ? t("header.gateway.label.starting")
+      : t("header.gateway.label.offline")
   const showNotConnectedHint =
     canStart && (gwState === "stopped" || gwState === "error")
 
@@ -72,27 +91,28 @@ export function AppHeader() {
         <SidebarTrigger className="text-muted-foreground hover:bg-accent hover:text-foreground flex h-9 w-9 items-center justify-center rounded-lg sm:hidden [&>svg]:size-5">
           <IconMenu2 />
         </SidebarTrigger>
-        <div className="hidden shrink-0 items-center sm:flex">
+        <div className="flex shrink-0 items-center">
           <Link to="/">
-            <img
-              className="h-10 w-auto"
-              src="/jane-wordmark.svg"
-              alt="JANE-ai"
-            />
+            <img className="h-10 w-auto" src="/jane-wordmark.svg" alt="JANE" />
           </Link>
         </div>
       </div>
 
       {/* Center prominent connection status */}
       <div className="pointer-events-none absolute left-1/2 hidden h-full -translate-x-1/2 items-center justify-center lg:flex">
-        {showNotConnectedHint && (
-          <div className="text-muted-foreground flex items-center gap-2 rounded-full border border-dashed px-4 py-1.5 text-xs shadow-sm backdrop-blur-md">
-            <span className="bg-destructive/50 relative flex size-2 shrink-0 items-center justify-center rounded-full">
-              <span className="bg-destructive absolute inline-flex size-full animate-ping rounded-full opacity-75"></span>
-            </span>
-            {t("chat.notConnected")}
-          </div>
-        )}
+        <div
+          className={`flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs shadow-sm backdrop-blur-md ${gatewayTone}`}
+        >
+          <span className="relative flex size-2 shrink-0 items-center justify-center rounded-full bg-current/50">
+            {!isRunning ? (
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-70"></span>
+            ) : null}
+          </span>
+          {gatewayLabel}
+          {showNotConnectedHint ? (
+            <span className="text-current/65">{t("chat.notConnected")}</span>
+          ) : null}
+        </div>
       </div>
 
       <AlertDialog open={showStopDialog} onOpenChange={setShowStopDialog}>
@@ -126,7 +146,7 @@ export function AppHeader() {
             isRunning
               ? "bg-destructive/10 text-destructive hover:bg-destructive/20"
               : isStopped
-                ? "bg-green-500 text-white hover:bg-green-600"
+                ? "bg-primary text-primary-foreground hover:bg-primary/85"
                 : ""
           }`}
           onClick={handleGatewayToggle}
@@ -151,6 +171,15 @@ export function AppHeader() {
         <Separator
           className="mx-4 my-2 hidden md:block"
           orientation="vertical"
+        />
+
+        <ThemeSettingsSheet
+          theme={theme}
+          palettes={palettes}
+          activePalette={activePalette}
+          onThemeChange={setTheme}
+          onPaletteSelect={selectPalette}
+          onPaletteSave={savePalette}
         />
 
         {/* Language Switcher */}

@@ -1,14 +1,22 @@
 import { IconLoader2, IconPlus, IconStar } from "@tabler/icons-react"
-import { useCallback, useEffect, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import { type ModelInfo, getModels, setDefaultModel } from "@/api/models"
+import { type OpenRouterModel, getOpenRouterModels } from "@/api/openrouter"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
+import {
+  buildOpenRouterAlias,
+  mergeOpenRouterCatalog,
+  parseOpenRouterPrice,
+} from "@/lib/openrouter"
 
 import { AddModelSheet } from "./add-model-sheet"
 import { DeleteModelDialog } from "./delete-model-dialog"
 import { EditModelSheet } from "./edit-model-sheet"
+import { OpenRouterDiscovery } from "./openrouter-discovery"
 import { getProviderKey, getProviderLabel } from "./provider-label"
 import { ProviderSection } from "./provider-section"
 
@@ -50,10 +58,17 @@ export function ModelsPage() {
 
   const [editingModel, setEditingModel] = useState<ModelInfo | null>(null)
   const [deletingModel, setDeletingModel] = useState<ModelInfo | null>(null)
+  const [catalogPrefill, setCatalogPrefill] =
+    useState<Partial<ModelInfo> | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [settingDefaultIndex, setSettingDefaultIndex] = useState<number | null>(
     null,
   )
+  const openRouterCatalogQuery = useQuery({
+    queryKey: ["openrouter-models", "all", ""],
+    queryFn: () => getOpenRouterModels({ outputModalities: "all" }),
+    staleTime: 300_000,
+  })
 
   const fetchModels = useCallback(async () => {
     try {
@@ -74,6 +89,12 @@ export function ModelsPage() {
     }
   }, [t])
 
+  const enrichedModels = useMemo(
+    () =>
+      mergeOpenRouterCatalog(models, openRouterCatalogQuery.data?.data ?? []),
+    [models, openRouterCatalogQuery.data?.data],
+  )
+
   useEffect(() => {
     fetchModels()
   }, [fetchModels])
@@ -91,7 +112,7 @@ export function ModelsPage() {
   }
 
   const grouped: Record<string, { label: string; models: ModelInfo[] }> = {}
-  for (const model of models) {
+  for (const model of enrichedModels) {
     const providerKey = getProviderKey(model.model)
     if (!grouped[providerKey]) {
       grouped[providerKey] = {
@@ -132,7 +153,22 @@ export function ModelsPage() {
       return a.label.localeCompare(b.label)
     })
 
-  const defaultModel = models.find((model) => model.is_default)
+  const defaultModel = enrichedModels.find((model) => model.is_default)
+
+  const handleQuickAdd = (model: OpenRouterModel) => {
+    setCatalogPrefill({
+      model_name: buildOpenRouterAlias(
+        model,
+        models.map((entry) => entry.model_name),
+      ),
+      model: `openrouter/${model.id}`,
+      api_base: "https://openrouter.ai/api/v1",
+      input_price_per_m_token: parseOpenRouterPrice(model.pricing.prompt),
+      output_price_per_m_token: parseOpenRouterPrice(model.pricing.completion),
+      catalog: model,
+    })
+    setAddOpen(true)
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -158,6 +194,8 @@ export function ModelsPage() {
             {t("models.description")}
           </p>
         </div>
+
+        <OpenRouterDiscovery onQuickAdd={handleQuickAdd} />
 
         {loading && (
           <div className="flex items-center justify-center py-20">
@@ -198,9 +236,13 @@ export function ModelsPage() {
 
       <AddModelSheet
         open={addOpen}
-        onClose={() => setAddOpen(false)}
+        onClose={() => {
+          setAddOpen(false)
+          setCatalogPrefill(null)
+        }}
         onSaved={fetchModels}
         existingModelNames={models.map((model) => model.model_name)}
+        initialModel={catalogPrefill}
       />
 
       <DeleteModelDialog

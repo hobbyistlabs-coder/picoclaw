@@ -25,6 +25,27 @@ interface PicoMessage {
   payload?: Record<string, unknown>
 }
 
+export interface ChatToolEvent {
+  id: string
+  name: string
+  kind: string
+  status: string
+  label?: string
+  eventType?: string
+  taskId?: string
+  codename?: string
+  parentSessionId?: string
+  latestEvent?: string
+  progressPercent?: number
+  error?: string
+  toolName?: string
+  toolStatus?: string
+  arguments?: Record<string, unknown>
+  summary?: string
+  result?: string
+  durationMs?: number
+}
+
 export interface ChatMessage {
   id: string
   role: "user" | "assistant"
@@ -32,6 +53,9 @@ export interface ChatMessage {
   timestamp: number | string
   metrics?: ChatMetrics
   source: "history" | "live"
+  reasoningContent?: string
+  toolEvents?: ChatToolEvent[]
+  pending?: boolean
 }
 
 type ConnectionState = "disconnected" | "connecting" | "connected" | "error"
@@ -55,6 +79,11 @@ function writeStoredSessionId(sessionId: string) {
 
   localStorage.removeItem(LAST_SESSION_STORAGE_KEY)
   localStorage.removeItem(LEGACY_SESSION_STORAGE_KEY)
+}
+
+function syncSessionId(sessionId: string, setState: (value: string) => void) {
+  writeStoredSessionId(sessionId)
+  setState(sessionId)
 }
 
 function generateSessionId(): string {
@@ -149,6 +178,7 @@ export function usePicoChat() {
   const msgIdCounter = useRef(0)
   const activeSessionIdRef = useRef(activeSessionId)
   const messagesRevisionRef = useRef(0)
+  const pendingAssistantIdRef = useRef("")
 
   const setTrackedMessages = useCallback(
     (nextState: SetStateAction<ChatMessage[]>) => {
@@ -186,10 +216,82 @@ export function usePicoChat() {
         timestamp: fallbackTime,
         metrics: m.metrics,
         source: "history" as const,
+        reasoningContent: m.reasoning_content,
+        // FIX: Map the full tool execution state from history!
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        toolEvents: (m.tool_calls || []).map((tool: any) => ({
+          id: tool.id || `tool-${Date.now()}-${Math.random()}`,
+          name: tool.name || "tool",
+          kind: tool.kind || "tool",
+          status: tool.status || "completed",
+          toolName: tool.tool_name,
+          arguments: tool.arguments,
+          summary: tool.summary, // <- CRITICAL FOR UI
+          result: tool.result, // <- CRITICAL FOR UI
+        })),
       })),
       metrics: detail.metrics ?? null,
     }
   }, [])
+
+  const resetPendingAssistant = useCallback(() => {
+    pendingAssistantIdRef.current = ""
+  }, [])
+
+  const ensurePendingAssistant = useCallback(() => {
+    const existingId = pendingAssistantIdRef.current
+    if (existingId) {
+      return existingId
+    }
+    const nextId = `pending-${activeSessionIdRef.current}-${Date.now()}`
+    pendingAssistantIdRef.current = nextId
+    setTrackedMessages((prev) => [
+      ...prev,
+      {
+        id: nextId,
+        role: "assistant",
+        content: "",
+        timestamp: Date.now(),
+        source: "live",
+        pending: true,
+        toolEvents: [],
+      },
+    ])
+    return nextId
+  }, [setTrackedMessages])
+
+  const updatePendingAssistant = useCallback(
+    (updater: (message: ChatMessage) => ChatMessage) => {
+      const pendingId = ensurePendingAssistant()
+      setTrackedMessages((prev) =>
+        prev.map((msg) => (msg.id === pendingId ? updater(msg) : msg)),
+      )
+    },
+    [ensurePendingAssistant, setTrackedMessages],
+  )
+
+  const mergeAssistantMessage = useCallback(
+    (
+      current: ChatMessage,
+      next: {
+        id: string
+        content?: string
+        timestamp: number
+        metrics?: ChatMetrics
+      },
+    ): ChatMessage => ({
+      ...current,
+      id: next.id,
+      content:
+        next.content && next.content.length > 0
+          ? next.content
+          : current.content,
+      timestamp: next.timestamp,
+      metrics: next.metrics ?? current.metrics,
+      pending: false,
+    }),
+    [],
+  )
 
   useEffect(() => {
     const storedSessionId = readStoredSessionId()
@@ -213,6 +315,7 @@ export function usePicoChat() {
         setTrackedMessages(historyMessages)
         setHistoryMetrics(metrics)
         setIsTyping(false)
+        resetPendingAssistant()
       })
       .catch((err) => {
         console.error("Failed to restore last session history:", err)
@@ -229,6 +332,7 @@ export function usePicoChat() {
         setTrackedMessages([])
         setHistoryMetrics(null)
         setIsTyping(false)
+        resetPendingAssistant()
       })
 
     return () => {
@@ -238,6 +342,14 @@ export function usePicoChat() {
 
   const handlePicoMessage = useCallback(
     (msg: PicoMessage) => {
+      if (
+        msg.session_id &&
+        msg.session_id.trim() !== "" &&
+        msg.session_id !== activeSessionIdRef.current
+      ) {
+        return
+      }
+
       const payload = msg.payload || {}
 
       switch (msg.type) {
@@ -252,17 +364,50 @@ export function usePicoChat() {
               ? normalizeUnixTimestamp(Number(msg.timestamp))
               : Date.now()
 
-          setTrackedMessages((prev) => [
-            ...prev,
-            {
-              id: messageId,
-              role: "assistant",
-              content,
-              timestamp: timestampRaw,
-              metrics: payload.metrics as ChatMetrics | undefined,
-              source: "live",
-            },
-          ])
+          const pendingId = pendingAssistantIdRef.current
+          setTrackedMessages((prev) => {
+            const existingIndex = prev.findIndex(
+              (item) => item.id === messageId,
+            )
+            if (existingIndex >= 0) {
+              return prev.map((item, index) =>
+                index === existingIndex
+                  ? mergeAssistantMessage(item, {
+                      id: messageId,
+                      content,
+                      timestamp: timestampRaw,
+                      metrics: payload.metrics as ChatMetrics | undefined,
+                    })
+                  : item,
+              )
+            }
+
+            if (!pendingId) {
+              return [
+                ...prev,
+                {
+                  id: messageId,
+                  role: "assistant",
+                  content,
+                  timestamp: timestampRaw,
+                  metrics: payload.metrics as ChatMetrics | undefined,
+                  source: "live",
+                },
+              ]
+            }
+
+            return prev.map((msg) =>
+              msg.id === pendingId
+                ? mergeAssistantMessage(msg, {
+                    id: messageId,
+                    content,
+                    timestamp: timestampRaw,
+                    metrics: payload.metrics as ChatMetrics | undefined,
+                  })
+                : msg,
+            )
+          })
+          resetPendingAssistant()
           setIsTyping(false)
           break
         }
@@ -270,20 +415,96 @@ export function usePicoChat() {
         case "message.update": {
           const content = (payload.content as string) || ""
           const messageId = payload.message_id as string
+          const timestampRaw =
+            msg.timestamp !== undefined &&
+            Number.isFinite(Number(msg.timestamp))
+              ? normalizeUnixTimestamp(Number(msg.timestamp))
+              : Date.now()
           if (!messageId) break
 
           setTrackedMessages((prev) =>
             prev.map((m) =>
-              m.id === messageId
-                ? {
-                    ...m,
+              m.id === messageId || m.id === pendingAssistantIdRef.current
+                ? mergeAssistantMessage(m, {
+                    id: messageId,
                     content,
-                    metrics:
-                      (payload.metrics as ChatMetrics | undefined) ?? m.metrics,
-                  }
+                    timestamp: timestampRaw,
+                    metrics: payload.metrics as ChatMetrics | undefined,
+                  })
                 : m,
             ),
           )
+          break
+        }
+
+        case "reasoning.set": {
+          const content = (payload.content as string) || ""
+          if (!content) break
+          updatePendingAssistant((message) => ({
+            ...message,
+            reasoningContent: content,
+          }))
+          break
+        }
+
+        case "message.stream": {
+          const content = (payload.content as string) || ""
+          if (!content) break
+          const isReasoning = Boolean(payload.is_reasoning)
+          updatePendingAssistant((message) => ({
+            ...message,
+            content: isReasoning
+              ? message.content
+              : `${message.content}${content}`,
+            reasoningContent: isReasoning
+              ? `${message.reasoningContent || ""}${content}`
+              : message.reasoningContent,
+          }))
+          setIsTyping(true)
+          break
+        }
+
+        case "tool.call": {
+          const raw = payload.tool_event as Record<string, unknown> | undefined
+          if (!raw) break
+          const event: ChatToolEvent = {
+            id: String(raw.id || ""),
+            name: String(raw.name || "tool"),
+            kind: String(raw.kind || "tool"),
+            status: String(raw.status || "started"),
+            label: raw.label ? String(raw.label) : undefined,
+            eventType: raw.event_type ? String(raw.event_type) : undefined,
+            taskId: raw.task_id ? String(raw.task_id) : undefined,
+            codename: raw.codename ? String(raw.codename) : undefined,
+            parentSessionId: raw.parent_session_id
+              ? String(raw.parent_session_id)
+              : undefined,
+            latestEvent: raw.latest_event
+              ? String(raw.latest_event)
+              : undefined,
+            progressPercent:
+              typeof raw.progress_percent === "number"
+                ? raw.progress_percent
+                : undefined,
+            error: raw.error ? String(raw.error) : undefined,
+            toolName: raw.tool_name ? String(raw.tool_name) : undefined,
+            toolStatus: raw.tool_status ? String(raw.tool_status) : undefined,
+            arguments: (raw.arguments as Record<string, unknown>) || undefined,
+            summary: raw.summary ? String(raw.summary) : undefined,
+            result: raw.result ? String(raw.result) : undefined,
+            durationMs:
+              typeof raw.duration_ms === "number" ? raw.duration_ms : undefined,
+          }
+          updatePendingAssistant((message) => {
+            const nextEvents = [...(message.toolEvents || [])]
+            const index = nextEvents.findIndex((item) => item.id === event.id)
+            if (index >= 0) {
+              nextEvents[index] = { ...nextEvents[index], ...event }
+            } else {
+              nextEvents.push(event)
+            }
+            return { ...message, toolEvents: nextEvents }
+          })
           break
         }
 
@@ -308,7 +529,12 @@ export function usePicoChat() {
           console.log("Unknown pico message type:", msg.type)
       }
     },
-    [setTrackedMessages],
+    [
+      mergeAssistantMessage,
+      resetPendingAssistant,
+      setTrackedMessages,
+      updatePendingAssistant,
+    ],
   )
 
   const connect = useCallback(async () => {
@@ -422,7 +648,7 @@ export function usePicoChat() {
   }, [disconnect])
 
   const sendMessage = useCallback(
-    (content: string) => {
+    (content: string, agentId?: string) => {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
         console.warn("WebSocket not connected")
         return
@@ -444,7 +670,10 @@ export function usePicoChat() {
       const picoMsg: PicoMessage = {
         type: "message.send",
         id,
-        payload: { content },
+        payload:
+          agentId && agentId !== "__auto__"
+            ? { content, agent_id: agentId }
+            : { content },
       }
       wsRef.current.send(JSON.stringify(picoMsg))
     },
@@ -464,10 +693,12 @@ export function usePicoChat() {
 
         // Only switch the active websocket session after history has loaded successfully.
         disconnect()
-        setActiveSessionId(sessionId)
+        activeSessionIdRef.current = sessionId
+        syncSessionId(sessionId, setActiveSessionId)
         setIsTyping(false)
         setTrackedMessages(historyMessages)
         setHistoryMetrics(metrics)
+        resetPendingAssistant()
       } catch (err) {
         console.error("Failed to load session history:", err)
         toast.error(t("chat.historyOpenFailed"))
@@ -492,16 +723,14 @@ export function usePicoChat() {
 
   // Start a new empty chat
   const newChat = useCallback(() => {
-    if (messages.length === 0) {
-      return
-    }
-
     disconnect()
     const newId = generateSessionId()
-    setActiveSessionId(newId)
+    activeSessionIdRef.current = newId
+    syncSessionId(newId, setActiveSessionId)
     setTrackedMessages([])
     setHistoryMetrics(null)
     setIsTyping(false)
+    resetPendingAssistant()
 
     // Reconnect with the fresh session
     setTimeout(() => {
@@ -509,7 +738,7 @@ export function usePicoChat() {
         connect()
       }
     }, 100)
-  }, [disconnect, connect, gatewayState, messages.length, setTrackedMessages])
+  }, [disconnect, connect, gatewayState, setTrackedMessages])
 
   const sessionMetrics = addChatMetrics(
     historyMetrics,

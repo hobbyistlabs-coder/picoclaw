@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { type ModelInfo, getModels, setDefaultModel } from "@/api/models"
+import { getOpenRouterModels } from "@/api/openrouter"
+import { isOpenRouterModel, mergeOpenRouterCatalog } from "@/lib/openrouter"
 
 interface UseChatModelsOptions {
   isConnected: boolean
@@ -24,7 +26,16 @@ export function useChatModels({ isConnected }: UseChatModelsOptions) {
   const loadModels = useCallback(async () => {
     try {
       const data = await getModels()
-      setModelList(data.models)
+      if (data.models.some(isOpenRouterModel)) {
+        try {
+          const catalog = await getOpenRouterModels({ outputModalities: "all" })
+          setModelList(mergeOpenRouterCatalog(data.models, catalog.data))
+        } catch {
+          setModelList(data.models)
+        }
+      } else {
+        setModelList(data.models)
+      }
       if (data.models.some((m) => m.model_name === data.default_model)) {
         setDefaultModelName(data.default_model)
       }
@@ -57,27 +68,35 @@ export function useChatModels({ isConnected }: UseChatModelsOptions) {
     () => modelList.some((m) => m.configured),
     [modelList],
   )
+  const hasAnyModels = modelList.length > 0
 
   const oauthModels = useMemo(
-    () => modelList.filter((m) => m.configured && m.auth_method === "oauth"),
+    () => modelList.filter((m) => m.auth_method === "oauth"),
     [modelList],
   )
 
   const localModels = useMemo(
-    () => modelList.filter((m) => m.configured && isLocalModel(m)),
+    () => modelList.filter((m) => isLocalModel(m)),
     [modelList],
   )
 
   const apiKeyModels = useMemo(
     () =>
       modelList.filter(
-        (m) => m.configured && m.auth_method !== "oauth" && !isLocalModel(m),
+        (m) => m.auth_method !== "oauth" && !isLocalModel(m),
       ),
     [modelList],
   )
 
+  const defaultModel = useMemo(
+    () => modelList.find((m) => m.model_name === defaultModelName) ?? null,
+    [defaultModelName, modelList],
+  )
+
   return {
     defaultModelName,
+    defaultModel,
+    hasAnyModels,
     hasConfiguredModels,
     apiKeyModels,
     oauthModels,

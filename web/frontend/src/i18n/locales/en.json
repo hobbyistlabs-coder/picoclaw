@@ -8,6 +8,7 @@
     "personas": "Personas",
     "skills": "Skills",
     "tools": "Tools",
+    "boards": "Boards",
     "services": "Services",
     "channels_group": "Channels",
     "show_more_channels": "More",
@@ -16,9 +17,9 @@
     "logs": "Logs"
   },
   "chat": {
-    "welcome": "What do you need from JANE-ai?",
+    "welcome": "What do you need from JANE?",
     "welcomeDesc": "Plan, route, and synthesize across your models and channels from a single strategic console.",
-    "placeholder": "Send a directive to JANE-ai...",
+    "placeholder": "Send a directive to JANE...",
     "newChat": "New Chat",
     "notConnected": "Gateway is not running. Start it to chat.",
     "thinking": {
@@ -33,8 +34,26 @@
     "historyOpenFailed": "Failed to open this chat history",
     "loadingMore": "Loading more...",
     "deleteSession": "Delete session",
+    "export": "Export Markdown",
     "messagesCount": "{{count}} messages",
     "noModel": "Select model",
+    "status": {
+      "connected": "Gateway online",
+      "disconnected": "Gateway offline",
+      "connectedDescription": "Ready to chat with {{model}}. Session routing and history are available.",
+      "sessions": "{{count}} loaded sessions"
+    },
+    "composer": {
+      "gatewayRequired": "Gateway required",
+      "modelRequired": "Pick a default model",
+      "ready": "Ready for a directive",
+      "shortcut": "Press Enter to send. Shift+Enter adds a new line."
+    },
+    "starters": {
+      "plan": "Draft a plan for today",
+      "review": "Review the current workspace state",
+      "route": "Choose the best model for this task"
+    },
     "empty": {
       "noConfiguredModel": "No Model Configured",
       "noConfiguredModelDescription": "You need to configure at least one AI model with an API key before you can start chatting.",
@@ -48,6 +67,11 @@
       "apikey": "API Key",
       "oauth": "OAuth",
       "local": "Local"
+    },
+    "persona": {
+      "auto": "Auto Route",
+      "label": "Persona: {{persona}}",
+      "selectorLabel": "Persona"
     },
     "metrics": {
       "session": "Session Metrics",
@@ -69,7 +93,33 @@
       },
       "status": {
         "starting": "Starting Gateway..."
+      },
+      "label": {
+        "running": "Gateway live",
+        "starting": "Gateway starting",
+        "offline": "Gateway offline"
       }
+    }
+  },
+  "theme": {
+    "title": "Theme Studio",
+    "description": "Switch light or dark mode, choose a saved palette, or craft your own colors.",
+    "mode": "Theme Mode",
+    "modes": {
+      "dark": "Dark",
+      "light": "Light"
+    },
+    "presets": "Palettes",
+    "editor": "Palette Editor",
+    "namePlaceholder": "Palette name",
+    "apply": "Apply Palette",
+    "saveNew": "Save as New",
+    "fields": {
+      "flame": "Flame",
+      "ember": "Ember",
+      "cream": "Cream",
+      "smoke": "Smoke",
+      "midnight": "Midnight"
     }
   },
   "common": {
@@ -155,6 +205,27 @@
   },
   "models": {
     "description": "Configure API keys for AI providers. Only configured models are available for chat.",
+    "discovery": {
+      "title": "OpenRouter Discovery",
+      "description": "Browse live OpenRouter models, inspect multimodal and tool support, then add a model preset directly into your config.",
+      "searchPlaceholder": "Search OpenRouter models",
+      "loading": "Loading OpenRouter catalog...",
+      "quickAdd": "Quick Add",
+      "context": "{{count}} tokens",
+      "moderated": "Moderated",
+      "outputs": {
+        "all": "All outputs",
+        "text": "Text",
+        "image": "Images",
+        "audio": "Audio"
+      },
+      "features": {
+        "all": "Any feature",
+        "tools": "Tool calling",
+        "structured_outputs": "Structured JSON",
+        "reasoning": "Reasoning"
+      }
+    },
     "loadError": "Failed to load models",
     "noDefaultHintPrefix": "No default model set yet. Click",
     "noDefaultHintSuffix": "to set one.",
@@ -216,6 +287,10 @@
       "rpmHint": "Maximum requests per minute. 0 = no limit.",
       "pricePerMToken": "Price Per 1M Tokens (USD)",
       "pricePerMTokenHint": "Used for chat cost estimates. Leave blank or 0 to disable cost estimation for this model.",
+      "inputPricePerMToken": "Input Price Per 1M Tokens (USD)",
+      "inputPricePerMTokenHint": "Prompt token rate. Falls back to the single price field if left blank.",
+      "outputPricePerMToken": "Output Price Per 1M Tokens (USD)",
+      "outputPricePerMTokenHint": "Completion token rate. Falls back to the single price field if left blank.",
       "thinkingLevel": "Thinking Level",
       "thinkingLevelHint": "Extended thinking budget: off, low, medium, high, xhigh, adaptive.",
       "maxTokensField": "Max Tokens Field",
@@ -422,6 +497,8 @@
       "session_scope_global_desc": "All messages share one global context.",
       "heartbeat_enabled": "Heartbeat",
       "heartbeat_enabled_hint": "Send periodic heartbeat messages.",
+      "auto_approve": "Auto-Approve Tools",
+      "auto_approve_hint": "Run tools that normally require a Yes/No confirmation without pausing for approval.",
       "heartbeat_interval": "Heartbeat Interval (minutes)",
       "heartbeat_interval_hint": "Interval in minutes between heartbeat signals.",
       "devices_enabled": "Enable Devices",
@@ -462,12 +539,28 @@
       "persona_subagent_model_hint": "Optional override for subagent execution.",
       "persona_subagent_fallbacks": "Subagent Fallbacks",
       "persona_list_hint": "One item per line or comma-separated.",
+      "revision_history": "Revision History",
+      "no_revisions": "No revisions yet.",
+      "load_revision": "Load Revision",
       "sections": {
         "agent": "Agent",
+        "workspace_files": "Workspace Prompt Files",
         "personas": "Personas",
         "runtime": "Runtime",
         "launcher": "Service",
         "devices": "Devices"
+      },
+      "workspace_files": {
+        "description": "Edit the Markdown files ingested into the workspace system prompt. Changes are picked up automatically after save.",
+        "load_error": "Failed to load workspace prompt files.",
+        "save_success": "Workspace prompt file saved.",
+        "save_error": "Failed to save workspace prompt file.",
+        "edit": "Edit",
+        "preview": "Preview",
+        "highlighted": "Highlighted",
+        "format": "Normalize Markdown",
+        "placeholder": "Write Markdown content...",
+        "empty": "_This file is empty._"
       },
       "open_raw": "Raw Config",
       "back_to_visual": "Visual Config",

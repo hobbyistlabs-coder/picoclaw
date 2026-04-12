@@ -26,6 +26,11 @@ type RichMessageEditor interface {
 	EditOutboundMessage(ctx context.Context, msg bus.OutboundMessage, messageID string) error
 }
 
+// StreamCapable — channels that can render incremental assistant output.
+type StreamCapable interface {
+	SendStream(ctx context.Context, msg bus.OutboundStreamMessage) error
+}
+
 // ReactionCapable — channels that can add a reaction (e.g. 👀) to an inbound message.
 // ReactToMessage adds a reaction and returns an undo function to remove it.
 // The undo function MUST be idempotent and safe to call multiple times.

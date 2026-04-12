@@ -10,6 +10,9 @@ import { useTranslation } from "react-i18next"
 
 import type { ModelInfo } from "@/api/models"
 import { Button } from "@/components/ui/button"
+import { formatModelPrice } from "@/lib/model-pricing"
+
+import { ModelCapabilityBadges } from "./model-capability-badges"
 
 interface ModelCardProps {
   model: ModelInfo
@@ -29,6 +32,7 @@ export function ModelCard({
   const { t } = useTranslation()
   const isOAuth = model.auth_method === "oauth"
   const canSetDefault = model.configured && !model.is_default
+  const price = formatModelPrice(model)
 
   return (
     <div
@@ -116,10 +120,18 @@ export function ModelCard({
         {model.model}
       </p>
 
+      {model.catalog?.description ? (
+        <p className="text-muted-foreground line-clamp-2 text-xs leading-5">
+          {model.catalog.description}
+        </p>
+      ) : null}
+
+      <ModelCapabilityBadges model={model.catalog} />
+
       <div className="flex items-center gap-2">
-        {model.price_per_m_token ? (
+        {price ? (
           <span className="text-muted-foreground bg-muted rounded px-1.5 py-0.5 text-[10px] font-medium">
-            ${model.price_per_m_token}/M
+            {price}
           </span>
         ) : null}
         {isOAuth ? (

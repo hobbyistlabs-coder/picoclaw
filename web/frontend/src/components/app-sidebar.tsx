@@ -4,6 +4,7 @@ import {
   IconChevronsDown,
   IconChevronsUp,
   IconKey,
+  IconLayoutKanban,
   IconListDetails,
   IconMasksTheater,
   IconMessageCircle,
@@ -47,6 +48,7 @@ interface NavGroup {
   defaultOpen: boolean
   items: NavItem[]
   isChannelsGroup?: boolean
+  count?: number
 }
 
 const baseNavGroups: Omit<NavGroup, "items">[] = [
@@ -120,6 +122,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           translateTitle: false,
         })),
         isChannelsGroup: true,
+        count: channelItems.length,
       },
       {
         ...baseNavGroups[2],
@@ -145,10 +148,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           },
           ...personaItems,
         ],
+        count: personaItems.length,
       },
       {
         ...baseNavGroups[3],
         items: [
+          {
+            title: "navigation.boards",
+            to: "/boards",
+            icon: IconLayoutKanban,
+            translateTitle: true,
+          },
           {
             title: "navigation.config",
             to: "/config",
@@ -172,15 +182,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       className="border-r-sidebar-border/60 bg-sidebar/95 border-r pt-3"
     >
       <SidebarContent className="bg-background">
-        <div className="text-sidebar-foreground mx-3 mb-4 rounded-3xl border border-white/10 bg-white/6 p-3 shadow-lg shadow-black/20">
+        <div className="text-sidebar-foreground bg-slate/6 mx-3 mb-4 rounded-3xl border border-white/10 p-3 shadow-lg shadow-black/20">
           <div className="mb-3 flex items-center gap-3">
             <img className="size-11 rounded-2xl" src="/jane-mark.svg" alt="" />
             <div>
               <p className="font-serif text-base font-semibold tracking-[0.24em] uppercase">
-                JANE-ai
+                JANE
               </p>
               <p className="text-sidebar-foreground/60 text-xs tracking-[0.28em] uppercase">
-                Endgame mesh
+                starways console
               </p>
             </div>
           </div>
@@ -198,7 +208,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarGroup className="px-2 py-0">
               <SidebarGroupLabel asChild>
                 <CollapsibleTrigger className="hover:bg-muted/60 flex w-full cursor-pointer items-center justify-between rounded-md px-2 py-1.5 transition-colors">
-                  <span>{t(group.label)}</span>
+                  <div className="flex items-center gap-2">
+                    <span>{t(group.label)}</span>
+                    {group.count ? (
+                      <span className="rounded-full border border-white/10 px-1.5 py-0.5 text-[10px] leading-none text-white/60">
+                        {group.count}
+                      </span>
+                    ) : null}
+                  </div>
                   <IconChevronRight className="size-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                 </CollapsibleTrigger>
               </SidebarGroupLabel>

@@ -95,6 +95,51 @@ func TestHandleListSessions_JSONLStorage(t *testing.T) {
 	}
 }
 
+func TestHandleListSessions_IncludesNonMainAgentSessions(t *testing.T) {
+	configPath, cleanup := setupOAuthTestEnv(t)
+	defer cleanup()
+
+	dir := sessionsTestDir(t, configPath)
+	store, err := memory.NewJSONLStore(dir)
+	if err != nil {
+		t.Fatalf("NewJSONLStore() error = %v", err)
+	}
+
+	sessionKey := picoSessionKey("coding", "persona-jsonl")
+	if err := store.AddFullMessage(nil, sessionKey, providers.Message{
+		Role:    "user",
+		Content: "route me to coding",
+	}); err != nil {
+		t.Fatalf("AddFullMessage() error = %v", err)
+	}
+
+	h := NewHandler(configPath)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/sessions", nil)
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var items []sessionListItem
+	if err := json.Unmarshal(rec.Body.Bytes(), &items); err != nil {
+		t.Fatalf("Unmarshal() error = %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("len(items) = %d, want 1", len(items))
+	}
+	if items[0].ID != "persona-jsonl" {
+		t.Fatalf("items[0].ID = %q, want persona-jsonl", items[0].ID)
+	}
+	if items[0].AgentID != "coding" {
+		t.Fatalf("items[0].AgentID = %q, want coding", items[0].AgentID)
+	}
+}
+
 func TestHandleListSessions_TitleUsesTrimmedSummary(t *testing.T) {
 	configPath, cleanup := setupOAuthTestEnv(t)
 	defer cleanup()
@@ -297,6 +342,120 @@ func TestHandleGetSession_IncludesUsageMetrics(t *testing.T) {
 	}
 	if len(resp.Messages) != 2 || resp.Messages[1].Metrics.TotalTokens != 150 {
 		t.Fatalf("resp.Messages = %+v", resp.Messages)
+	}
+}
+
+func TestHandleGetSession_IncludesReasoningAndToolCalls(t *testing.T) {
+	configPath, cleanup := setupOAuthTestEnv(t)
+	defer cleanup()
+
+	dir := sessionsTestDir(t, configPath)
+	store, err := memory.NewJSONLStore(dir)
+	if err != nil {
+		t.Fatalf("NewJSONLStore() error = %v", err)
+	}
+
+	sessionKey := picoSessionPrefix + "reasoning-jsonl"
+	messages := []providers.Message{
+		{Role: "user", Content: "inspect tools"},
+		{
+			Role:             "assistant",
+			ReasoningContent: "Need to inspect repo and call tools.",
+			ToolCalls: []providers.ToolCall{{
+				ID:   "call_1",
+				Name: "mcp_docs_lookup",
+				Function: &providers.FunctionCall{
+					Name:      "mcp_docs_lookup",
+					Arguments: `{"topic":"frontend events"}`,
+				},
+			}},
+		},
+		{Role: "tool", Content: "lookup result"},
+		{Role: "assistant", Content: "I found the event schema."},
+	}
+
+	for _, msg := range messages {
+		if err := store.AddFullMessage(nil, sessionKey, msg); err != nil {
+			t.Fatalf("AddFullMessage() error = %v", err)
+		}
+	}
+
+	h := NewHandler(configPath)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/sessions/reasoning-jsonl", nil)
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var resp struct {
+		Messages []struct {
+			Role             string `json:"role"`
+			Content          string `json:"content"`
+			ReasoningContent string `json:"reasoning_content"`
+			ToolCalls        []struct {
+				ID   string `json:"id"`
+				Name string `json:"name"`
+				Kind string `json:"kind"`
+			} `json:"tool_calls"`
+		} `json:"messages"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Unmarshal() error = %v", err)
+	}
+	if len(resp.Messages) != 2 {
+		t.Fatalf("len(resp.Messages) = %d, want 2", len(resp.Messages))
+	}
+	if resp.Messages[1].ReasoningContent != "Need to inspect repo and call tools." {
+		t.Fatalf("reasoning = %q", resp.Messages[1].ReasoningContent)
+	}
+	if len(resp.Messages[1].ToolCalls) != 1 {
+		t.Fatalf("tool calls = %+v", resp.Messages[1].ToolCalls)
+	}
+	if resp.Messages[1].ToolCalls[0].Kind != "mcp" {
+		t.Fatalf("tool kind = %q, want mcp", resp.Messages[1].ToolCalls[0].Kind)
+	}
+}
+
+func TestBuildSessionMetrics_PartialEstimatedCostStillAggregatesKnownCost(t *testing.T) {
+	metrics := buildSessionMetrics([]providers.Message{
+		{
+			Role:    "assistant",
+			Content: "known cost",
+			Usage: &providers.UsageInfo{
+				PromptTokens:     100,
+				CompletionTokens: 50,
+				TotalTokens:      150,
+				EstimatedCostUSD: 0.0012,
+				HasEstimatedCost: true,
+			},
+		},
+		{
+			Role:    "assistant",
+			Content: "unknown cost",
+			Usage: &providers.UsageInfo{
+				PromptTokens:     30,
+				CompletionTokens: 20,
+				TotalTokens:      50,
+			},
+		},
+	})
+
+	if metrics == nil {
+		t.Fatal("metrics = nil, want aggregated metrics")
+	}
+	if metrics.TotalTokens != 200 {
+		t.Fatalf("TotalTokens = %d, want 200", metrics.TotalTokens)
+	}
+	if !metrics.HasEstimatedCost {
+		t.Fatalf("HasEstimatedCost = false, want true")
+	}
+	if metrics.EstimatedCostUSD != 0.0012 {
+		t.Fatalf("EstimatedCostUSD = %v, want 0.0012", metrics.EstimatedCostUSD)
 	}
 }
 

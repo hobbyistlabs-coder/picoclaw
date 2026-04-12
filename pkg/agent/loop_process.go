@@ -9,6 +9,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"jane/pkg/bus"
@@ -30,6 +31,9 @@ func (al *AgentLoop) ProcessDirectWithChannel(
 	ctx context.Context,
 	content, sessionKey, channel, chatID string,
 ) (string, error) {
+	if err := al.reloadRuntimeConfigIfChanged(ctx); err != nil {
+		return "", err
+	}
 	if err := al.ensureMCPInitialized(ctx); err != nil {
 		return "", err
 	}
@@ -51,6 +55,9 @@ func (al *AgentLoop) ProcessHeartbeat(
 	ctx context.Context,
 	content, channel, chatID string,
 ) (string, error) {
+	if err := al.reloadRuntimeConfigIfChanged(ctx); err != nil {
+		return "", err
+	}
 	agent := al.registry.GetDefaultAgent()
 	if agent == nil {
 		return "", fmt.Errorf("no default agent for heartbeat")
@@ -68,6 +75,9 @@ func (al *AgentLoop) ProcessHeartbeat(
 }
 
 func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage) (string, error) {
+	if err := al.reloadRuntimeConfigIfChanged(ctx); err != nil {
+		return "", err
+	}
 	// Add message preview to log (show full content for error messages)
 	var logContent string
 	if strings.Contains(msg.Content, "Error:") || strings.Contains(msg.Content, "error") {
@@ -165,6 +175,7 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 					"agent_id":    agent.ID,
 					"session_key": sessionKey,
 				})
+				logSessionStateTransition(agent.Workspace, sessionKey, "pending_approval", "generating")
 				for _, tc := range pending.normalizedToolCalls {
 					rejectMsg := providers.Message{
 						Role:       "tool",
@@ -202,12 +213,24 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 					"agent_id":    agent.ID,
 					"session_key": sessionKey,
 				})
+				logSessionStateTransition(agent.Workspace, sessionKey, "pending_approval", "executing_tools")
 
 				// Execute the approved tools
-				agentResults := al.executeToolBatch(ctx, pending.agent, pending.opts, pending.normalizedToolCalls, pending.iteration)
+				agentResults, hasAsync := al.executeToolBatch(
+					ctx,
+					pending.agent,
+					pending.opts,
+					pending.normalizedToolCalls,
+					pending.iteration,
+				)
+				if hasAsync {
+					logSessionStateTransition(agent.Workspace, sessionKey, "executing_tools", "pending_async")
+					return "", nil
+				}
 
 				// Inject results into context, matching original logic from loop_llm.go
 				for _, r := range agentResults {
+					logSessionToolResult(agent.Workspace, sessionKey, r.tc.Name, r.result)
 					if !r.result.Silent && r.result.ForUser != "" && pending.opts.SendResponse {
 						al.bus.PublishOutbound(ctx, bus.OutboundMessage{
 							Channel: pending.opts.Channel,
@@ -281,14 +304,28 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 }
 
 func (al *AgentLoop) resolveMessageRoute(msg bus.InboundMessage) (routing.ResolvedRoute, *AgentInstance, error) {
-	route := al.registry.ResolveRoute(routing.RouteInput{
+	input := routing.RouteInput{
 		Channel:    msg.Channel,
 		AccountID:  inboundMetadata(msg, metadataKeyAccountID),
 		Peer:       extractPeer(msg),
 		ParentPeer: extractParentPeer(msg),
 		GuildID:    inboundMetadata(msg, metadataKeyGuildID),
 		TeamID:     inboundMetadata(msg, metadataKeyTeamID),
-	})
+	}
+
+	explicitAgentID := strings.TrimSpace(inboundMetadata(msg, "agent_id"))
+
+	// Extract agent ID from session key if it's in the form "agent:<agent_id>:<rest>"
+	if explicitAgentID == "" && strings.HasPrefix(msg.SessionKey, sessionKeyAgentPrefix) {
+		if parsed := routing.ParseAgentSessionKey(msg.SessionKey); parsed != nil {
+			explicitAgentID = parsed.AgentID
+		}
+	}
+
+	route := al.registry.ResolveRoute(input)
+	if explicitAgentID != "" {
+		route = al.registry.ResolveExplicitRoute(explicitAgentID, route)
+	}
 
 	agent, ok := al.registry.GetAgent(route.AgentID)
 	if !ok {
@@ -341,6 +378,19 @@ func (al *AgentLoop) processSystemMessage(
 	if idx := strings.Index(content, "Result:\n"); idx >= 0 {
 		content = content[idx+8:] // Extract just the result part
 	}
+	if batchID := msg.Metadata["async_batch_id"]; batchID != "" {
+		expected, _ := strconv.Atoi(msg.Metadata["async_batch_expected"])
+		combined, ready := al.addAsyncBatchResult(batchID, expected, content)
+		if !ready {
+			logger.InfoCF("agent", "Async batch awaiting more results",
+				map[string]any{
+					"batch_id": batchID,
+					"tool":     msg.Metadata["async_tool_name"],
+				})
+			return "", nil
+		}
+		content = combined
+	}
 
 	// Skip internal channels - only log, don't send to user
 	if constants.IsInternalChannel(originChannel) {
@@ -359,16 +409,21 @@ func (al *AgentLoop) processSystemMessage(
 		return "", fmt.Errorf("no default agent for system message")
 	}
 
-	// Use the origin session for context
-	sessionKey := routing.BuildAgentMainSessionKey(agent.ID)
+	// Use the originating session when available.
+	sessionKey := msg.SessionKey
+	if sessionKey == "" {
+		sessionKey = routing.BuildAgentMainSessionKey(agent.ID)
+	}
+	history := agent.Sessions.GetHistory(sessionKey)
 
 	return al.runAgentLoop(ctx, agent, processOptions{
 		SessionKey:      sessionKey,
 		Channel:         originChannel,
 		ChatID:          originChatID,
-		UserMessage:     fmt.Sprintf("[System: %s] %s", msg.SenderID, msg.Content),
+		UserMessage:     buildAsyncResumePrompt(history, msg.SenderID, content),
 		DefaultResponse: "Background task completed.",
 		EnableSummary:   false,
 		SendResponse:    true,
+		NoHistory:       true,
 	})
 }

@@ -35,6 +35,8 @@ interface AddForm {
   requestTimeout: string
   thinkingLevel: string
   pricePerMToken: string
+  inputPricePerMToken: string
+  outputPricePerMToken: string
 }
 
 const EMPTY_ADD_FORM: AddForm = {
@@ -51,6 +53,8 @@ const EMPTY_ADD_FORM: AddForm = {
   requestTimeout: "",
   thinkingLevel: "",
   pricePerMToken: "",
+  inputPricePerMToken: "",
+  outputPricePerMToken: "",
 }
 
 interface AddModelSheetProps {
@@ -58,6 +62,13 @@ interface AddModelSheetProps {
   onClose: () => void
   onSaved: () => void
   existingModelNames: string[]
+  initialModel?: Partial<{
+    model_name: string
+    model: string
+    api_base: string
+    input_price_per_m_token: number
+    output_price_per_m_token: number
+  }> | null
 }
 
 export function AddModelSheet({
@@ -65,6 +76,7 @@ export function AddModelSheet({
   onClose,
   onSaved,
   existingModelNames,
+  initialModel,
 }: AddModelSheetProps) {
   const { t } = useTranslation()
   const [form, setForm] = useState<AddForm>(EMPTY_ADD_FORM)
@@ -81,12 +93,23 @@ export function AddModelSheet({
 
   useEffect(() => {
     if (open) {
-      setForm(EMPTY_ADD_FORM)
+      setForm({
+        ...EMPTY_ADD_FORM,
+        modelName: initialModel?.model_name ?? "",
+        model: initialModel?.model ?? "",
+        apiBase: initialModel?.api_base ?? "",
+        inputPricePerMToken: initialModel?.input_price_per_m_token
+          ? String(initialModel.input_price_per_m_token)
+          : "",
+        outputPricePerMToken: initialModel?.output_price_per_m_token
+          ? String(initialModel.output_price_per_m_token)
+          : "",
+      })
       setSetAsDefault(false)
       setFieldErrors({})
       setServerError("")
     }
-  }, [open])
+  }, [initialModel, open])
 
   const validate = (): boolean => {
     const errors: Partial<Record<keyof AddForm, string>> = {}
@@ -133,6 +156,12 @@ export function AddModelSheet({
         thinking_level: form.thinkingLevel.trim() || undefined,
         price_per_m_token: form.pricePerMToken
           ? Number(form.pricePerMToken)
+          : undefined,
+        input_price_per_m_token: form.inputPricePerMToken
+          ? Number(form.inputPricePerMToken)
+          : undefined,
+        output_price_per_m_token: form.outputPricePerMToken
+          ? Number(form.outputPricePerMToken)
           : undefined,
       })
       if (setAsDefault) {
@@ -227,6 +256,34 @@ export function AddModelSheet({
                   value={form.pricePerMToken}
                   onChange={setField("pricePerMToken")}
                   placeholder="2.50"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                />
+              </Field>
+
+              <Field
+                label={t("models.field.inputPricePerMToken")}
+                hint={t("models.field.inputPricePerMTokenHint")}
+              >
+                <Input
+                  value={form.inputPricePerMToken}
+                  onChange={setField("inputPricePerMToken")}
+                  placeholder="1.30"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                />
+              </Field>
+
+              <Field
+                label={t("models.field.outputPricePerMToken")}
+                hint={t("models.field.outputPricePerMTokenHint")}
+              >
+                <Input
+                  value={form.outputPricePerMToken}
+                  onChange={setField("outputPricePerMToken")}
+                  placeholder="2.60"
                   type="number"
                   min={0}
                   step="0.01"

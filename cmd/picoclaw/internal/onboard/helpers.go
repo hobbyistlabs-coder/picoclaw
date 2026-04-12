@@ -10,7 +10,7 @@ import (
 	"jane/pkg/config"
 )
 
-func onboard() {
+func Onboard() {
 	configPath := internal.GetConfigPath()
 
 	if _, err := os.Stat(configPath); err == nil {

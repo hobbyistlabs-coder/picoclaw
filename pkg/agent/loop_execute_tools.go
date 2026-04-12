@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -32,9 +33,23 @@ func (al *AgentLoop) executeToolBatch(
 	opts processOptions,
 	normalizedToolCalls []providers.ToolCall,
 	iteration int,
-) []indexedAgentResult {
+) ([]indexedAgentResult, bool) {
 	agentResults := make([]indexedAgentResult, len(normalizedToolCalls))
 	var wg sync.WaitGroup
+	asyncCount := 0
+	for _, tc := range normalizedToolCalls {
+		tool, ok := agent.Tools.Get(tc.Name)
+		if ok {
+			if _, ok := tool.(tools.AsyncExecutor); ok {
+				asyncCount++
+			}
+		}
+	}
+	asyncBatchID := ""
+	if asyncCount > 0 {
+		asyncBatchID = fmt.Sprintf("%s:%d:%d", opts.SessionKey, iteration, time.Now().UnixNano())
+		al.startAsyncBatch(asyncBatchID, asyncCount)
+	}
 
 	for i, tc := range normalizedToolCalls {
 		agentResults[i].tc = tc
@@ -67,22 +82,17 @@ func (al *AgentLoop) executeToolBatch(
 					"tool":      tc.Name,
 					"iteration": iteration,
 				})
+			publishToolEvent(ctx, al, opts, buildToolEvent(tc, "started", nil, 0))
+			startToolTime := time.Now()
 
 			// Create async callback for tools that implement AsyncExecutor.
 			// When the background work completes, this publishes the result
 			// as an inbound system message so processSystemMessage routes it
 			// back to the user via the normal agent loop.
 			asyncCallback := func(_ context.Context, result *tools.ToolResult) {
-				// Send ForUser content directly to the user (immediate feedback),
-				// mirroring the synchronous tool execution path.
-				if !result.Silent && result.ForUser != "" {
-					outCtx, outCancel := context.WithTimeout(context.Background(), 5*time.Second)
-					defer outCancel()
-					_ = al.bus.PublishOutbound(outCtx, bus.OutboundMessage{
-						Channel: opts.Channel,
-						ChatID:  opts.ChatID,
-						Content: result.ForUser,
-					})
+				if tc.Name != "spawn" {
+					publishToolEvent(context.Background(), al, opts,
+						buildToolEvent(tc, "completed", result, time.Since(startToolTime).Milliseconds()))
 				}
 
 				// Determine content for the agent loop (ForLLM or error).
@@ -104,16 +114,29 @@ func (al *AgentLoop) executeToolBatch(
 				pubCtx, pubCancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer pubCancel()
 				_ = al.bus.PublishInbound(pubCtx, bus.InboundMessage{
-					Channel:  "system",
-					SenderID: fmt.Sprintf("async:%s", tc.Name),
-					ChatID:   fmt.Sprintf("%s:%s", opts.Channel, opts.ChatID),
-					Content:  content,
+					Channel:    "system",
+					SenderID:   fmt.Sprintf("async:%s", tc.Name),
+					ChatID:     fmt.Sprintf("%s:%s", opts.Channel, opts.ChatID),
+					Content:    content,
+					SessionKey: opts.SessionKey,
+					Metadata: map[string]string{
+						"async_batch_id":       asyncBatchID,
+						"async_batch_expected": strconv.Itoa(asyncCount),
+						"async_tool_name":      tc.Name,
+						"async_tool_call_id":   tc.ID,
+					},
 				})
 			}
 
-			startToolTime := time.Now()
+			progressCallback := func(task *tools.SubagentTask, event *tools.SubagentProgressEvent) {
+				publishToolEvent(context.Background(), al, opts, buildSubagentEvent(tc, task, event))
+			}
+			toolCtx := tools.WithToolSessionKey(ctx, opts.SessionKey)
+			toolCtx = tools.WithToolCallID(toolCtx, tc.ID)
+			toolCtx = tools.WithToolAsyncBatchID(toolCtx, asyncBatchID)
+			toolCtx = tools.WithSubagentProgress(toolCtx, progressCallback)
 			toolResult := agent.Tools.ExecuteWithContext(
-				ctx,
+				toolCtx,
 				tc.Name,
 				tc.Arguments,
 				opts.Channel,
@@ -122,9 +145,13 @@ func (al *AgentLoop) executeToolBatch(
 			)
 			metricsToolExecutionDuration.Add(time.Since(startToolTime).Seconds())
 			agentResults[idx].result = toolResult
+			if !toolResult.Async {
+				publishToolEvent(ctx, al, opts,
+					buildToolEvent(tc, "completed", toolResult, time.Since(startToolTime).Milliseconds()))
+			}
 		}(i, tc)
 	}
 	wg.Wait()
 
-	return agentResults
+	return agentResults, asyncCount > 0
 }

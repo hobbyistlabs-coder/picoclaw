@@ -16,6 +16,7 @@ import (
 	"jane/pkg/config"
 	"jane/pkg/memory"
 	"jane/pkg/providers"
+	"jane/pkg/routing"
 	"jane/pkg/runtimepaths"
 )
 
@@ -37,6 +38,7 @@ type sessionFile struct {
 
 // sessionListItem is a lightweight summary returned by GET /api/sessions.
 type sessionListItem struct {
+	AgentID      string `json:"agent_id"`
 	ID           string `json:"id"`
 	Title        string `json:"title"`
 	Preview      string `json:"preview"`
@@ -45,55 +47,94 @@ type sessionListItem struct {
 	Updated      string `json:"updated"`
 }
 
-// picoSessionPrefix is the key prefix used by the gateway's routing for Pico
-// channel sessions. The full key format is:
-//
-//	agent:main:pico:direct:pico:<session-uuid>
-//
-// The sanitized filename replaces ':' with '_', so on disk it becomes:
-//
-//	agent_main_pico_direct_pico_<session-uuid>.json
-const (
-	picoSessionPrefix          = "agent:main:pico:direct:pico:"
-	sanitizedPicoSessionPrefix = "agent_main_pico_direct_pico_"
-	maxSessionTitleRunes       = 60
-)
-
-// extractPicoSessionID extracts the session UUID from a full session key.
-// Returns the UUID and true if the key matches the Pico session pattern.
-func extractPicoSessionID(key string) (string, bool) {
-	if strings.HasPrefix(key, picoSessionPrefix) {
-		return strings.TrimPrefix(key, picoSessionPrefix), true
-	}
-	return "", false
+type sessionToolCall struct {
+	ID        string         `json:"id"`
+	Name      string         `json:"name"`
+	Kind      string         `json:"kind,omitempty"`
+	Arguments map[string]any `json:"arguments,omitempty"`
 }
 
-func extractPicoSessionIDFromSanitizedKey(key string) (string, bool) {
-	if strings.HasPrefix(key, sanitizedPicoSessionPrefix) {
-		return strings.TrimPrefix(key, sanitizedPicoSessionPrefix), true
+const (
+	picoSessionPrefix    = "agent:main:pico:direct:pico:"
+	maxSessionTitleRunes = 60
+)
+
+type legacySessionRecord struct {
+	basePath  string
+	agentID   string
+	sessionID string
+	session   sessionFile
+}
+
+func extractPicoSessionMeta(key string) (string, string, bool) {
+	parsed := routing.ParseAgentSessionKey(key)
+	if parsed == nil {
+		return "", "", false
 	}
-	return "", false
+	if !strings.HasPrefix(parsed.Rest, "pico:direct:pico:") {
+		return "", "", false
+	}
+	return parsed.AgentID, strings.TrimPrefix(parsed.Rest, "pico:direct:pico:"), true
+}
+
+func picoSessionKey(agentID, sessionID string) string {
+	return strings.ToLower(routing.BuildAgentPeerSessionKey(routing.SessionKeyParams{
+		AgentID: agentID,
+		Channel: "pico",
+		Peer:    &routing.RoutePeer{Kind: "direct", ID: "pico:" + sessionID},
+		DMScope: routing.DMScopePerChannelPeer,
+	}))
 }
 
 func sanitizeSessionKey(key string) string {
-	return strings.ReplaceAll(key, ":", "_")
+	key = strings.ReplaceAll(key, ":", "_")
+	base := filepath.Base(filepath.Clean(key))
+	if base == "." || base == "/" || base == "\\" || base == ".." {
+		return ""
+	}
+	return base
 }
 
-func (h *Handler) readLegacySession(dir, sessionID string) (sessionFile, error) {
-	path := filepath.Join(dir, sanitizeSessionKey(picoSessionPrefix+sessionID)+".json")
-	data, err := os.ReadFile(path)
+func (h *Handler) readLegacySessions(dir string) ([]legacySessionRecord, error) {
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return sessionFile{}, err
+		return nil, err
 	}
 
-	var sess sessionFile
-	if err := json.Unmarshal(data, &sess); err != nil {
-		return sessionFile{}, err
+	records := make([]legacySessionRecord, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") || strings.HasSuffix(entry.Name(), ".meta.json") || strings.HasSuffix(entry.Name(), ".migrated") {
+			continue
+		}
+
+		basePath := filepath.Join(dir, strings.TrimSuffix(entry.Name(), ".json"))
+		data, readErr := os.ReadFile(basePath + ".json")
+		if readErr != nil {
+			continue
+		}
+
+		var sess sessionFile
+		if unmarshalErr := json.Unmarshal(data, &sess); unmarshalErr != nil || isEmptySession(sess) {
+			continue
+		}
+
+		agentID, sessionID, ok := extractPicoSessionMeta(sess.Key)
+		if !ok {
+			continue
+		}
+
+		records = append(records, legacySessionRecord{
+			basePath:  basePath,
+			agentID:   agentID,
+			sessionID: sessionID,
+			session:   sess,
+		})
 	}
-	return sess, nil
+
+	return records, nil
 }
 
-func buildSessionListItem(sessionID string, sess sessionFile) sessionListItem {
+func buildSessionListItem(sessionID, agentID string, sess sessionFile) sessionListItem {
 	preview := ""
 	for _, msg := range sess.Messages {
 		if msg.Role == "user" && strings.TrimSpace(msg.Content) != "" {
@@ -124,6 +165,7 @@ func buildSessionListItem(sessionID string, sess sessionFile) sessionListItem {
 	}
 
 	return sessionListItem{
+		AgentID:      agentID,
 		ID:           sessionID,
 		Title:        title,
 		Preview:      preview,
@@ -151,7 +193,7 @@ func truncateRunes(s string, maxLen int) string {
 func buildSessionMetrics(messages []providers.Message) *bus.MessageMetrics {
 	metrics := &bus.MessageMetrics{}
 	hasUsage := false
-	costKnown := true
+	hasEstimatedCost := false
 
 	for _, msg := range messages {
 		metrics.ToolCalls += len(msg.ToolCalls)
@@ -165,8 +207,7 @@ func buildSessionMetrics(messages []providers.Message) *bus.MessageMetrics {
 		metrics.TotalTokens += msg.Usage.TotalTokens
 		if msg.Usage.HasEstimatedCost {
 			metrics.EstimatedCostUSD += msg.Usage.EstimatedCostUSD
-		} else {
-			costKnown = false
+			hasEstimatedCost = true
 		}
 	}
 
@@ -174,8 +215,8 @@ func buildSessionMetrics(messages []providers.Message) *bus.MessageMetrics {
 		return nil
 	}
 
-	metrics.HasEstimatedCost = hasUsage && costKnown
-	if !metrics.HasEstimatedCost {
+	metrics.HasEstimatedCost = hasEstimatedCost
+	if !hasEstimatedCost {
 		metrics.EstimatedCostUSD = 0
 	}
 
@@ -257,14 +298,14 @@ func (h *Handler) handleListSessions(w http.ResponseWriter, r *http.Request) {
 	store, err := h.sqliteSessionStore(dir)
 	if err == nil {
 		defer store.Close()
-		stored, listErr := store.ListSessions(r.Context(), picoSessionPrefix, limit, offset)
+		stored, listErr := store.ListSessions(r.Context(), "agent:", 1000, 0)
 		if listErr != nil {
 			http.Error(w, "failed to load sessions", http.StatusInternalServerError)
 			return
 		}
 		items := make([]sessionListItem, 0, len(stored))
 		for _, sess := range stored {
-			sessionID, ok := extractPicoSessionID(sess.Key)
+			agentID, sessionID, ok := extractPicoSessionMeta(sess.Key)
 			if !ok {
 				continue
 			}
@@ -272,14 +313,24 @@ func (h *Handler) handleListSessions(w http.ResponseWriter, r *http.Request) {
 			if isEmptySession(file) {
 				continue
 			}
-			items = append(items, buildSessionListItem(sessionID, file))
+			items = append(items, buildSessionListItem(sessionID, agentID, file))
+		}
+		sort.Slice(items, func(i, j int) bool { return items[i].Updated > items[j].Updated })
+		if offset >= len(items) {
+			items = []sessionListItem{}
+		} else {
+			end := offset + limit
+			if end > len(items) {
+				end = len(items)
+			}
+			items = items[offset:end]
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(items)
 		return
 	}
 
-	entries, err := os.ReadDir(dir)
+	records, err := h.readLegacySessions(dir)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode([]sessionListItem{})
@@ -287,27 +338,12 @@ func (h *Handler) handleListSessions(w http.ResponseWriter, r *http.Request) {
 	}
 	items := []sessionListItem{}
 	seen := make(map[string]struct{})
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") || strings.HasSuffix(entry.Name(), ".meta.json") || strings.HasSuffix(entry.Name(), ".migrated") {
+	for _, record := range records {
+		if _, exists := seen[record.sessionID]; exists {
 			continue
 		}
-		data, readErr := os.ReadFile(filepath.Join(dir, entry.Name()))
-		if readErr != nil {
-			continue
-		}
-		var sess sessionFile
-		if unmarshalErr := json.Unmarshal(data, &sess); unmarshalErr != nil || isEmptySession(sess) {
-			continue
-		}
-		sessionID, ok := extractPicoSessionID(sess.Key)
-		if !ok {
-			continue
-		}
-		if _, exists := seen[sessionID]; exists {
-			continue
-		}
-		seen[sessionID] = struct{}{}
-		items = append(items, buildSessionListItem(sessionID, sess))
+		seen[record.sessionID] = struct{}{}
+		items = append(items, buildSessionListItem(record.sessionID, record.agentID, record.session))
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Updated > items[j].Updated })
 	if offset >= len(items) {
@@ -342,44 +378,61 @@ func (h *Handler) handleGetSession(w http.ResponseWriter, r *http.Request) {
 	store, err := h.sqliteSessionStore(dir)
 	if err == nil {
 		defer store.Close()
-		stored, getErr := store.GetSession(r.Context(), picoSessionPrefix+sessionID)
-		if getErr == nil {
-			sess := storedToSessionFile(stored)
-			if isEmptySession(sess) {
-				http.Error(w, "session not found", http.StatusNotFound)
+		stored, listErr := store.ListSessions(r.Context(), "agent:", 1000, 0)
+		if listErr == nil {
+			for _, item := range stored {
+				agentID, currentSessionID, ok := extractPicoSessionMeta(item.Key)
+				if !ok || currentSessionID != sessionID {
+					continue
+				}
+				sess := storedToSessionFile(item)
+				if isEmptySession(sess) {
+					continue
+				}
+				writeSessionResponse(w, sessionID, agentID, sess)
 				return
 			}
-			writeSessionResponse(w, sessionID, sess)
-			return
-		}
-		if !errors.Is(getErr, os.ErrNotExist) {
+		} else if !errors.Is(listErr, os.ErrNotExist) {
 			http.Error(w, "failed to parse session", http.StatusInternalServerError)
 			return
 		}
 	}
 
-	sess, err := h.readLegacySession(dir, sessionID)
-	if err != nil || isEmptySession(sess) {
-		if errors.Is(err, os.ErrNotExist) || isEmptySession(sess) {
-			http.Error(w, "session not found", http.StatusNotFound)
-		} else {
-			http.Error(w, "failed to parse session", http.StatusInternalServerError)
+	records, readErr := h.readLegacySessions(dir)
+	if readErr == nil {
+		for _, record := range records {
+			if record.sessionID != sessionID {
+				continue
+			}
+			writeSessionResponse(w, sessionID, record.agentID, record.session)
+			return
 		}
-		return
 	}
-	writeSessionResponse(w, sessionID, sess)
+	http.Error(w, "session not found", http.StatusNotFound)
 }
 
-func writeSessionResponse(w http.ResponseWriter, sessionID string, sess sessionFile) {
+func writeSessionResponse(w http.ResponseWriter, sessionID, agentID string, sess sessionFile) {
 	type chatMessage struct {
-		Role    string              `json:"role"`
-		Content string              `json:"content"`
-		Metrics *bus.MessageMetrics `json:"metrics,omitempty"`
+		Role             string              `json:"role"`
+		Content          string              `json:"content"`
+		ReasoningContent string              `json:"reasoning_content,omitempty"`
+		ToolCalls        []sessionToolCall   `json:"tool_calls,omitempty"`
+		Metrics          *bus.MessageMetrics `json:"metrics,omitempty"`
 	}
 
 	messages := make([]chatMessage, 0, len(sess.Messages))
+	var pendingReasoning string
+	var pendingTools []sessionToolCall
 	for _, msg := range sess.Messages {
-		// Only include user and assistant messages that have actual content
+		if msg.Role == "assistant" {
+			if msg.ReasoningContent != "" {
+				pendingReasoning = msg.ReasoningContent
+			}
+			if len(msg.ToolCalls) > 0 {
+				pendingTools = append(pendingTools, buildToolCalls(msg.ToolCalls)...)
+			}
+		}
+
 		if (msg.Role == "user" || msg.Role == "assistant") && strings.TrimSpace(msg.Content) != "" {
 			var metrics *bus.MessageMetrics
 			if msg.Usage != nil {
@@ -393,15 +446,20 @@ func writeSessionResponse(w http.ResponseWriter, sessionID string, sess sessionF
 				}
 			}
 			messages = append(messages, chatMessage{
-				Role:    msg.Role,
-				Content: msg.Content,
-				Metrics: metrics,
+				Role:             msg.Role,
+				Content:          msg.Content,
+				ReasoningContent: pendingReasoning,
+				ToolCalls:        pendingTools,
+				Metrics:          metrics,
 			})
+			pendingReasoning = ""
+			pendingTools = nil
 		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
+		"agent_id": agentID,
 		"id":       sessionID,
 		"messages": messages,
 		"metrics":  buildSessionMetrics(sess.Messages),
@@ -409,6 +467,41 @@ func writeSessionResponse(w http.ResponseWriter, sessionID string, sess sessionF
 		"created":  sess.Created.Format(time.RFC3339),
 		"updated":  sess.Updated.Format(time.RFC3339),
 	})
+}
+
+func buildToolCalls(calls []providers.ToolCall) []sessionToolCall {
+	out := make([]sessionToolCall, 0, len(calls))
+	for _, call := range calls {
+		args := call.Arguments
+		name := call.Name
+		if name == "" && call.Function != nil {
+			name = call.Function.Name
+		}
+		if args == nil && call.Function != nil && call.Function.Arguments != "" {
+			var parsed map[string]any
+			if err := json.Unmarshal([]byte(call.Function.Arguments), &parsed); err == nil {
+				args = parsed
+			}
+		}
+		out = append(out, sessionToolCall{
+			ID:        call.ID,
+			Name:      name,
+			Kind:      sessionToolKind(name),
+			Arguments: args,
+		})
+	}
+	return out
+}
+
+func sessionToolKind(name string) string {
+	switch {
+	case name == "spawn" || name == "subagent":
+		return "subagent"
+	case name == "mcp2cli" || strings.HasPrefix(name, "mcp_"):
+		return "mcp"
+	default:
+		return "tool"
+	}
 }
 
 // handleDeleteSession deletes a specific session.
@@ -430,28 +523,47 @@ func (h *Handler) handleDeleteSession(w http.ResponseWriter, r *http.Request) {
 	store, err := h.sqliteSessionStore(dir)
 	if err == nil {
 		defer store.Close()
-		removed, deleteErr := store.DeleteSession(r.Context(), picoSessionPrefix+sessionID)
-		if deleteErr != nil {
+		stored, listErr := store.ListSessions(r.Context(), "agent:", 1000, 0)
+		if listErr != nil && !errors.Is(listErr, os.ErrNotExist) {
 			http.Error(w, "failed to delete session", http.StatusInternalServerError)
 			return
 		}
-		if removed {
+		removedAny := false
+		for _, item := range stored {
+			_, currentSessionID, ok := extractPicoSessionMeta(item.Key)
+			if !ok || currentSessionID != sessionID {
+				continue
+			}
+			removed, deleteErr := store.DeleteSession(r.Context(), item.Key)
+			if deleteErr != nil {
+				http.Error(w, "failed to delete session", http.StatusInternalServerError)
+				return
+			}
+			removedAny = removedAny || removed
+		}
+		if removedAny {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 	}
 
-	base := filepath.Join(dir, sanitizeSessionKey(picoSessionPrefix+sessionID))
 	removed := false
-	for _, path := range []string{base + ".json", base + ".jsonl", base + ".meta.json"} {
-		if removeErr := os.Remove(path); removeErr != nil {
-			if os.IsNotExist(removeErr) {
-				continue
-			}
-			http.Error(w, "failed to delete session", http.StatusInternalServerError)
-			return
+	records, _ := h.readLegacySessions(dir)
+	for _, record := range records {
+		if record.sessionID != sessionID {
+			continue
 		}
-		removed = true
+		for _, path := range []string{
+			record.basePath + ".json",
+			record.basePath + ".jsonl",
+			record.basePath + ".meta.json",
+		} {
+			if removeErr := os.Remove(path); removeErr != nil && !os.IsNotExist(removeErr) {
+				http.Error(w, "failed to delete session", http.StatusInternalServerError)
+				return
+			}
+			removed = true
+		}
 	}
 	if !removed {
 		http.Error(w, "session not found", http.StatusNotFound)

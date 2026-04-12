@@ -45,7 +45,7 @@ func TestSpawnTool_Execute_ValidTask(t *testing.T) {
 	manager := NewSubagentManager(provider, "test-model", "/tmp/test")
 	tool := NewSpawnTool(manager)
 
-	ctx := context.Background()
+	ctx := WithToolSessionKey(context.Background(), "agent:test:session")
 	args := map[string]any{
 		"task":  "Write a haiku about coding",
 		"label": "haiku-task",
@@ -60,6 +60,13 @@ func TestSpawnTool_Execute_ValidTask(t *testing.T) {
 	}
 	if !result.Async {
 		t.Error("SpawnTool should return async result")
+	}
+	tasks := manager.ListTasks()
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 spawned task, got %d", len(tasks))
+	}
+	if tasks[0].OriginSession != "agent:test:session" {
+		t.Errorf("expected origin session to be preserved, got %q", tasks[0].OriginSession)
 	}
 }
 

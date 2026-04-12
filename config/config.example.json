@@ -286,6 +286,9 @@
       },
       "fetch_limit_bytes": 10485760
     },
+    "boards": {
+      "enabled": true
+    },
     "cron": {
       "enabled": true,
       "exec_timeout_minutes": 5

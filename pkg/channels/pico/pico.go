@@ -144,6 +144,18 @@ func (c *PicoChannel) Send(ctx context.Context, msg bus.OutboundMessage) error {
 		return channels.ErrNotRunning
 	}
 
+	if msg.ToolEvent != nil {
+		return c.broadcastToSession(msg.ChatID, newMessage(TypeToolCall, map[string]any{
+			"tool_event": msg.ToolEvent,
+		}))
+	}
+
+	if msg.ReasoningContent != "" {
+		return c.broadcastToSession(msg.ChatID, newMessage(TypeReasoningSet, map[string]any{
+			"content": msg.ReasoningContent,
+		}))
+	}
+
 	outMsg := newMessage(TypeMessageCreate, map[string]any{
 		"content": msg.Content,
 	})
@@ -175,6 +187,13 @@ func (c *PicoChannel) EditOutboundMessage(
 		outMsg.Payload["metrics"] = msg.Metrics
 	}
 	return c.broadcastToSession(msg.ChatID, outMsg)
+}
+
+func (c *PicoChannel) SendStream(ctx context.Context, msg bus.OutboundStreamMessage) error {
+	return c.broadcastToSession(msg.ChatID, newMessage(TypeMessageStream, map[string]any{
+		"content":      msg.Content,
+		"is_reasoning": msg.IsReasoning,
+	}))
 }
 
 // StartTyping implements channels.TypingCapable.
@@ -300,6 +319,18 @@ func (c *PicoChannel) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	go c.readLoop(pc)
 }
 
+// secureCompare prevents timing attacks even on length by executing a dummy
+// constant time compare when lengths don't match, as ConstantTimeCompare
+// returns early on length mismatch.
+func secureCompare(given, actual []byte) bool {
+	if len(given) != len(actual) {
+		// Dummy comparison to prevent length timing attack
+		subtle.ConstantTimeCompare(actual, actual)
+		return false
+	}
+	return subtle.ConstantTimeCompare(given, actual) == 1
+}
+
 // authenticate checks the Bearer token from the Authorization header.
 // Query parameter authentication is only allowed when AllowTokenQuery is explicitly enabled.
 func (c *PicoChannel) authenticate(r *http.Request) bool {
@@ -311,14 +342,14 @@ func (c *PicoChannel) authenticate(r *http.Request) bool {
 	// Check Authorization header
 	auth := r.Header.Get("Authorization")
 	if after, ok := strings.CutPrefix(auth, "Bearer "); ok {
-		if subtle.ConstantTimeCompare([]byte(after), []byte(token)) == 1 {
+		if secureCompare([]byte(after), []byte(token)) {
 			return true
 		}
 	}
 
 	// Check query parameter only when explicitly allowed
 	if c.config.AllowTokenQuery {
-		if subtle.ConstantTimeCompare([]byte(r.URL.Query().Get("token")), []byte(token)) == 1 {
+		if secureCompare([]byte(r.URL.Query().Get("token")), []byte(token)) {
 			return true
 		}
 	}
@@ -450,6 +481,9 @@ func (c *PicoChannel) handleMessageSend(pc *picoConn, msg PicoMessage) {
 		"platform":   "pico",
 		"session_id": sessionID,
 		"conn_id":    pc.id,
+	}
+	if agentID, ok := msg.Payload["agent_id"].(string); ok && strings.TrimSpace(agentID) != "" {
+		metadata["agent_id"] = agentID
 	}
 
 	logger.DebugCF("pico", "Received message", map[string]any{

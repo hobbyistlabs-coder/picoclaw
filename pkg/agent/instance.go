@@ -62,7 +62,7 @@ func NewAgentInstance(
 	workspace := resolveAgentWorkspace(agentCfg, defaults)
 	os.MkdirAll(workspace, 0o755)
 
-	model := resolveAgentModel(agentCfg, defaults)
+	model := resolveAgentModel(agentCfg, defaults, cfg)
 	fallbacks := resolveAgentFallbacks(agentCfg, defaults)
 
 	restrict := defaults.RestrictToWorkspace
@@ -97,14 +97,14 @@ func NewAgentInstance(
 	}
 	if cfg.Tools.IsToolEnabled("append_file") {
 		toolsRegistry.Register(tools.NewAppendFileTool(workspace, restrict, allowWritePaths))
+	}
 
-		if cfg.Tools.IsToolEnabled("alpaca_finance") {
-			toolsRegistry.Register(alpaca.NewAlpacaTool(
-				cfg.Tools.Alpaca.KeyID,
-				cfg.Tools.Alpaca.SecretKey,
-				cfg.Tools.Alpaca.BaseURL,
-			))
-		}
+	if cfg.Tools.IsToolEnabled("alpaca_finance") {
+		toolsRegistry.Register(alpaca.NewAlpacaTool(
+			cfg.Tools.Alpaca.KeyID,
+			cfg.Tools.Alpaca.SecretKey,
+			cfg.Tools.Alpaca.BaseURL,
+		))
 	}
 
 	if cfg.Tools.IsToolEnabled("calculator") {
@@ -272,11 +272,22 @@ func resolveAgentWorkspace(agentCfg *config.AgentConfig, defaults *config.AgentD
 }
 
 // resolveAgentModel resolves the primary model for an agent.
-func resolveAgentModel(agentCfg *config.AgentConfig, defaults *config.AgentDefaults) string {
-	if agentCfg != nil && agentCfg.Model != nil && strings.TrimSpace(agentCfg.Model.Primary) != "" {
-		return strings.TrimSpace(agentCfg.Model.Primary)
+func resolveAgentModel(agentCfg *config.AgentConfig, defaults *config.AgentDefaults, cfg *config.Config) string {
+	resolveFromModelList := func(raw string) string {
+		raw = strings.TrimSpace(raw)
+		if raw == "" || cfg == nil {
+			return raw
+		}
+		if mc, err := cfg.GetModelConfig(raw); err == nil && mc != nil && strings.TrimSpace(mc.Model) != "" {
+			return strings.TrimSpace(mc.Model)
+		}
+		return raw
 	}
-	return defaults.GetModelName()
+
+	if agentCfg != nil && agentCfg.Model != nil && strings.TrimSpace(agentCfg.Model.Primary) != "" {
+		return resolveFromModelList(agentCfg.Model.Primary)
+	}
+	return resolveFromModelList(defaults.GetModelName())
 }
 
 // resolveAgentFallbacks resolves the fallback models for an agent.

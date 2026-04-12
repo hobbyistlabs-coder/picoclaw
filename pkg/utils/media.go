@@ -20,13 +20,13 @@ func IsAudioFile(filename, contentType string) bool {
 	audioTypes := []string{"audio/", "application/ogg", "application/x-ogg"}
 
 	for _, ext := range audioExtensions {
-		if strings.HasSuffix(strings.ToLower(filename), ext) {
+		if len(filename) >= len(ext) && strings.EqualFold(filename[len(filename)-len(ext):], ext) {
 			return true
 		}
 	}
 
 	for _, audioType := range audioTypes {
-		if strings.HasPrefix(strings.ToLower(contentType), audioType) {
+		if len(contentType) >= len(audioType) && strings.EqualFold(contentType[:len(audioType)], audioType) {
 			return true
 		}
 	}
@@ -37,14 +37,10 @@ func IsAudioFile(filename, contentType string) bool {
 // SanitizeFilename removes potentially dangerous characters from a filename
 // and returns a safe version for local filesystem storage.
 func SanitizeFilename(filename string) string {
-	// Get the base filename without path
-	base := filepath.Base(filename)
-
-	// Remove any directory traversal attempts
-	base = strings.ReplaceAll(base, "..", "")
-	base = strings.ReplaceAll(base, "/", "_")
-	base = strings.ReplaceAll(base, "\\", "_")
-
+	base := filepath.Base(filepath.Clean(filename))
+	if base == "." || base == "/" || base == "\\" || base == ".." {
+		return ""
+	}
 	return base
 }
 

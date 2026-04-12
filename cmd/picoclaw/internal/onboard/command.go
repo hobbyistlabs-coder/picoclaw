@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+//go:generate rm -rf workspace
 //go:generate cp -r ../../../../workspace .
 //go:embed workspace
 var embeddedFiles embed.FS
@@ -16,7 +17,7 @@ func NewOnboardCommand() *cobra.Command {
 		Aliases: []string{"o"},
 		Short:   "Initialize Jane AI configuration and workspace",
 		Run: func(cmd *cobra.Command, args []string) {
-			onboard()
+			Onboard()
 		},
 	}
 

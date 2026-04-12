@@ -10,12 +10,15 @@ build/
 *.out
 /jane-ai
 /jane-ai-test
+/docker/workspace/
 cmd/**/workspace
 
 # Picoclaw specific
 
 # Jane AI
 .jane-ai/
+.claude/
+config/logs/
 config.json
 sessions/
 build/
@@ -25,6 +28,7 @@ build/
 # Secrets & Config (keep templates, ignore actual secrets)
 .env
 .env.local
+.env.alpaca
 .env.local.*
 config/config.json
 
@@ -54,9 +58,12 @@ dist/
 # Windows Application Icon/Resource
 *.syso
 
+# Runtime logs
+docker/data/logs/
+docker/data/workspace/*.log
+web/backend/logs/
+
 # Keep embedded backend dist directory placeholder in VCS
 !web/backend/dist/
 web/backend/dist/*
-!web/backend/dist/.gitkeep
 !web/backend/dist/placeholder.txt
-!cmd/picoclaw/internal/onboard/workspace/placeholder.txt

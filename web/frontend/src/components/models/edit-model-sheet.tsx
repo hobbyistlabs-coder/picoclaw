@@ -33,6 +33,8 @@ interface EditForm {
   requestTimeout: string
   thinkingLevel: string
   pricePerMToken: string
+  inputPricePerMToken: string
+  outputPricePerMToken: string
 }
 
 interface EditModelSheetProps {
@@ -61,6 +63,8 @@ export function EditModelSheet({
     requestTimeout: "",
     thinkingLevel: "",
     pricePerMToken: "",
+    inputPricePerMToken: "",
+    outputPricePerMToken: "",
   })
   const [saving, setSaving] = useState(false)
   const [setAsDefault, setSetAsDefault] = useState(false)
@@ -83,6 +87,12 @@ export function EditModelSheet({
         thinkingLevel: model.thinking_level ?? "",
         pricePerMToken: model.price_per_m_token
           ? String(model.price_per_m_token)
+          : "",
+        inputPricePerMToken: model.input_price_per_m_token
+          ? String(model.input_price_per_m_token)
+          : "",
+        outputPricePerMToken: model.output_price_per_m_token
+          ? String(model.output_price_per_m_token)
           : "",
       })
       setSetAsDefault(model.is_default)
@@ -116,6 +126,12 @@ export function EditModelSheet({
         thinking_level: form.thinkingLevel || undefined,
         price_per_m_token: form.pricePerMToken
           ? Number(form.pricePerMToken)
+          : undefined,
+        input_price_per_m_token: form.inputPricePerMToken
+          ? Number(form.inputPricePerMToken)
+          : undefined,
+        output_price_per_m_token: form.outputPricePerMToken
+          ? Number(form.outputPricePerMToken)
           : undefined,
       })
       if (setAsDefault) {
@@ -198,6 +214,34 @@ export function EditModelSheet({
                   value={form.pricePerMToken}
                   onChange={setField("pricePerMToken")}
                   placeholder="2.50"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                />
+              </Field>
+
+              <Field
+                label={t("models.field.inputPricePerMToken")}
+                hint={t("models.field.inputPricePerMTokenHint")}
+              >
+                <Input
+                  value={form.inputPricePerMToken}
+                  onChange={setField("inputPricePerMToken")}
+                  placeholder="1.30"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                />
+              </Field>
+
+              <Field
+                label={t("models.field.outputPricePerMToken")}
+                hint={t("models.field.outputPricePerMTokenHint")}
+              >
+                <Input
+                  value={form.outputPricePerMToken}
+                  onChange={setField("outputPricePerMToken")}
+                  placeholder="2.60"
                   type="number"
                   min={0}
                   step="0.01"

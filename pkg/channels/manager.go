@@ -184,11 +184,13 @@ func (m *Manager) StartAll(ctx context.Context) error {
 		w := newChannelWorker(name, channel)
 		m.workers[name] = w
 		go m.runWorker(dispatchCtx, name, w)
+		go m.runStreamWorker(dispatchCtx, name, w)
 		go m.runMediaWorker(dispatchCtx, name, w)
 	}
 
 	// Start the dispatcher that reads from the bus and routes to workers
 	go m.dispatchOutbound(dispatchCtx)
+	go m.dispatchOutboundStream(dispatchCtx)
 	go m.dispatchOutboundMedia(dispatchCtx)
 
 	// Start the TTL janitor that cleans up stale typing/placeholder entries
@@ -245,6 +247,16 @@ func (m *Manager) StopAll(ctx context.Context) error {
 	for _, w := range m.workers {
 		if w != nil {
 			<-w.done
+		}
+	}
+	for _, w := range m.workers {
+		if w != nil {
+			close(w.streamQueue)
+		}
+	}
+	for _, w := range m.workers {
+		if w != nil {
+			<-w.streamDone
 		}
 	}
 	// Close all media worker queues and wait for them to drain

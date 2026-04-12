@@ -213,6 +213,7 @@ func (p *CodexCliProvider) parseJSONLEvents(output string) (*LLMResponse, error)
 		finishReason = "tool_calls"
 		content = stripToolCallsFromText(content)
 	}
+	content = sanitizeProviderText(content)
 
 	return &LLMResponse{
 		Content:      strings.TrimSpace(content),

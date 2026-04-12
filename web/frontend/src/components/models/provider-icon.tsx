@@ -68,14 +68,14 @@ export function ProviderIcon({
 
   if (!iconUrl || loadFailed) {
     return (
-      <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm border border-black/10 bg-white text-[9px] font-semibold text-black/70 dark:border-white/20 dark:text-black/70">
+      <span className="bg-slate inline-flex size-4 shrink-0 items-center justify-center rounded-sm border border-black/10 text-[9px] font-semibold text-black/70 dark:border-white/20 dark:text-black/70">
         {initial}
       </span>
     )
   }
 
   return (
-    <span className="inline-flex size-4 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-black/10 bg-white p-0.5 dark:border-white/20">
+    <span className="bg-slate inline-flex size-4 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-black/10 p-0.5 dark:border-white/20">
       <img
         src={iconUrl}
         alt={`${providerLabel} logo`}

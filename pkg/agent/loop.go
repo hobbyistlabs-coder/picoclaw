@@ -7,8 +7,11 @@
 package agent
 
 import (
+	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"jane/pkg/bus"
 	"jane/pkg/channels"
@@ -17,6 +20,7 @@ import (
 	"jane/pkg/media"
 	"jane/pkg/providers"
 	"jane/pkg/state"
+	"jane/pkg/tools"
 	"jane/pkg/voice"
 )
 
@@ -27,15 +31,20 @@ type AgentLoop struct {
 	state            *state.Manager
 	running          atomic.Bool
 	summarizing      sync.Map
+	asyncBatches     sync.Map
 	pendingApprovals sync.Map // Tracks state for Human-in-the-Loop approvals
 	summaryJobs      chan summaryJob
 	wg               sync.WaitGroup
 	fallback         *providers.FallbackChain
+	provider         providers.LLMProvider
 	channelManager   *channels.Manager
 	mediaStore       media.MediaStore
 	transcriber      voice.Transcriber
 	cmdRegistry      *commands.Registry
 	mcp              mcpRuntime
+	configPath       string
+	configModTime    time.Time
+	reloadMu         sync.Mutex
 }
 
 type pendingApprovalState struct {
@@ -76,3 +85,38 @@ const (
 	metadataKeyParentPeerKind = "parent_peer_kind"
 	metadataKeyParentPeerID   = "parent_peer_id"
 )
+
+// DispatchSubagent implements tools.AgentDispatcher.
+func (al *AgentLoop) DispatchSubagent(
+	ctx context.Context,
+	agentID, task, originChannel, originChatID, sessionKey string,
+) (*tools.ToolResult, error) {
+	agent, ok := al.registry.GetAgent(agentID)
+	if !ok {
+		return nil, fmt.Errorf("agent '%s' not found", agentID)
+	}
+
+	opts := processOptions{
+		SessionKey:      sessionKey,
+		Channel:         originChannel,
+		ChatID:          originChatID,
+		UserMessage:     task,
+		DefaultResponse: "Subagent task completed.",
+		EnableSummary:   false, // Keep subagent session isolated from auto-summary for now
+		SendResponse:    false, // Do not send intermediate bus messages to user for delegated tasks
+		Stream:          false,
+	}
+
+	content, err := al.runAgentLoop(ctx, agent, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tools.ToolResult{
+		ForLLM:  content,
+		ForUser: content,
+		Silent:  true,
+		IsError: false,
+		Async:   false,
+	}, nil
+}
