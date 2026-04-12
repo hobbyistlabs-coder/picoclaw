@@ -337,11 +337,7 @@ func (s *Store) AddCard(
 	return card, nil
 }
 
-func (s *Store) UpdateCard(
-	ctx context.Context,
-	cardID string,
-	input UpdateCardInput,
-) (*BoardCard, error) {
+func (s *Store) UpdateCard(ctx context.Context, cardID string, input UpdateCardInput) (*BoardCard, error) {
 	card, err := s.getCard(ctx, cardID)
 	if err != nil {
 		return nil, err
@@ -552,9 +548,6 @@ func (s *Store) reindexColumn(ctx context.Context, columnID string) {
 			s.db.ExecContext(ctx, `UPDATE board_cards SET position = ? WHERE id = ?`, i, cardID)
 			i++
 		}
-	}
-	if err := rows.Err(); err != nil {
-		return
 	}
 }
 

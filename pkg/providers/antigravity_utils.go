@@ -4,9 +4,6 @@ import (
 	"math/rand"
 )
 
-// --- Schema sanitization ---
-
-// Google/Gemini doesn't support many JSON Schema keywords that other providers accept.
 var geminiUnsupportedKeywords = map[string]bool{
 	"patternProperties":    true,
 	"additionalProperties": true,
@@ -40,7 +37,6 @@ func sanitizeSchemaForGemini(schema map[string]any) map[string]any {
 		if geminiUnsupportedKeywords[k] {
 			continue
 		}
-		// Recursively sanitize nested objects
 		switch val := v.(type) {
 		case map[string]any:
 			result[k] = sanitizeSchemaForGemini(val)
@@ -59,7 +55,6 @@ func sanitizeSchemaForGemini(schema map[string]any) map[string]any {
 		}
 	}
 
-	// Ensure top-level has type: "object" if properties are present
 	if _, hasProps := result["properties"]; hasProps {
 		if _, hasType := result["type"]; !hasType {
 			result["type"] = "object"
@@ -68,8 +63,6 @@ func sanitizeSchemaForGemini(schema map[string]any) map[string]any {
 
 	return result
 }
-
-// --- Helpers ---
 
 func truncateString(s string, maxLen int) string {
 	if len(s) <= maxLen {

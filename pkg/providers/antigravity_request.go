@@ -16,7 +16,6 @@ func (p *AntigravityProvider) buildRequest(
 	req := antigravityRequest{}
 	toolCallNames := make(map[string]string)
 
-	// Build contents from messages
 	for _, msg := range messages {
 		switch msg.Role {
 		case "system":
@@ -26,7 +25,6 @@ func (p *AntigravityProvider) buildRequest(
 		case "user":
 			if msg.ToolCallID != "" {
 				toolName := resolveToolResponseName(msg.ToolCallID, toolCallNames)
-				// Tool result
 				req.Contents = append(req.Contents, antigravityContent{
 					Role: "user",
 					Parts: []antigravityPart{{
@@ -94,7 +92,6 @@ func (p *AntigravityProvider) buildRequest(
 		}
 	}
 
-	// Build tools (sanitize schemas for Gemini compatibility)
 	if len(tools) > 0 {
 		var funcDecls []antigravityFuncDecl
 		for _, t := range tools {
@@ -113,7 +110,6 @@ func (p *AntigravityProvider) buildRequest(
 		}
 	}
 
-	// Generation config
 	config := &antigravityGenConfig{}
 	if val, ok := options["max_tokens"]; ok {
 		if maxTokens, ok := val.(int); ok && maxTokens > 0 {

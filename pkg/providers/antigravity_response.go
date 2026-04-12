@@ -25,7 +25,6 @@ func (p *AntigravityProvider) parseSSEResponse(body string) (*LLMResponse, error
 			break
 		}
 
-		// v1internal SSE wraps the Gemini response in a "response" field
 		var sseChunk struct {
 			Response antigravityJSONResponse `json:"response"`
 		}
@@ -120,7 +119,6 @@ func (p *AntigravityProvider) parseAntigravityError(statusCode int, body []byte)
 
 	msg := errResp.Error.Message
 	if statusCode == 429 {
-		// Try to extract quota reset info
 		for _, detail := range errResp.Error.Details {
 			if typeVal, ok := detail["@type"].(string); ok &&
 				strings.HasSuffix(typeVal, "ErrorInfo") {

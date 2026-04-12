@@ -28,7 +28,7 @@ func (m *turnMetrics) addUsage(usage *providers.UsageInfo) {
 	}
 }
 
-func (m *turnMetrics) usage() *providers.UsageInfo {
+func (m turnMetrics) usage() *providers.UsageInfo {
 	if m.promptTokens == 0 && m.completionTokens == 0 && m.totalTokens == 0 {
 		return nil
 	}
@@ -41,7 +41,7 @@ func (m *turnMetrics) usage() *providers.UsageInfo {
 	}
 }
 
-func (m *turnMetrics) outbound() *bus.MessageMetrics {
+func (m turnMetrics) outbound() *bus.MessageMetrics {
 	if m.toolCalls == 0 && m.promptTokens == 0 && m.completionTokens == 0 && m.totalTokens == 0 {
 		return nil
 	}

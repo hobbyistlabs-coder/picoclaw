@@ -24,7 +24,6 @@ func createAntigravityTokenSource() func() (string, string, error) {
 			)
 		}
 
-		// Refresh if needed
 		if cred.NeedsRefresh() && cred.RefreshToken != "" {
 			oauthCfg := auth.GoogleAntigravityOAuthConfig()
 			refreshed, err := auth.RefreshAccessToken(cred, oauthCfg)
@@ -49,7 +48,6 @@ func createAntigravityTokenSource() func() (string, string, error) {
 
 		projectID := cred.ProjectID
 		if projectID == "" {
-			// Try to fetch project ID from API
 			fetchedID, err := FetchAntigravityProjectID(cred.AccessToken)
 			if err != nil {
 				logger.WarnCF(
@@ -59,7 +57,7 @@ func createAntigravityTokenSource() func() (string, string, error) {
 						"error": err.Error(),
 					},
 				)
-				projectID = "rising-fact-p41fc" // Default fallback (same as OpenCode)
+				projectID = "rising-fact-p41fc"
 			} else {
 				projectID = fetchedID
 				cred.ProjectID = projectID
@@ -71,7 +69,6 @@ func createAntigravityTokenSource() func() (string, string, error) {
 	}
 }
 
-// FetchAntigravityProjectID retrieves the Google Cloud project ID from the loadCodeAssist endpoint.
 func FetchAntigravityProjectID(accessToken string) (string, error) {
 	reqBody, _ := json.Marshal(map[string]any{
 		"metadata": map[string]any{
@@ -123,7 +120,6 @@ func FetchAntigravityProjectID(accessToken string) (string, error) {
 	return result.CloudAICompanionProject, nil
 }
 
-// FetchAntigravityModels fetches available models from the Cloud Code Assist API.
 func FetchAntigravityModels(accessToken, projectID string) ([]AntigravityModelInfo, error) {
 	reqBody, _ := json.Marshal(map[string]any{
 		"project": projectID,
@@ -184,7 +180,6 @@ func FetchAntigravityModels(accessToken, projectID string) ([]AntigravityModelIn
 		})
 	}
 
-	// Ensure gemini-3-flash-preview and gemini-3-flash are in the list if they aren't already
 	hasFlashPreview := false
 	hasFlash := false
 	for _, m := range models {

@@ -67,7 +67,7 @@ func TestAgentConfig_FullParse(t *testing.T) {
 	jsonData := `{
 		"agents": {
 			"defaults": {
-				"workspace": "~/.jane-ai/workspace",
+				"workspace": "~/.picoclaw/workspace",
 				"model": "glm-4.7",
 				"max_tokens": 8192,
 				"max_tool_iterations": 20
@@ -148,8 +148,7 @@ func TestAgentConfig_FullParse(t *testing.T) {
 	if binding.AgentID != "support" || binding.Match.Channel != "telegram" {
 		t.Errorf("binding = %+v", binding)
 	}
-	if binding.Match.Peer == nil || binding.Match.Peer.Kind != "direct" ||
-		binding.Match.Peer.ID != "user123" {
+	if binding.Match.Peer == nil || binding.Match.Peer.Kind != "direct" || binding.Match.Peer.ID != "user123" {
 		t.Errorf("binding.Match.Peer = %+v", binding.Match.Peer)
 	}
 
@@ -169,7 +168,7 @@ func TestConfig_BackwardCompat_NoAgentsList(t *testing.T) {
 	jsonData := `{
 		"agents": {
 			"defaults": {
-				"workspace": "~/.jane-ai/workspace",
+				"workspace": "~/.picoclaw/workspace",
 				"model": "glm-4.7",
 				"max_tokens": 8192,
 				"max_tool_iterations": 20
@@ -183,10 +182,7 @@ func TestConfig_BackwardCompat_NoAgentsList(t *testing.T) {
 	}
 
 	if len(cfg.Agents.List) != 5 {
-		t.Errorf(
-			"agents.list should have default agents for backward compat, got %d",
-			len(cfg.Agents.List),
-		)
+		t.Errorf("agents.list should have default agents for backward compat, got %d", len(cfg.Agents.List))
 	}
 	if len(cfg.Bindings) != 0 {
 		t.Errorf("bindings should be empty, got %d", len(cfg.Bindings))
@@ -470,10 +466,7 @@ func TestDefaultConfig_SummarizationThresholds(t *testing.T) {
 	cfg := DefaultConfig()
 
 	if cfg.Agents.Defaults.SummarizeMessageThreshold != 20 {
-		t.Errorf(
-			"SummarizeMessageThreshold = %d, want 20",
-			cfg.Agents.Defaults.SummarizeMessageThreshold,
-		)
+		t.Errorf("SummarizeMessageThreshold = %d, want 20", cfg.Agents.Defaults.SummarizeMessageThreshold)
 	}
 	if cfg.Agents.Defaults.SummarizeTokenPercent != 75 {
 		t.Errorf("SummarizeTokenPercent = %d, want 75", cfg.Agents.Defaults.SummarizeTokenPercent)
@@ -495,7 +488,7 @@ func TestDefaultConfig_WorkspacePath_Default(t *testing.T) {
 	t.Setenv("HOME", "/tmp/home")
 
 	cfg := DefaultConfig()
-	want := filepath.Join("/tmp/home", ".jane-ai", "workspace")
+	want := filepath.Join("/tmp/home", ".picoclaw", "workspace")
 
 	if cfg.Agents.Defaults.Workspace != want {
 		t.Errorf("Default workspace path = %q, want %q", cfg.Agents.Defaults.Workspace, want)
@@ -509,11 +502,7 @@ func TestDefaultConfig_WorkspacePath_WithPicoclawHome(t *testing.T) {
 	want := "/custom/picoclaw/home/workspace"
 
 	if cfg.Agents.Defaults.Workspace != want {
-		t.Errorf(
-			"Workspace path with PICOCLAW_HOME = %q, want %q",
-			cfg.Agents.Defaults.Workspace,
-			want,
-		)
+		t.Errorf("Workspace path with PICOCLAW_HOME = %q, want %q", cfg.Agents.Defaults.Workspace, want)
 	}
 }
 
@@ -592,12 +581,7 @@ func TestFlexibleStringSlice_UnmarshalText(t *testing.T) {
 			}
 
 			if len(f) != len(tt.expected) {
-				t.Errorf(
-					"UnmarshalText(%q) length = %d, want %d",
-					tt.input,
-					len(f),
-					len(tt.expected),
-				)
+				t.Errorf("UnmarshalText(%q) length = %d, want %d", tt.input, len(f), len(tt.expected))
 				return
 			}
 
