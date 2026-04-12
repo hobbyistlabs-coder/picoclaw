@@ -69,6 +69,13 @@ func (al *AgentLoop) runAgentLoop(
 	messages = resolveMediaRefs(messages, al.mediaStore, maxMediaSize)
 
 	// 2. Save user message to session
+	logger.LogSessionEvent(al.cfg.Agents.Defaults.Workspace, opts.SessionKey, logger.ReplayEvent{
+		EventType: logger.ReplayEventTypeStateTransition,
+		Details: logger.ReplayEventDetails{
+			FromState: "idle",
+			ToState:   "processing",
+		},
+	})
 	agent.Sessions.AddMessage(opts.SessionKey, "user", opts.UserMessage)
 
 	// 3. Run LLM iteration loop
@@ -129,6 +136,13 @@ func (al *AgentLoop) runAgentLoop(
 	}
 
 	// 8. Log response
+	logger.LogSessionEvent(al.cfg.Agents.Defaults.Workspace, opts.SessionKey, logger.ReplayEvent{
+		EventType: logger.ReplayEventTypeStateTransition,
+		Details: logger.ReplayEventDetails{
+			FromState: "processing",
+			ToState:   "idle",
+		},
+	})
 	responsePreview := utils.Truncate(finalContent, 120)
 	logger.InfoCF("agent", fmt.Sprintf("Response: %s", responsePreview),
 		map[string]any{
@@ -214,6 +228,7 @@ func (al *AgentLoop) runLLMIteration(
 	messages []providers.Message,
 	opts processOptions,
 ) (string, int, turnMetrics, error) {
+
 	iteration := 0
 	var finalContent string
 	var metrics turnMetrics
@@ -265,6 +280,21 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			errorCategory := logger.ReplayErrorInfrastructureFailure
+			if failoverErr := providers.ClassifyError(err, activeModel, activeModel); failoverErr != nil {
+				if failoverErr.Reason == providers.FailoverContextLength || failoverErr.Reason == providers.FailoverFormat {
+					errorCategory = logger.ReplayErrorModelFailure
+				}
+			}
+			logger.LogSessionEvent(
+				al.cfg.Agents.Defaults.Workspace,
+				opts.SessionKey,
+				logger.ReplayEvent{
+					EventType:     logger.ReplayEventTypeError,
+					ErrorCategory: errorCategory,
+					ErrorMessage:  err.Error(),
+				},
+			)
 			return "", iteration, metrics, err
 		}
 		metrics.addUsage(enrichUsageWithCost(agent.Config, activeModel, response.Usage))
@@ -275,6 +305,16 @@ func (al *AgentLoop) runLLMIteration(
 			al.targetReasoningChannelID(opts.Channel),
 		)
 		if response.ReasoningContent != "" {
+			logger.LogSessionEvent(
+				al.cfg.Agents.Defaults.Workspace,
+				opts.SessionKey,
+				logger.ReplayEvent{
+					EventType: logger.ReplayEventTypeCoT,
+					Details: logger.ReplayEventDetails{
+						CoTText: response.ReasoningContent,
+					},
+				},
+			)
 			metrics.reasoningContent = response.ReasoningContent
 			if opts.Channel == "pico" {
 				al.bus.PublishOutbound(ctx, bus.OutboundMessage{
@@ -336,6 +376,18 @@ func (al *AgentLoop) runLLMIteration(
 			ReasoningContent: response.ReasoningContent,
 		}
 		for _, tc := range normalizedToolCalls {
+			logger.LogSessionEvent(
+				al.cfg.Agents.Defaults.Workspace,
+				opts.SessionKey,
+				logger.ReplayEvent{
+					EventType: logger.ReplayEventTypeToolCall,
+					Details: logger.ReplayEventDetails{
+						ToolName: tc.Name,
+						Inputs:   tc.Arguments,
+					},
+				},
+			)
+
 			argumentsJSON, _ := json.Marshal(tc.Arguments)
 			// Copy ExtraContent to ensure thought_signature is persisted for Gemini 3
 			extraContent := tc.ExtraContent
@@ -381,7 +433,11 @@ func (al *AgentLoop) runLLMIteration(
 			approvalMsg := "The following tool execution requires your approval:\n"
 			for _, tc := range normalizedToolCalls {
 				argsJSON, _ := json.MarshalIndent(tc.Arguments, "", "  ")
-				approvalMsg += fmt.Sprintf("\n- `%s`:\n```json\n%s\n```\n", tc.Name, string(argsJSON))
+				approvalMsg += fmt.Sprintf(
+					"\n- `%s`:\n```json\n%s\n```\n",
+					tc.Name,
+					string(argsJSON),
+				)
 			}
 			approvalMsg += "\nDo you approve? (Yes/No)"
 
@@ -406,7 +462,13 @@ func (al *AgentLoop) runLLMIteration(
 		// --- End HITL ---
 
 		// Execute tool calls in parallel
-		agentResults, hasAsync := al.executeToolBatch(ctx, agent, opts, normalizedToolCalls, iteration)
+		agentResults, hasAsync := al.executeToolBatch(
+			ctx,
+			agent,
+			opts,
+			normalizedToolCalls,
+			iteration,
+		)
 		if hasAsync {
 			return "", iteration, metrics, errAsyncPending
 		}
