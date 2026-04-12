@@ -265,6 +265,14 @@ func (al *AgentLoop) runLLMIteration(
 			activeModel, iteration,
 		)
 		if err != nil {
+			logger.LogSessionEvent(
+				agent.Workspace,
+				opts.SessionKey,
+				"error",
+				logger.ReplayEventDetails{},
+				logger.ReplayErrorCategoryModelFailure, // Broadly assuming model/infrastructure failure here
+				err.Error(),
+			)
 			return "", iteration, metrics, err
 		}
 		metrics.addUsage(enrichUsageWithCost(agent.Config, activeModel, response.Usage))
@@ -276,6 +284,18 @@ func (al *AgentLoop) runLLMIteration(
 		)
 		if response.ReasoningContent != "" {
 			metrics.reasoningContent = response.ReasoningContent
+
+			logger.LogSessionEvent(
+				agent.Workspace,
+				opts.SessionKey,
+				"cot",
+				logger.ReplayEventDetails{
+					CotText: response.ReasoningContent,
+				},
+				logger.ReplayErrorCategoryNone,
+				"",
+			)
+
 			if opts.Channel == "pico" {
 				al.bus.PublishOutbound(ctx, bus.OutboundMessage{
 					Channel:          opts.Channel,
@@ -336,6 +356,18 @@ func (al *AgentLoop) runLLMIteration(
 			ReasoningContent: response.ReasoningContent,
 		}
 		for _, tc := range normalizedToolCalls {
+			logger.LogSessionEvent(
+				agent.Workspace,
+				opts.SessionKey,
+				"tool_call",
+				logger.ReplayEventDetails{
+					ToolName: tc.Name,
+					Inputs:   tc.Arguments,
+				},
+				logger.ReplayErrorCategoryNone,
+				"",
+			)
+
 			argumentsJSON, _ := json.Marshal(tc.Arguments)
 			// Copy ExtraContent to ensure thought_signature is persisted for Gemini 3
 			extraContent := tc.ExtraContent
@@ -401,6 +433,18 @@ func (al *AgentLoop) runLLMIteration(
 				Content: approvalMsg,
 			})
 
+			logger.LogSessionEvent(
+				agent.Workspace,
+				opts.SessionKey,
+				"state_transition",
+				logger.ReplayEventDetails{
+					FromState: "generating",
+					ToState:   "pending_approval",
+				},
+				logger.ReplayErrorCategoryNone,
+				"",
+			)
+
 			return "", iteration, metrics, errApprovalPending
 		}
 		// --- End HITL ---
@@ -454,7 +498,31 @@ func (al *AgentLoop) runLLMIteration(
 				contentForLLM = r.result.Err.Error()
 			}
 
+			logger.LogSessionEvent(
+				agent.Workspace,
+				opts.SessionKey,
+				"tool_result",
+				logger.ReplayEventDetails{
+					ToolName: r.tc.Name,
+					Outputs: map[string]any{
+						"for_llm": contentForLLM,
+					},
+				},
+				logger.ReplayErrorCategoryNone,
+				"",
+			)
+
 			if r.result.IsError {
+				logger.LogSessionEvent(
+					agent.Workspace,
+					opts.SessionKey,
+					"error",
+					logger.ReplayEventDetails{
+						ToolName: r.tc.Name,
+					},
+					logger.ReplayErrorCategoryLogicFailure,
+					contentForLLM,
+				)
 				logger.ErrorCF("agent", "Tool execution failed",
 					map[string]any{
 						"tool":           r.tc.Name,
