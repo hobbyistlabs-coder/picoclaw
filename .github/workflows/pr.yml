@@ -17,7 +17,10 @@ jobs:
           go-version-file: go.mod
 
       - name: Run go generate
-        run: go generate ./...
+        run: |
+          mkdir -p web/backend/dist && touch web/backend/dist/index.html
+          mkdir -p cmd/picoclaw/internal/onboard/workspace
+          go generate ./...
 
       - name: Golangci Lint
         uses: golangci/golangci-lint-action@v9
@@ -56,7 +59,10 @@ jobs:
           go-version-file: go.mod
 
       - name: Run go generate
-        run: go generate ./...
+        run: |
+          mkdir -p web/backend/dist && touch web/backend/dist/index.html
+          mkdir -p cmd/picoclaw/internal/onboard/workspace
+          go generate ./...
 
       - name: Run go test
         run: go test ./...
