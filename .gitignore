@@ -66,4 +66,4 @@ web/backend/logs/
 # Keep embedded backend dist directory placeholder in VCS
 !web/backend/dist/
 web/backend/dist/*
-!web/backend/dist/.gitkeep
+!web/backend/dist/keep.txt
